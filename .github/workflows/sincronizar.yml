@@ -1,0 +1,45 @@
+name: Sincronizar con Aules y publicar
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['data/progreso.enc'] # guardar progreso desde la web no debe relanzar la descarga de Aules
+  schedule:
+    - cron: '17 5,11,15,19 * * *' # UTC: 6:17, 12:17, 16:17 y 20:17 en Valencia (horario de invierno)
+  workflow_dispatch: # botón "Sincronizar ahora" de la web
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      AULES_URL: ${{ secrets.AULES_URL }}
+      AULES_TOKEN: ${{ secrets.AULES_TOKEN }}
+      CLAVE_MAESTRA: ${{ secrets.CLAVE_MAESTRA }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Sin secretos todavía se publica la web sola (modo demostración).
+      # Si Aules falla, el paso falla y se mantiene la publicación anterior con los últimos datos buenos.
+      - name: Descargar de Aules
+        if: env.AULES_TOKEN != ''
+        run: node sync/aules.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deploy
+        uses: actions/deploy-pages@v4
