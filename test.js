@@ -67,7 +67,7 @@ const srv = http.createServer((req, res) => {
 const URL_AULES = `http://127.0.0.1:${srv.address().port}/fp/course/view.php?id=3`; // URL de una página cualquiera: se normaliza
 const run = (token) => promisify(execFile)('node', ['sync/aules.mjs'], { env: { ...process.env, AULES_URL: URL_AULES, AULES_TOKEN: token, CLAVE_MAESTRA: 'demo' } });
 
-await assert.rejects(run('MALO'), /Token no válido/); // token incorrecto: falla y no publica
+await assert.rejects(run('MALO'), /Aules no acepta el token/); // token incorrecto: falla y no publica
 const { stdout } = await run('TOKEN-PRUEBA');
 srv.close();
 assert.match(stdout, /OK: 6 cursos, 15 tareas, 2 eventos, 0 avisos/);
