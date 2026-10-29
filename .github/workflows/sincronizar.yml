@@ -1,12 +1,12 @@
-name: Sincronizar con Aules y publicar
+name: Publicar Doodle
 
+# Solo publica la web en GitHub Pages. La descarga de Aules la hace la propia web desde tu navegador
+# (Aules no acepta conexiones desde los servidores de GitHub) y sube aquí data/curso.enc cifrado.
 on:
   push:
     branches: [main]
-    paths-ignore: ['data/progreso.enc'] # guardar progreso desde la web no debe relanzar la descarga de Aules
-  schedule:
-    - cron: '17 5,11,15,19 * * *' # UTC: 6:17, 12:17, 16:17 y 20:17 en Valencia (horario de invierno)
-  workflow_dispatch: # botón "Sincronizar ahora" de la web
+    paths-ignore: ['data/progreso.enc'] # el progreso se lee con la API de GitHub; no hace falta republicar
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publicar:
@@ -23,20 +23,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
-    env:
-      AULES_URL: ${{ secrets.AULES_URL }}
-      AULES_TOKEN: ${{ secrets.AULES_TOKEN }}
-      CLAVE_MAESTRA: ${{ secrets.CLAVE_MAESTRA }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-      # Sin secretos todavía se publica la web sola (modo demostración).
-      # Si Aules falla, el paso falla y se mantiene la publicación anterior con los últimos datos buenos.
-      - name: Descargar de Aules
-        if: env.AULES_TOKEN != ''
-        run: node sync/aules.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
