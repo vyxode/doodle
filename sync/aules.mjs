@@ -10,6 +10,8 @@ const URL_AULES = (process.env.AULES_URL || '').trim().replace(/\/(course|my|log
 if (!URL_AULES || !AULES_TOKEN || !CLAVE_MAESTRA) { console.error('Faltan AULES_URL, AULES_TOKEN o CLAVE_MAESTRA'); process.exit(1); }
 
 const avisos = [];
+// En GitHub Actions, "::error::" convierte el fallo en un aviso visible en el resumen de la ejecución.
+process.on('uncaughtException', (e) => { console.error(e.message); console.log('::error::' + e.message.replace(/\n/g, ' ')); process.exit(1); });
 
 // Moodle espera los arrays como clave[0]=..., clave[1]=...
 function aplanar(obj, form, pre = '') {
