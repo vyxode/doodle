@@ -28,10 +28,10 @@ jobs:
       AULES_TOKEN: ${{ secrets.AULES_TOKEN }}
       CLAVE_MAESTRA: ${{ secrets.CLAVE_MAESTRA }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          node-version: 24
       # Sin secretos todavía se publica la web sola (modo demostración).
       # Si Aules falla, el paso falla y se mantiene la publicación anterior con los últimos datos buenos.
       - name: Descargar de Aules

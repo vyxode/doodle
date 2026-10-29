@@ -21,9 +21,13 @@ function aplanar(obj, form, pre = '') {
 async function ws(fn, params = {}) {
   const form = new URLSearchParams({ wstoken: AULES_TOKEN, wsfunction: fn, moodlewsrestformat: 'json' });
   aplanar(params, form);
-  const r = await fetch(URL_AULES + '/webservice/rest/server.php', { method: 'POST', body: form });
-  if (!r.ok) throw new Error(`${fn}: HTTP ${r.status}`);
-  const j = await r.json();
+  let r;
+  try { r = await fetch(URL_AULES + '/webservice/rest/server.php', { method: 'POST', body: form, signal: AbortSignal.timeout(60000) }); }
+  catch (e) { throw new Error(`${fn}: no se pudo conectar con ${URL_AULES} (${e.cause ? e.cause.code || e.cause.message : e.message})`); }
+  const cuerpo = await r.text();
+  if (!r.ok) throw new Error(`${fn}: HTTP ${r.status} · ${cuerpo.slice(0, 200)}`);
+  let j;
+  try { j = JSON.parse(cuerpo); } catch (e) { throw new Error(`${fn}: Aules no devolvió JSON · ${cuerpo.slice(0, 200)}`); }
   if (j && j.exception) throw new Error(`${fn}: ${j.message} (${j.errorcode})`);
   return j;
 }
