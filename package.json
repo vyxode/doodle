@@ -1,0 +1,9 @@
+{
+  "name": "curso-dam",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node sync/aules.mjs",
+    "test": "node test.js"
+  }
+}
