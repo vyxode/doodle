@@ -260,6 +260,7 @@ export function montarKanban(cont, datos, alCambiar) {
 
 // ======================= Java real (CheerpJ: una JVM en el navegador) =======================
 // javac de OpenJDK 8 (tools.jar) compila en el navegador; la entrada por teclado se escribe antes de ejecutar.
+// LIB_JAVA se compila en js/vendor/doodle-lib.jar al ejecutar `node test.js` (el /str/ de CheerpJ no admite carpetas).
 // Mini JUnit propio: las anotaciones y asserts de JUnit 4 y 5 más usados, para escribir tests sin librerías externas.
 export const LIB_JAVA = {
   'org/junit/Test.java': 'package org.junit; import java.lang.annotation.*; @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.METHOD) public @interface Test { Class<? extends Throwable> expected() default None.class; class None extends Throwable {} }',
@@ -349,7 +350,7 @@ public class Lanzador {
 };
 const EJEMPLO_JAVA = [{ nombre: 'Main.java', codigo: 'import java.util.Scanner;\n\npublic class Main {\n\tpublic static void main(String[] args) {\n\t\tScanner sc = new Scanner(System.in);\n\t\tSystem.out.print("¿Cómo te llamas? ");\n\t\tString nombre = sc.nextLine();\n\t\tSystem.out.println("Hola, " + nombre + "!");\n\t}\n}\n' }];
 const EJEMPLO_TEST = (clase) => `import org.junit.jupiter.api.Test;\nimport static org.junit.jupiter.api.Assertions.*;\n\npublic class ${clase}Test {\n\t@Test\n\tvoid ejemplo() {\n\t\tassertEquals(4, 2 + 2);\n\t}\n}\n`;
-const jvm = { estado: 'parado', promesa: null, libCompilada: false };
+const jvm = { promesa: null };
 async function arrancarJvm(aviso) {
   if (jvm.promesa) return jvm.promesa;
   jvm.promesa = (async () => {
@@ -392,14 +393,11 @@ export function montarJava(cont, datos, alCambiar) {
   }
   async function compilar(extra = []) {
     const enc = new TextEncoder();
-    for (const [ruta, src] of Object.entries(LIB_JAVA)) window.cheerpjAddStringFile('/str/lib/' + ruta, enc.encode(src));
     for (const a of d.archivos) window.cheerpjAddStringFile('/str/' + a.nombre, enc.encode(a.codigo));
     window.cheerpjAddStringFile('/str/doodle-entrada.txt', enc.encode(d.entrada.endsWith('\n') || !d.entrada ? d.entrada : d.entrada + '\n'));
-    const fuentes = [...(jvm.libCompilada ? ['/str/lib/doodle/Lanzador.java'] : Object.keys(LIB_JAVA).map((r) => '/str/lib/' + r)), ...d.archivos.map((a) => '/str/' + a.nombre), ...extra];
-    const cp = rutaApp('tools.jar') + ':/files/';
-    const codigo = await window.cheerpjRunMain('com.sun.tools.javac.Main', cp, '-encoding', 'UTF-8', '-nowarn', '-d', '/files/', '-cp', '/files/', ...fuentes);
-    if (codigo === 0) jvm.libCompilada = true;
-    return { codigo, cp };
+    const lib = rutaApp('doodle-lib.jar') + ':/files/';
+    const codigo = await window.cheerpjRunMain('com.sun.tools.javac.Main', rutaApp('tools.jar') + ':' + lib, '-encoding', 'UTF-8', '-nowarn', '-d', '/files/', '-cp', lib, ...d.archivos.map((a) => '/str/' + a.nombre), ...extra);
+    return { codigo, cp: lib };
   }
   const consola = () => document.getElementById('console');
   // Espera a que aparezca la marca de fin que escribe el lanzador (CheerpJ no avisa de otra forma).
@@ -424,7 +422,7 @@ export function montarJava(cont, datos, alCambiar) {
       const { codigo, cp } = await compilar();
       if (codigo !== 0) {
         const lin = (c.textContent.match(/\/str\/([\w.]+\.java):(\d+):/) || []);
-        c.textContent = c.textContent.replace(/\/str\/(lib\/)?/g, '');
+        c.textContent = c.textContent.replace(/\/str\//g, '');
         const nombre = lin[1], n = +lin[2];
         if (nombre) { const i = d.archivos.findIndex((a) => a.nombre === nombre); if (i >= 0 && i !== d.activo) abrir(i); ed.marcar(n); }
         salida.insertAdjacentHTML('beforeend', '<div class="aviso error"><b>Error de compilación</b><span>Revisa el mensaje de arriba: indica el archivo y la línea.</span></div>');
