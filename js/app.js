@@ -24,6 +24,7 @@ const S = {
   prog: progVacio(), cfg: LS.get('doodle-cfg') || {},
   remoto: { sha: null, salt: null, shaCurso: null, estado: ['', ''] }, sync: '', sincronizando: false,
   filtro: { modulo: '' }, tabModulo: 'todo', mes: null, diaSel: null, recordar: false,
+  objetivos: {}, semanaPlan: 0, calVista: 'mes', pomo: null,
 };
 function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {}, marcas: {}, plan: {}, tiempo: {} }; }
 const guardarCfg = () => LS.set('doodle-cfg', S.cfg);
@@ -453,6 +454,8 @@ function vistaInicio() {
   <header class="portada"><p class="fecha">${hoy[0].toUpperCase() + hoy.slice(1)}</p><h1>${frase}</h1></header>
   ${(() => { const nov = (LS.get('doodle-novedades') || []).slice().reverse(); return nov.length && !S.demo ? `<section class="bloque novedades"><header><h2>Novedades</h2><button type="button" class="boton mini" data-acc="visto">Marcar como visto</button></header>
     <div class="lista">${nov.map((n) => `<a class="nota-fila" href="#tarea-${esc(n.clave)}"><span class="nf-nombre">${esc(n.nombre)}<small>${esc(n.modulo)}</small></span><span class="chip ${{ nota: 'ok', fecha: 'ojo' }[n.tipo] || 'info'}">${esc(n.texto)}</span></a>`).join('')}</div></section>` : ''; })()}
+  ${resumenSemana()}
+  ${(() => { const hoyT = T.filter((t) => porHacer(t) && (S.prog.plan[t.clave] || {}).dia === diaISO()); return hoyT.length ? `<section class="bloque"><header><h2>Hoy toca</h2><a href="#calendario" data-acc="cal-vista" data-v="plan">Planificar</a></header>${listaFilas(hoyT.map((t) => ({ fecha: t.entrega || ahora(), nombre: t.nombre, modulo: t.modulo, url: t.url, tarea: t, chip: estadoTarea(t) })), '')}</section>` : ''; })()}
   ${urg.length ? `<section class="bloque bloque-urgente"><header><h2>Urgente</h2><span class="suave">Vence en 3 días o ya ha vencido y aún se admite</span></header>${listaFilas(urg, '')}</section>` : ''}
   <div class="cifras">
     ${cifra(medias.length ? fNota(medias.reduce((a, b) => a + b) / medias.length) : '—', 'Media general')}
@@ -505,6 +508,7 @@ function vistaModulo(id) {
       ${plegado('Entregadas', hechas)}${plegado('Cerradas o antiguas sin entregar', perdidas)}</section>`;
   const conNota = c.notas.filter((n) => n.nota != null && n.max);
   const secNotas = `<section class="bloque"><header><h2>Calificaciones</h2><span class="suave">Media ${fNota(mediaCurso(c))} / 10</span></header>
+    ${c.notas.length ? `<div class="panel">${bloqueNecesito(c)}${grafica(puntosDe(c))}</div>` : ''}
     ${barras(conNota.map((n) => [n.nombre, n.nota / n.max * 10, color]))}
     ${c.notas.some((n) => n.comentario) ? `<div class="lista">${c.notas.filter((n) => n.comentario).map((n) => `<div class="panel corte"><b>${esc(n.nombre)}</b><p class="suave pre">${esc(n.comentario)}</p></div>`).join('')}</div>` : ''}</section>`;
   const secContenido = `<section class="bloque"><header><h2>Contenido</h2><a href="${esc(c.url)}" target="_blank" rel="noopener">Abrir en Aules ↗</a></header>
@@ -514,7 +518,7 @@ function vistaModulo(id) {
     </details>`).join('') || vacio('Sin contenido.')}</section>`;
   const secEj = `<section class="bloque"><header><h2>Ejercicios y trabajos</h2><a href="#ejercicios" data-acc="ir-ejercicios" data-modulo="${esc(nombre)}">Abrir en Ejercicios</a></header>${listaEjercicios(nombre)}</section>`;
   const cuerpo = { tareas: secTareas, notas: secNotas, contenido: secContenido, ejercicios: secEj }[tab]
-    || `<div class="cifras">${cifra(fNota(mediaCurso(c)), 'Media')}${cifra(ts.filter(porHacer).length, 'Por entregar', ts.some(urgente) ? 'alerta' : '')}${cifra(ts.filter((t) => t.hecha).length, 'Entregadas')}</div>` + secTareas + secNotas;
+    || `<div class="cifras">${cifra(fNota(mediaCurso(c)), 'Media')}${cifra(ts.filter(porHacer).length, 'Por entregar', ts.some(urgente) ? 'alerta' : '')}${cifra(ts.filter((t) => t.hecha).length, 'Entregadas')}</div>` + progresoTemas(c) + secTareas + secNotas;
   return `<div class="cab-modulo corte trama-esquina" style="--mod:${color}">
       <a href="#modulos" class="antetitulo">← Módulos</a><h1>${esc(nombre)}</h1>
       <a class="boton mini" href="${esc(c.url)}" target="_blank" rel="noopener">Aules ↗</a></div>
@@ -542,7 +546,10 @@ function vistaCalendario() {
   const selFecha = new Date(Math.floor(S.diaSel / 10000), Math.floor(S.diaSel / 100) % 100 - 1, S.diaSel % 100, 12);
   const mods = [...new Set([...cursos().map((c) => nombreModulo(c.nombre)), ...modulosCatalogo()])];
   const proximas = agenda().filter((i) => i.fecha >= ahora() && i.fecha <= ahora() + 7 * D && (!i.tarea || porHacer(i.tarea)));
+  const pestanas = `<div class="tabs" role="tablist"><button type="button" role="tab" data-acc="cal-vista" data-v="mes" aria-selected="${S.calVista !== 'plan'}">Mes</button><button type="button" role="tab" data-acc="cal-vista" data-v="plan" aria-selected="${S.calVista === 'plan'}">Planificar la semana</button></div>`;
+  if (S.calVista === 'plan') return cabecera('Calendario') + pestanas + vistaPlanificar();
   return `${cabecera('Calendario', '<button type="button" class="boton mini" data-acc="ics">Añadir las entregas a mi calendario</button>')}
+  ${pestanas}
   <div class="cal-layout">
     <section class="calendario corte">
       <header class="cal-cab"><button type="button" class="boton mini" data-acc="mes" data-v="-1" aria-label="Mes anterior">‹</button>
@@ -574,15 +581,168 @@ function vistaNotas() {
   const T = tareas();
   const porModulo = cursos().map((c) => [nombreModulo(c.nombre), mediaCurso(c), colorDe(nombreModulo(c.nombre))]).filter(([, m]) => m != null);
   const propias = T.filter((t) => t.origen === 'propia' && t.nota10 != null);
-  return cabecera('Notas', '<span class="suave">Todas las notas sobre 10. La línea vertical marca el 5.</span>') + `
+  const semana = minutosPorModulo(inicioSemana()), total = minutosPorModulo(0);
+  const conTiempo = Object.keys(total).sort((a, b) => total[b] - total[a]);
+  return cabecera('Notas', '<span class="suave">Todas las notas sobre 10. La línea marca el 5.</span>') + `
   <section class="bloque"><header><h2>Media por módulo</h2></header>${barras(porModulo)}</section>
-  <div class="rejilla-notas">${cursos().map((c) => {
-    const ns = c.notas.filter((n) => n.nota != null && n.max), nombre = nombreModulo(c.nombre);
-    return ns.length ? `<section class="bloque"><header><h2 class="h-mod" style="--mod:${colorDe(nombre)}"><i class="punto-mod"></i>${esc(nombre)}</h2><a href="#modulo-${c.id}">Detalle</a></header>
-      ${barras(ns.map((n) => [n.nombre, n.nota / n.max * 10, colorDe(nombre)]))}</section>` : '';
-  }).join('')}</div>
-  ${propias.length ? `<section class="bloque"><header><h2>Notas que has añadido tú</h2></header>${barras(propias.map((t) => [t.modulo + ': ' + t.nombre, t.nota10, colorDe(t.modulo)]))}</section>` : ''}`;
+  ${cursos().map((c) => {
+    const ns = c.notas.filter((n) => n.nota != null && n.max), nombre = nombreModulo(c.nombre), pts = puntosDe(c);
+    if (!c.notas.length) return '';
+    return `<section class="bloque nota-modulo"><header><h2>${esc(nombre)}</h2><a href="#modulo-${c.id}">Ver módulo</a></header>
+      <div class="panel">${bloqueNecesito(c)}${grafica(pts)}</div>
+      ${ns.length ? `<details class="plegable"><summary>Todas las notas <span class="suave">(${ns.length})</span></summary>${barras(ns.map((n) => [n.nombre, n.nota / n.max * 10, colorDe(nombre)]))}</details>` : ''}</section>`;
+  }).join('')}
+  ${propias.length ? `<section class="bloque"><header><h2>Notas que has añadido tú</h2></header>${barras(propias.map((t) => [t.modulo + ': ' + t.nombre, t.nota10, colorDe(t.modulo)]))}</section>` : ''}
+  <section class="bloque"><header><h2>Tiempo de estudio</h2><span class="suave">Con el modo concentración</span></header>
+    ${conTiempo.length ? `<div class="lista">${conTiempo.map((m) => `<div class="nota-fila"><span class="nf-nombre">${esc(m)}<small>Esta semana: ${fMin(semana[m] || 0)}</small></span><b>${fMin(total[m])}</b></div>`).join('')}</div>`
+      : vacio('Pulsa «Concentrarme» mientras haces un ejercicio y aquí verás cuánto tiempo dedicas a cada módulo.')}</section>`;
 }
+
+// ---------- notas: lo que te falta y cómo vas ----------
+const pesoDe = (n) => { const m = String(n.peso || '').match(/\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(',', '.')) : 0; };
+// Media que necesitas en lo que queda para llegar a «objetivo». Usa los pesos de Aules si todos los elementos los tienen;
+// si no, cuenta todas las notas igual y «quedan» es cuántas faltan.
+function necesito(c, objetivo, quedan) {
+  const items = c.notas.filter((n) => n.max), hechas = items.filter((n) => n.nota != null), faltan = items.filter((n) => n.nota == null);
+  const n10 = (n) => n.nota / n.max * 10;
+  if (items.length && items.every((n) => pesoDe(n) > 0) && faltan.length) {
+    const ph = hechas.reduce((a, n) => a + pesoDe(n), 0), pq = faltan.reduce((a, n) => a + pesoDe(n), 0);
+    return { media: (objetivo * (ph + pq) - hechas.reduce((a, n) => a + n10(n) * pesoDe(n), 0)) / pq, quedan: faltan.length, porPeso: true };
+  }
+  if (!quedan) return null;
+  return { media: (objetivo * (hechas.length + quedan) - hechas.reduce((a, n) => a + n10(n), 0)) / quedan, quedan };
+}
+function textoNecesito(r, objetivo) {
+  if (!r) return 'Indica cuántas notas quedan.';
+  if (r.media <= 0) return `Ya tienes asegurado el ${fNota(objetivo)}, aunque saques un 0 en lo que queda.`;
+  if (r.media > 10) return `Con lo que queda no llega al ${fNota(objetivo)}: haría falta una media de ${fNota(r.media)}.`;
+  return `Necesitas una media de <b>${fNota(Math.ceil(r.media * 100) / 100)}</b> en ${r.porPeso ? `las ${r.quedan} notas que faltan en Aules (según sus pesos)` : 'lo que queda'}.`;
+}
+function bloqueNecesito(c) {
+  const o = S.objetivos[c.id] || { obj: 5, quedan: c.notas.filter((n) => n.max && n.nota == null).length || 3 };
+  const r = necesito(c, o.obj, o.quedan), conPesos = r && r.porPeso;
+  return `<div class="necesito" data-curso="${c.id}">
+    <span>Para sacar un</span><select data-acc="objetivo" aria-label="Nota que quieres">${[5, 6, 7, 8, 9, 10].map((v) => `<option ${v === o.obj ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    ${conPesos ? '' : `<span>en</span><select data-acc="quedan" aria-label="Notas que quedan">${[...Array(15)].map((_, i) => `<option value="${i + 1}" ${i + 1 === o.quedan ? 'selected' : ''}>${i + 1} ${i ? 'notas' : 'nota'}</option>`).join('')}</select><span>que quedan:</span>`}
+    <p class="necesito-res">${textoNecesito(r, o.obj)}</p></div>`;
+}
+// Evolución: cada nota como punto y la media acumulada como línea, en escala 0–10 con el 5 marcado.
+function grafica(puntos) {
+  if (puntos.length < 2) return '';
+  const W = 560, H = 150, iz = 26, de = 34, ar = 10, ab = 22, x = (i) => iz + i * (W - iz - de) / (puntos.length - 1), y = (v) => ar + (10 - v) * (H - ar - ab) / 10;
+  let suma = 0; const medias = puntos.map((p, i) => (suma += p.v) / (i + 1));
+  const ult = medias[medias.length - 1];
+  return `<svg class="grafica" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolución: media actual ${fNota(ult)}">
+    ${[0, 5, 10].map((v) => `<line x1="${iz}" x2="${W - de}" y1="${y(v)}" y2="${y(v)}" class="g-rej ${v === 5 ? 'g-cinco' : ''}"/><text x="${iz - 6}" y="${y(v)}" class="g-et" text-anchor="end" dominant-baseline="central">${v}</text>`).join('')}
+    <polyline class="g-media" points="${medias.map((m, i) => `${x(i)},${y(m)}`).join(' ')}"/>
+    ${puntos.map((p, i) => `<circle class="g-punto ${p.v < 5 ? 'susp' : ''}" cx="${x(i)}" cy="${y(p.v)}" r="3.5"><title>${esc(p.nombre)}: ${fNota(p.v)}</title></circle>`).join('')}
+    <text x="${x(puntos.length - 1) + 8}" y="${y(ult)}" class="g-fin" dominant-baseline="central">${fNota(Math.round(ult * 100) / 100)}</text>
+    <text x="${iz}" y="${H - 4}" class="g-et">${esc(F_DIA_MES.format(puntos[0].fecha * 1000))}</text>
+    <text x="${W - de}" y="${H - 4}" class="g-et" text-anchor="end">${esc(F_DIA_MES.format(puntos[puntos.length - 1].fecha * 1000))}</text></svg>`;
+}
+const puntosDe = (c) => tareas().filter((t) => t.cursoId === c.id && t.nota10 != null).map((t) => ({ fecha: t.enviada || t.entrega || 0, v: t.nota10, nombre: t.nombre })).filter((p) => p.fecha).sort((a, b) => a.fecha - b.fecha);
+
+// ---------- tiempo de estudio ----------
+const diaISO = (ms = Date.now()) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const inicioSemana = (ms = Date.now()) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); };
+const fMin = (m) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ' ' + Math.round(m % 60) + ' min' : ''}` : `${Math.round(m)} min`);
+function minutosPorModulo(desdeMs, hastaMs = Infinity) {
+  const out = {};
+  for (const [k, v] of Object.entries(S.prog.tiempo)) {
+    const [dia, mod] = k.split('|'), t = new Date(dia + 'T12:00').getTime();
+    if (t >= desdeMs && t < hastaMs) out[mod] = (out[mod] || 0) + (v.min || 0);
+  }
+  return out;
+}
+function registrarMinutos(modulo, min) {
+  if (min < 1) return;
+  const k = diaISO() + '|' + (modulo || 'Sin módulo');
+  cambiar('tiempo', k, { min: Math.round(((S.prog.tiempo[k] || {}).min || 0) + min) });
+}
+
+// ---------- modo concentración (pomodoro de 25 + 5) ----------
+function pitido() { try { const a = new AudioContext(), o = a.createOscillator(), g = a.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(0.15, a.currentTime); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.8); o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + 0.8); } catch (e) { /* sin audio */ } if (navigator.vibrate) navigator.vibrate([200, 100, 200]); }
+function iniciarPomodoro(modulo) {
+  if (S.pomo) return pararPomodoro();
+  S.pomo = { fase: 'trabajo', inicio: Date.now(), fin: Date.now() + 25 * 60e3, modulo };
+  pintarPomodoro();
+}
+function pararPomodoro() {
+  if (S.pomo && S.pomo.fase === 'trabajo') registrarMinutos(S.pomo.modulo, (Date.now() - S.pomo.inicio) / 60e3);
+  S.pomo = null; pintarPomodoro();
+}
+function pintarPomodoro() {
+  let el = document.getElementById('pomo');
+  if (!S.pomo) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'pomo'; el.className = 'pomo'; el.setAttribute('role', 'timer'); document.body.append(el); }
+  const resta = Math.max(0, S.pomo.fin - Date.now()), mm = Math.floor(resta / 60e3), ss = Math.floor(resta / 1e3) % 60;
+  el.innerHTML = `<span class="pomo-fase">${S.pomo.fase === 'trabajo' ? 'Concentración' : 'Descanso'}${S.pomo.modulo ? ', ' + esc(S.pomo.modulo) : ''}</span><b>${mm}:${String(ss).padStart(2, '0')}</b><button type="button" class="boton mini" data-acc="pomo-parar">Parar</button>`;
+  if (resta > 0) return;
+  pitido();
+  if (S.pomo.fase === 'trabajo') { registrarMinutos(S.pomo.modulo, 25); S.pomo = { ...S.pomo, fase: 'descanso', inicio: Date.now(), fin: Date.now() + 5 * 60e3 }; }
+  else S.pomo = null;
+  pintarPomodoro();
+}
+setInterval(() => { if (S.pomo) pintarPomodoro(); }, 1000);
+
+// ---------- progreso por tema ----------
+function progresoTemas(c) {
+  const ts = tareas().filter((t) => t.cursoId === c.id), porCm = new Map(ts.map((t) => [t.cmid, t]));
+  const nombre = nombreModulo(c.nombre), cat = catalogo().filter((e) => e.modulo === nombre);
+  const filas = c.secciones.map((s) => {
+    const tt = s.elementos.filter((e) => e.tipo === 'assign').map((e) => porCm.get(e.id)).filter(Boolean);
+    const num = (s.nombre.match(/tema\s*(\d+)/i) || [])[1], ej = num ? cat.filter((e) => new RegExp('^Tema ' + num + '\\b').test(e.tema)) : [];
+    if (!tt.length && !ej.length) return null;
+    const hechas = tt.filter((t) => t.hecha).length, notas = tt.filter((t) => t.nota10 != null).map((t) => t.nota10);
+    const total = tt.length + ej.length, hecho = hechas + ej.filter(hecho_).length;
+    const estado = hecho === total ? 'Terminado' : tt.length && tt.every((t) => situacion(t) === 'futura') ? 'Aún no empieza' : hecho ? 'En curso' : 'Sin empezar';
+    return `<div class="tema-prog ${hecho === total ? 'hecho' : ''}"><div class="tp-cab"><b>${esc(s.nombre)}</b><span class="suave">${estado}</span></div>
+      <div class="barra"><i style="width:${total ? hecho / total * 100 : 0}%"></i></div>
+      <small class="suave">${tt.length ? `${hechas} de ${tt.length} tareas` : ''}${tt.length && ej.length ? ', ' : ''}${ej.length ? `${ej.filter(hecho_).length} de ${ej.length} ejercicios` : ''}${notas.length ? `. Media ${fNota(notas.reduce((a, b) => a + b) / notas.length)}` : ''}</small></div>`;
+  }).filter(Boolean);
+  return filas.length ? `<section class="bloque"><header><h2>Progreso por tema</h2></header><div class="temas-prog">${filas.join('')}</div></section>` : '';
+}
+const hecho_ = (e) => hecho(e);
+
+// ---------- resumen de la semana ----------
+function resumenSemana() {
+  const lunes = inicioSemana(), clave = 'semana-' + lunes;
+  if (S.demo || LS.get('doodle-semana-vista') === clave) return '';
+  const fin = lunes / 1000 + 7 * D, ag = agenda().filter((i) => i.tarea && porHacer(i.tarea) && i.fecha < fin);
+  const aMedias = trabajos().filter((w) => w.tarea && !(tareas().find((t) => t.clave === w.tarea) || { hecha: true }).hecha);
+  const min = Object.values(minutosPorModulo(lunes - 7 * D * 1000, lunes)).reduce((a, b) => a + b, 0);
+  return `<section class="bloque resumen-semana panel"><header><h2>Tu semana</h2><button type="button" class="boton mini" data-acc="semana-vista" data-v="${clave}">Entendido</button></header>
+    <p>${ag.length ? `Esta semana vencen <b>${ag.length}</b> entrega${ag.length === 1 ? '' : 's'}.` : 'Esta semana no vence ninguna entrega.'}${aMedias.length ? ` Tienes <b>${aMedias.length}</b> trabajo${aMedias.length === 1 ? '' : 's'} a medias.` : ''}${min ? ` La semana pasada estudiaste ${fMin(min)} con el modo concentración.` : ''}</p>
+    ${aMedias.length ? `<p class="suave">A medias: ${aMedias.slice(0, 5).map((w) => `<a href="#trabajo-${w.id}">${esc(w.titulo)}</a>`).join(', ')}</p>` : ''}</section>`;
+}
+
+// ---------- planificador semanal ----------
+const F_PLAN = F({ weekday: 'long', day: 'numeric' });
+function vistaPlanificar() {
+  const lunes = inicioSemana() + (S.semanaPlan || 0) * 7 * D * 1000;
+  const dias = [...Array(7)].map((_, i) => { const d = new Date(lunes); d.setDate(d.getDate() + i); return d; });
+  const pend = tareas().filter(porHacer).sort((a, b) => (a.entrega || 9e9) - (b.entrega || 9e9));
+  const plan = (t) => (S.prog.plan[t.clave] || {}).dia;
+  const fila = (t, quitar) => `<div class="plan-tarea" draggable="true" data-clave="${esc(t.clave)}"><a href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>
+    <small class="suave">${esc(t.modulo)}${t.entrega ? ', entrega ' + cuando(t.entrega).toLowerCase() : ''}${!quitar && plan(t) ? ', planificada para el ' + esc(F_DIA_MES.format(new Date(plan(t) + 'T12:00'))) : ''}</small>
+    ${quitar ? `<button type="button" class="boton mini" data-acc="plan-quitar" data-v="${esc(t.clave)}" aria-label="Quitar de este día">Quitar</button>`
+      : `<select data-acc="plan" data-v="${esc(t.clave)}" aria-label="Planificar para"><option value="">Planificar para…</option>${dias.map((d) => `<option value="${diaISO(d.getTime())}">${esc(F_PLAN.format(d))}</option>`).join('')}</select>`}</div>`;
+  const hoyIso = diaISO();
+  return `<div class="plan-cab"><button type="button" class="boton mini" data-acc="plan-semana" data-v="-1" aria-label="Semana anterior">‹</button>
+      <b>Semana del ${esc(F_DIA_MES.format(dias[0]))} al ${esc(F_DIA_MES.format(dias[6]))}</b>
+      <button type="button" class="boton mini" data-acc="plan-semana" data-v="1" aria-label="Semana siguiente">›</button></div>
+    <div class="plan-semana">${dias.map((d) => { const iso = diaISO(d.getTime()), ts = pend.filter((t) => plan(t) === iso);
+      return `<section class="plan-dia ${iso === hoyIso ? 'hoy' : ''}" data-dia="${iso}"><h3>${esc(F_PLAN.format(d))}</h3>${ts.map((t) => fila(t, true)).join('') || '<p class="suave plan-vacio">Libre</p>'}</section>`; }).join('')}</div>
+    <section class="bloque"><header><h2>Sin planificar</h2><span class="suave">Elige un día o, en el ordenador, arrástralas</span></header>
+      <div class="plan-sin">${pend.filter((t) => !dias.some((d) => diaISO(d.getTime()) === plan(t))).map((t) => fila(t, false)).join('') || '<p class="suave">Todo planificado.</p>'}</div></section>`;
+}
+// arrastrar tareas a los días (PC)
+document.addEventListener('dragstart', (ev) => { const t = ev.target.closest && ev.target.closest('.plan-tarea'); if (t) ev.dataTransfer.setData('text/doodle-plan', t.dataset.clave); });
+document.addEventListener('dragover', (ev) => { if (ev.target.closest && ev.target.closest('.plan-dia')) ev.preventDefault(); });
+document.addEventListener('drop', (ev) => {
+  const dia = ev.target.closest && ev.target.closest('.plan-dia'), clave = ev.dataTransfer.getData('text/doodle-plan');
+  if (dia && clave) { ev.preventDefault(); cambiar('plan', clave, { dia: dia.dataset.dia }); render(); }
+});
 
 function vistaMas() {
   return cabecera('Más') + `<div class="mas-enlaces">
@@ -811,6 +971,7 @@ function vistaTrabajo(id) {
       <div class="taller-titulo"><span class="antetitulo">${esc(w.modulo || 'Sin módulo')}${t && t.entrega ? ', entrega el ' + fCorta(t.entrega) : ''}</span><input type="text" id="w-titulo" value="${esc(w.titulo)}" aria-label="Nombre del trabajo"></div>
       <select id="w-tipo" aria-label="Herramienta">${Object.entries(HERR).map(([k, v]) => `<option value="${k}" ${k === w.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select>
       ${t && t.enunciado ? '<button type="button" class="boton mini" data-acc="enunciado" aria-expanded="false">Enunciado</button>' : ''}
+      <button type="button" class="boton mini" data-acc="pomodoro" data-v="${esc(w.modulo || '')}">${S.pomo ? 'Parar' : 'Concentrarme'}</button>
     </header>
     ${t && t.enunciado ? `<aside class="taller-enun panel corte" hidden><p class="pre">${esc(t.enunciado)}</p></aside>` : ''}
     <div class="taller-herr" id="taller-herr"></div>
@@ -910,6 +1071,7 @@ function abrirLab(id) {
       <div class="fila-botones">
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos - 1] || {}).id || '')}" ${pos > 0 ? '' : 'disabled'} aria-label="Ejercicio anterior">‹</button>
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos + 1] || {}).id || '')}" ${pos < lista.length - 1 ? '' : 'disabled'} aria-label="Ejercicio siguiente">›</button>
+        <button type="button" class="boton mini" data-acc="pomodoro" data-v="${esc(e.modulo)}">Concentrarme</button>
         <label class="casilla"><input type="checkbox" data-acc="lab-hecho" data-id="${esc(id)}" ${g.hecho ? 'checked' : ''}> Hecho</label>
       </div>
     </header>
@@ -1040,6 +1202,12 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'lab-ir' && el.dataset.v) abrirLab(el.dataset.v);
   else if (acc === 'sync') sincronizarAules();
   else if (acc === 'buscar') abrirBuscador();
+  else if (acc === 'pomodoro') { iniciarPomodoro(el.dataset.v); el.textContent = S.pomo ? 'Parar' : 'Concentrarme'; }
+  else if (acc === 'pomo-parar') { pararPomodoro(); document.querySelectorAll('[data-acc=pomodoro]').forEach((b) => { b.textContent = 'Concentrarme'; }); }
+  else if (acc === 'cal-vista') { S.calVista = el.dataset.v; if (location.hash !== '#calendario') location.hash = 'calendario'; else render(); }
+  else if (acc === 'plan-semana') { S.semanaPlan += +el.dataset.v; render(); }
+  else if (acc === 'plan-quitar') { cambiar('plan', el.dataset.v, { dia: '' }); render(); }
+  else if (acc === 'semana-vista') { LS.set('doodle-semana-vista', el.dataset.v); render(); }
   else if (acc === 'atajos') mostrarAtajos();
   else if (acc === 'ics') { const n = exportarIcs(); el.textContent = n ? `${n} entregas exportadas` : 'No hay entregas pendientes'; }
   else if (acc === 'visto') { LS.del('doodle-novedades'); render(); }
@@ -1080,6 +1248,12 @@ document.addEventListener('change', async (ev) => {
   else if (el.id === 'w-tipo') { cambiar('trabajos', S.montado, { tipo: el.value }); render(true); }
   else if (el.id === 'w-titulo') cambiar('trabajos', S.montado, { titulo: el.value.trim() || 'Sin nombre' });
   else if (el.id === 't-privada') cambiar('marcas', el.dataset.clave, { nota: el.value });
+  else if (acc === 'plan') { if (el.value) { cambiar('plan', el.dataset.v, { dia: el.value }); render(); } }
+  else if (acc === 'objetivo' || acc === 'quedan') {
+    const caja = el.closest('.necesito'), id = +caja.dataset.curso, c = cursos().find((x) => x.id === id);
+    const o = S.objetivos[id] = { obj: +caja.querySelector('[data-acc=objetivo]').value, quedan: Math.max(1, +(caja.querySelector('[data-acc=quedan]') || { value: 0 }).value || 0) };
+    caja.querySelector('.necesito-res').innerHTML = textoNecesito(necesito(c, o.obj, o.quedan), o.obj);
+  }
   else if (acc === 'hecha') { cambiar('tareas', el.dataset.id, { hecha: el.checked }); render(); }
   else if (acc === 'nota') cambiar('tareas', el.dataset.id, { nota: el.value === '' ? null : Math.max(0, +el.value) });
   else if (el.id === 'importar' && el.files[0]) {
