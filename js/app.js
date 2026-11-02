@@ -25,7 +25,7 @@ const S = {
   remoto: { sha: null, salt: null, shaCurso: null, estado: ['', ''] }, sync: '', sincronizando: false,
   filtro: { modulo: '' }, tabModulo: 'todo', mes: null, diaSel: null, recordar: false,
 };
-function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {} }; }
+function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {}, marcas: {}, plan: {}, tiempo: {} }; }
 const guardarCfg = () => LS.set('doodle-cfg', S.cfg);
 const aplicarTema = () => { // sin elegir: sigue al sistema
   const t = { claro: 'light', oscuro: 'dark' }[S.cfg.tema];
@@ -66,17 +66,39 @@ function colorDe(modulo) {
 const CONVALIDADOS = new Set(['Itinerario para la Empleabilidad I']); // no se muestran en ninguna parte
 // sin tareas ni notas (p. ej. Tutoría) no es un módulo que seguir
 const cursos = () => ((S.curso && S.curso.cursos) || []).filter((c) => !CONVALIDADOS.has(nombreModulo(c.nombre)) && (c.tareas.length || c.notas.length));
-function tareas() {
+// marcas tuyas sobre cada tarea: hecha en papel, oculta y apuntes privados
+const marca = (clave) => S.prog.marcas[clave] || {};
+function tareas(conOcultas) {
   const out = [];
   for (const c of cursos()) for (const t of c.tareas) {
-    out.push({ ...t, clave: 'a' + t.id, origen: 'aules', modulo: nombreModulo(c.nombre), cursoId: c.id,
-      hecha: t.estado === 'submitted' || t.nota != null, nota10: t.nota != null && t.notaMax ? t.nota / t.notaMax * 10 : null });
+    const clave = 'a' + t.id, m = marca(clave);
+    if (m.oculta && !conOcultas) continue;
+    out.push({ ...t, clave, origen: 'aules', modulo: nombreModulo(c.nombre), cursoId: c.id, papel: !!m.papel, oculta: !!m.oculta, privada: m.nota || '',
+      hecha: t.estado === 'submitted' || t.nota != null || !!m.papel, nota10: t.nota != null && t.notaMax ? t.nota / t.notaMax * 10 : null });
   }
   for (const [id, t] of Object.entries(S.prog.tareas)) {
     if (t.borrado) continue;
-    out.push({ ...t, clave: id, origen: 'propia', nota10: t.nota != null && t.nota !== '' ? t.nota / (t.max || 10) * 10 : null });
+    out.push({ ...t, clave: id, origen: 'propia', privada: marca(id).nota || '', nota10: t.nota != null && t.nota !== '' ? t.nota / (t.max || 10) * 10 : null });
   }
   return out;
+}
+// Compara los datos de Aules de antes y de ahora: notas, comentarios, fechas cambiadas y tareas nuevas.
+function novedades(antes, despues) {
+  if (!antes || !antes.generado || !despues || S.demo) return;
+  const viejas = new Map(); for (const c of antes.cursos || []) for (const t of c.tareas) viejas.set(t.id, t);
+  const lista = LS.get('doodle-novedades') || [], ahoraMs = Date.now();
+  for (const c of despues.cursos || []) {
+    const modulo = nombreModulo(c.nombre); if (CONVALIDADOS.has(modulo)) continue;
+    for (const t of c.tareas) {
+      const v = viejas.get(t.id), base = { clave: 'a' + t.id, nombre: t.nombre, modulo, t: ahoraMs };
+      if (marca(base.clave).oculta) continue;
+      if (!v) { lista.push({ ...base, tipo: 'nueva', texto: 'Tarea nueva' + (t.entrega ? ', entrega ' + cuando(t.entrega).toLowerCase() : '') }); continue; }
+      if (t.nota != null && t.nota !== v.nota) lista.push({ ...base, tipo: 'nota', texto: 'Nota: ' + fNota(t.notaMax ? t.nota / t.notaMax * 10 : t.nota) + ' sobre 10' });
+      else if (t.comentario && t.comentario !== v.comentario) lista.push({ ...base, tipo: 'nota', texto: 'Comentario nuevo del profesor' });
+      if (t.entrega && v.entrega && t.entrega !== v.entrega) lista.push({ ...base, tipo: 'fecha', texto: 'Cambio de fecha: ahora ' + cuando(t.entrega).toLowerCase() + ' (antes ' + fCorta(v.entrega) + ')' });
+    }
+  }
+  LS.set('doodle-novedades', lista.slice(-40));
 }
 // Lo que importa de una tarea es si todavía se puede entregar:
 // hecha · futura (aún no abre) · cerrada (pasó el cierre o Aules ya no deja) · retraso (venció pero se admite)
@@ -211,6 +233,7 @@ async function sincronizarAules() {
   S.sincronizando = true; S.sync = 'Descargando de Aules…'; pintarEstado();
   try {
     const curso = await descargarAules(S.aules.url, S.aules.token);
+    novedades(S.curso, curso);
     S.curso = curso;
     const sobre = await cifrar(S.pass, curso);
     LS.set('doodle-curso', sobre);
@@ -223,6 +246,7 @@ async function sincronizarAules() {
 
 // ---------- entrada ----------
 async function arrancar() {
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   try { const r = await fetch('data/curso.enc', { cache: 'no-store' }); if (r.ok) S.sobreCurso = await r.json(); } catch (e) { /* aún no publicado */ }
   const hayAlgo = S.sobreCurso || LS.get('doodle-curso') || LS.get('doodle-prog');
   if (!hayAlgo && !location.hostname.endsWith('.github.io')) return entrarDemo(); // vista previa fuera de GitHub Pages
@@ -249,8 +273,9 @@ async function entrar(pass) {
     try {
       const rem = await bajarProgreso(); if (rem) { S.prog = mezclar(S.prog, rem); guardarLocal(); }
       const c = await leerArchivo('data/curso.enc'); S.remoto.shaCurso = c.sha;
-      if (c.sobre) { const nuevo = await masNuevo(pass, [c.sobre]); if ((nuevo.generado || '') > (S.curso.generado || '')) { S.curso = nuevo; LS.set('doodle-curso', c.sobre); } }
+      if (c.sobre) { const nuevo = await masNuevo(pass, [c.sobre]); if ((nuevo.generado || '') > (S.curso.generado || '')) { novedades(S.curso, nuevo); S.curso = nuevo; LS.set('doodle-curso', c.sobre); } }
       estadoSync('Sincronizado', 'si'); render();
+      copiaSemanal().catch(() => {});
     } catch (e) { errSync(e); }
   }
   if (S.aules && (!S.curso.generado || Date.now() - Date.parse(S.curso.generado) > VIEJO)) sincronizarAules();
@@ -298,6 +323,7 @@ const IC = {
   ejercicios: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
   notas: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   ajustes: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  buscar: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
   mas: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   sync: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
 };
@@ -316,11 +342,12 @@ function render(forzar) {
   <div class="marco">
     <aside class="lateral">
       <a href="#inicio" class="lateral-logo">${LOGO}<small>DAM, primer curso</small></a>
+      <button type="button" class="lateral-buscar" data-acc="buscar">${icono('buscar')}<span>Buscar</span><kbd>Ctrl K</kbd></button>
       <nav aria-label="Secciones">${NAV.map(([id, t]) => `<a href="#${id}" ${id === base ? 'aria-current="page"' : ''}>${icono(id)}<span>${t}</span></a>`).join('')}</nav>
       <div class="lateral-pie" id="estado-pc"></div>
     </aside>
     <div class="principal">
-      <header class="barra-sup">${LOGO}<div class="estado-movil" id="estado-movil"></div></header>
+      <header class="barra-sup">${LOGO}<div class="estado-movil" id="estado-movil"></div><button type="button" class="boton mini" data-acc="buscar" aria-label="Buscar">${icono('buscar')}</button></header>
       ${S.demo ? '<div class="demo-banda">Estás viendo datos de ejemplo. <a href="#" id="salir-demo">Salir</a></div>' : ''}
       <main class="vista" id="vista"></main>
     </div>
@@ -332,6 +359,7 @@ function render(forzar) {
   vista.innerHTML = v.startsWith('modulo-') ? vistaModulo(+v.slice(7)) : v.startsWith('tarea-') ? vistaTarea(v.slice(6)) : v.startsWith('trabajo-') ? vistaTrabajo(v.slice(8))
     : ({ inicio: vistaInicio, modulos: vistaModulos, calendario: vistaCalendario, notas: vistaNotas, ejercicios: vistaEjercicios, ajustes: vistaAjustes, mas: vistaMas }[v] || vistaInicio)();
   if (v.startsWith('trabajo-')) montarTrabajo(v.slice(8));
+  actualizarContador();
   const sd = document.getElementById('salir-demo');
   if (sd) sd.addEventListener('click', (ev) => { ev.preventDefault(); S.demo = false; S.curso = null; location.hash = ''; pintarBloqueo(); });
 }
@@ -423,6 +451,8 @@ function vistaInicio() {
     : 'No tienes entregas pendientes.';
   return `
   <header class="portada"><p class="fecha">${hoy[0].toUpperCase() + hoy.slice(1)}</p><h1>${frase}</h1></header>
+  ${(() => { const nov = (LS.get('doodle-novedades') || []).slice().reverse(); return nov.length && !S.demo ? `<section class="bloque novedades"><header><h2>Novedades</h2><button type="button" class="boton mini" data-acc="visto">Marcar como visto</button></header>
+    <div class="lista">${nov.map((n) => `<a class="nota-fila" href="#tarea-${esc(n.clave)}"><span class="nf-nombre">${esc(n.nombre)}<small>${esc(n.modulo)}</small></span><span class="chip ${{ nota: 'ok', fecha: 'ojo' }[n.tipo] || 'info'}">${esc(n.texto)}</span></a>`).join('')}</div></section>` : ''; })()}
   ${urg.length ? `<section class="bloque bloque-urgente"><header><h2>Urgente</h2><span class="suave">Vence en 3 días o ya ha vencido y aún se admite</span></header>${listaFilas(urg, '')}</section>` : ''}
   <div class="cifras">
     ${cifra(medias.length ? fNota(medias.reduce((a, b) => a + b) / medias.length) : '—', 'Media general')}
@@ -512,7 +542,7 @@ function vistaCalendario() {
   const selFecha = new Date(Math.floor(S.diaSel / 10000), Math.floor(S.diaSel / 100) % 100 - 1, S.diaSel % 100, 12);
   const mods = [...new Set([...cursos().map((c) => nombreModulo(c.nombre)), ...modulosCatalogo()])];
   const proximas = agenda().filter((i) => i.fecha >= ahora() && i.fecha <= ahora() + 7 * D && (!i.tarea || porHacer(i.tarea)));
-  return `${cabecera('Calendario')}
+  return `${cabecera('Calendario', '<button type="button" class="boton mini" data-acc="ics">Añadir las entregas a mi calendario</button>')}
   <div class="cal-layout">
     <section class="calendario corte">
       <header class="cal-cab"><button type="button" class="boton mini" data-acc="mes" data-v="-1" aria-label="Mes anterior">‹</button>
@@ -593,10 +623,23 @@ function vistaAjustes() {
   <section class="bloque"><header><h2>Apariencia</h2></header>
     <div class="panel corte"><div class="seg" role="group" aria-label="Tema">
       ${[['', 'Como el sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']].map(([k, t]) => `<button type="button" data-acc="tema" data-v="${k}" aria-pressed="${(S.cfg.tema || '') === k}">${t}</button>`).join('')}</div></div></section>
+  <section class="bloque"><header><h2>Doodle como app</h2></header>
+    <div class="panel corte">
+      <p>En el iPhone: abre Doodle en Safari, toca <b>Compartir</b> y luego <b>Añadir a pantalla de inicio</b>. Se abrirá como una app, a pantalla completa y también sin conexión. En el PC, usa el icono de instalar de la barra de direcciones.</p>
+      ${'setAppBadge' in navigator && 'Notification' in window ? `<p>${Notification.permission === 'granted' ? 'El icono de la app muestra cuántas entregas urgentes tienes.' : 'El icono de la app puede mostrar cuántas entregas urgentes tienes. Para eso el iPhone pide permiso de notificaciones (Doodle no te mandará ninguna).'}</p>
+      ${Notification.permission === 'granted' ? '' : '<div class="fila-botones"><button type="button" class="boton" data-acc="contador">Mostrar el número en el icono</button></div>'}` : ''}
+    </div></section>
   <section class="bloque"><header><h2>Copia de seguridad</h2></header>
-    <div class="panel corte"><p>Descarga tu progreso en un archivo (sin cifrar) o recupéralo de una copia. Al recuperar se mezcla con lo que ya tienes.</p>
+    <div class="panel corte"><p>${S.pat ? 'Cada semana se guarda sola una copia cifrada de tu progreso en GitHub. ' : ''}También puedes descargar tu progreso en un archivo (sin cifrar) o recuperarlo de una copia. Al recuperar se mezcla con lo que ya tienes.</p>
       <div class="fila-botones"><button class="boton" data-acc="exportar">Descargar copia</button>
-      <label class="boton">Recuperar copia<input type="file" id="importar" accept="application/json,.json" hidden></label></div></div></section>
+      <label class="boton">Recuperar de un archivo<input type="file" id="importar" accept="application/json,.json" hidden></label>
+      ${S.pat ? '<button type="button" class="boton" data-acc="ver-copias">Recuperar de GitHub</button>' : ''}</div><div id="copias-gh"></div></div></section>
+  ${(() => { const oc = tareas(true).filter((t) => t.oculta); return oc.length ? `<section class="bloque"><header><h2>Tareas ocultas</h2><span class="suave">${oc.length}</span></header>
+    <div class="lista">${oc.map((t) => `<div class="nota-fila"><span class="nf-nombre">${esc(t.nombre)}<small>${esc(t.modulo)}</small></span><button type="button" class="boton mini" data-acc="ocultar" data-v="${esc(t.clave)}">Mostrar</button></div>`).join('')}</div></section>` : ''; })()}
+  ${(() => { const lim = Date.now() - 30 * D * 1000, pap = [];
+    for (const [sec, et] of [['trabajos', 'Trabajo'], ['tareas', 'Tarea propia'], ['ejPropios', 'Ejercicio']]) for (const [id, x] of Object.entries(S.prog[sec])) if (x.borrado && (x.t || 0) > lim) pap.push({ sec, id, et, nombre: x.titulo || x.nombre || x.texto || id, t: x.t });
+    return pap.length ? `<section class="bloque"><header><h2>Papelera</h2><span class="suave">Lo borrado se puede recuperar durante 30 días</span></header>
+    <div class="lista">${pap.sort((a, b) => b.t - a.t).map((x) => `<div class="nota-fila"><span class="nf-nombre">${esc(String(x.nombre).slice(0, 80))}<small>${x.et}, borrado ${hace(x.t)}</small></span><button type="button" class="boton mini" data-acc="recuperar" data-sec="${x.sec}" data-v="${esc(x.id)}">Recuperar</button></div>`).join('')}</div></section>` : ''; })()}
   <section class="bloque"><header><h2>Sesión</h2></header>
     <div class="panel corte"><p>${LS.get('doodle-recordar') ? 'Este dispositivo recuerda tu contraseña.' : 'Este dispositivo te pide la contraseña cada vez.'}</p>
       <div class="fila-botones"><button class="boton peligro" data-acc="bloquear">Cerrar sesión${LS.get('doodle-recordar') ? ' y olvidar la contraseña' : ''}</button></div></div></section>`;
@@ -726,14 +769,16 @@ function vistaTarea(clave) {
       <a href="${c ? '#modulo-' + c.id : '#calendario'}" class="antetitulo">← ${esc(t.modulo)}</a><h1>${esc(t.nombre)}</h1>
       ${est ? `<span class="chip ${est[0]}">${esc(est[1])}</span>` : ''}</div>
     <div class="aviso-tarea s-${situacion(t)}" style="--mod:${colorDe(t.modulo)}">${{
-      hecha: `Entregada${t.enviada ? ' el ' + fCorta(t.enviada) : ''}${t.nota10 != null ? '. Nota: ' + fNota(t.nota10) + ' sobre 10' : '. Aún sin nota'}.`,
+      hecha: t.papel && t.estado !== 'submitted' && t.nota == null ? 'La marcaste como hecha en papel o en clase.' : `Entregada${t.enviada ? ' el ' + fCorta(t.enviada) : ''}${t.nota10 != null ? '. Nota: ' + fNota(t.nota10) + ' sobre 10' : '. Aún sin nota'}.`,
       futura: `Aún no se puede entregar: se abre el ${fCorta(t.apertura)} a las ${fHora(t.apertura)}.`,
       cerrada: 'Cerrada: Aules ya no admite entregas de esta tarea.',
       antigua: `Venció hace más de dos semanas (${fCorta(t.entrega)}). Si aún cuenta, pregunta al profesor.`,
       retraso: `Venció ${cuando(t.entrega).toLowerCase()}, pero Aules todavía la admite${t.cierre ? ' hasta el ' + fCorta(t.cierre) + ' a las ' + fHora(t.cierre) : ''}.`,
       pendiente: t.entrega ? `Entrega: ${cuando(t.entrega).toLowerCase()}${t.cierre && t.cierre > t.entrega ? ' (se admite hasta el ' + fCorta(t.cierre) + ')' : ''}.` : 'Sin fecha de entrega.',
     }[situacion(t)]}
-      ${t.url && porHacer(t) ? `<a class="boton principal" href="${esc(t.url)}" target="_blank" rel="noopener">Entregar en Aules ↗</a>` : ''}</div>
+      <div class="fila-botones">${t.url && porHacer(t) ? `<a class="boton principal" href="${esc(t.url)}&action=editsubmission" target="_blank" rel="noopener">Entregar en Aules</a>` : ''}
+        ${t.origen === 'aules' && (t.papel || !(t.estado === 'submitted' || t.nota != null)) ? `<button type="button" class="boton" data-acc="papel" data-v="${esc(clave)}">${t.papel ? 'Quitar «hecha en papel»' : 'La hice en papel'}</button>` : ''}
+        ${t.origen === 'aules' ? `<button type="button" class="boton" data-acc="ocultar" data-v="${esc(clave)}" title="Para cosas que no son una tarea tuya, como soluciones o justificantes">Ocultar</button>` : ''}</div></div>
     <div class="dos-col">
       <section class="bloque"><header><h2>Enunciado</h2>${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">Abrir en Aules ↗</a>` : ''}</header>
         <div class="panel corte"><p class="pre">${t.enunciado ? esc(t.enunciado) : '<span class="suave">Esta tarea no tiene enunciado escrito en Aules.</span>'}</p>
@@ -748,6 +793,8 @@ function vistaTarea(clave) {
         <section class="bloque"><header><h2>Datos</h2></header>
           <dl class="datos-tarea panel corte">${fecha('Entrega', t.entrega)}${fecha('Se abre', t.apertura)}${fecha('Cierre', t.cierre)}${t.hecha ? fecha('Enviada', t.enviada) : ''}
             <div><dt>Nota</dt><dd>${t.nota10 != null ? `<b>${fNota(t.nota10)}</b> / 10` : '—'}</dd></div></dl></section>
+        <section class="bloque"><header><h2>Tus apuntes</h2><span class="suave">Solo los ves tú</span></header>
+          <textarea id="t-privada" data-clave="${esc(clave)}" rows="4" placeholder="Dudas, recordatorios, qué te dijo el profesor…">${esc(t.privada)}</textarea></section>
         ${t.comentario ? `<section class="bloque"><header><h2>Comentario del profesor</h2></header><div class="panel corte"><p class="pre">${esc(t.comentario)}</p></div></section>` : ''}
       </div>
     </div>`;
@@ -882,6 +929,107 @@ function cerrarLab() {
   if ((location.hash.slice(1) || 'inicio') === 'ejercicios' || location.hash.startsWith('#modulo-')) render();
 }
 
+// ---------- calendario del iPhone (.ics con aviso el día antes) ----------
+function exportarIcs() {
+  const txt = (x) => String(x || '').replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m).replace(/\n/g, '\\n');
+  const fecha = (ts) => new Date(ts * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const ev = tareas().filter((t) => porHacer(t) && t.entrega).map((t) => [
+    'BEGIN:VEVENT', `UID:${t.clave}@doodle`, `DTSTAMP:${fecha(ahora())}`, `DTSTART:${fecha(t.entrega - 1800)}`, `DTEND:${fecha(t.entrega)}`,
+    `SUMMARY:${txt('Entrega: ' + t.nombre)}`, `DESCRIPTION:${txt(t.modulo + (t.url ? '\n' + t.url : ''))}`, ...(t.url ? [`URL:${t.url}`] : []),
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${txt('Mañana: ' + t.nombre)}`, 'TRIGGER:-P1D', 'END:VALARM', 'END:VEVENT'].join('\r\n'));
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Doodle//DAM//ES', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Entregas DAM', ...ev, 'END:VCALENDAR'].join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = 'entregas-dam.ics';
+  document.body.append(a); a.click(); a.remove();
+  return ev.length;
+}
+
+// ---------- número de entregas urgentes en el icono de la app ----------
+function actualizarContador() {
+  if (!('setAppBadge' in navigator) || S.demo || !S.curso) return;
+  const n = tareas().filter(urgente).length;
+  (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+}
+
+// ---------- copia semanal del progreso en GitHub ----------
+async function copiaSemanal() {
+  if (!S.pat || S.demo || Date.now() - (LS.get('doodle-ultima-copia') || 0) < 7 * D * 1000) return;
+  await escribirArchivo(`data/copias/progreso-${new Date().toISOString().slice(0, 10)}.enc`, await cifrar(S.pass, S.prog), null);
+  LS.set('doodle-ultima-copia', Date.now());
+}
+async function verCopias(caja) {
+  caja.innerHTML = '<p class="suave">Buscando copias…</p>';
+  try {
+    const r = await gh('/contents/data/copias');
+    const lista = r.ok ? (await r.json()).filter((f) => f.name.endsWith('.enc')).sort((a, b) => b.name.localeCompare(a.name)) : [];
+    caja.innerHTML = lista.length ? `<div class="fila-botones">${lista.slice(0, 12).map((f) => `<button type="button" class="boton mini" data-acc="recuperar-copia" data-v="${esc(f.path)}">${esc(f.name.replace(/^progreso-|\.enc$/g, ''))}</button>`).join('')}</div>` : '<p class="suave">Todavía no hay copias en GitHub.</p>';
+  } catch (e) { caja.innerHTML = `<p class="error-txt">${esc(e.message)}</p>`; }
+}
+
+// ---------- búsqueda (Ctrl+K) ----------
+function resultados(q) {
+  const k = sinAcentos(q).split(/\s+/).filter(Boolean), out = [];
+  const vale = (...txt) => { const t = sinAcentos(txt.join(' ')); return k.every((p) => t.includes(p)); };
+  for (const [id, t] of NAV) if (vale(t)) out.push({ tipo: 'Ir a', nombre: t, ir: '#' + id });
+  for (const c of cursos()) { const n = nombreModulo(c.nombre); if (vale(n, 'modulo')) out.push({ tipo: 'Módulo', nombre: n, ir: '#modulo-' + c.id }); }
+  for (const t of tareas()) if (vale(t.nombre, t.modulo, t.privada)) out.push({ tipo: 'Tarea', nombre: t.nombre, extra: t.modulo + (t.entrega ? ', ' + cuando(t.entrega).toLowerCase() : ''), ir: '#tarea-' + t.clave });
+  for (const w of trabajos()) if (vale(w.titulo, w.modulo, HERR[w.tipo])) out.push({ tipo: 'Trabajo', nombre: w.titulo, extra: HERR[w.tipo] + ', ' + (w.modulo || ''), ir: '#trabajo-' + w.id });
+  for (const e of catalogo()) if (vale(e.n, e.texto, e.tema)) out.push({ tipo: 'Ejercicio', nombre: (e.n ? e.n + ' ' : '') + e.texto.slice(0, 90), extra: e.tema, lab: e.id });
+  for (const c of cursos()) for (const sec of c.secciones) for (const el of sec.elementos) if (el.url && vale(el.nombre, sec.nombre, el.archivos.join(' '))) out.push({ tipo: 'Apuntes', nombre: el.nombre, extra: nombreModulo(c.nombre) + ', ' + (sec.nombre || ''), url: el.url });
+  return out.slice(0, 40);
+}
+function abrirBuscador() {
+  if (!S.curso || document.getElementById('buscador')) return;
+  const capa = document.createElement('div'); capa.id = 'buscador'; capa.className = 'buscador'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-label', 'Buscar');
+  capa.innerHTML = `<div class="buscador-caja"><input type="search" id="buscar-q" placeholder="Buscar tareas, ejercicios, apuntes…" autocomplete="off" aria-label="Buscar"><ul id="buscar-res" role="listbox"></ul><p class="buscador-pie suave">↑ ↓ para moverte, Intro para abrir, Esc para cerrar</p></div>`;
+  document.body.append(capa);
+  const q = capa.querySelector('input'), ul = capa.querySelector('ul');
+  let items = [], sel = 0;
+  const pintar = () => {
+    items = q.value.trim() ? resultados(q.value) : NAV.map(([id, t]) => ({ tipo: 'Ir a', nombre: t, ir: '#' + id }));
+    sel = Math.min(sel, Math.max(0, items.length - 1));
+    ul.innerHTML = items.length ? items.map((it, i) => `<li role="option" aria-selected="${i === sel}" data-i="${i}"><span class="b-tipo">${esc(it.tipo)}</span><span class="b-texto">${esc(it.nombre)}${it.extra ? `<small>${esc(it.extra)}</small>` : ''}</span></li>`).join('') : '<li class="suave b-nada">Nada coincide.</li>';
+    const act = ul.querySelector('[aria-selected="true"]'); if (act) act.scrollIntoView({ block: 'nearest' });
+  };
+  const abrir = (it) => { cerrarBuscador(); if (!it) return; if (it.url) window.open(it.url, '_blank', 'noopener'); else if (it.lab) abrirLab(it.lab); else location.hash = it.ir; };
+  q.addEventListener('input', () => { sel = 0; pintar(); });
+  q.addEventListener('keydown', (ev) => {
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); sel = Math.min(items.length - 1, sel + 1); pintar(); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); sel = Math.max(0, sel - 1); pintar(); }
+    else if (ev.key === 'Enter') { ev.preventDefault(); abrir(items[sel]); }
+    else if (ev.key === 'Escape') cerrarBuscador();
+  });
+  ul.addEventListener('click', (ev) => { const li = ev.target.closest('[data-i]'); if (li) abrir(items[+li.dataset.i]); });
+  capa.addEventListener('click', (ev) => { if (ev.target === capa) cerrarBuscador(); });
+  pintar(); q.focus();
+}
+function cerrarBuscador() { const c = document.getElementById('buscador'); if (c) c.remove(); }
+
+// ---------- atajos de teclado ----------
+const ATAJOS = [['Ctrl K  o  /', 'Buscar'], ['G luego I', 'Inicio'], ['G luego M', 'Módulos'], ['G luego C', 'Calendario'], ['G luego E', 'Ejercicios'], ['G luego N', 'Notas'], ['G luego A', 'Ajustes'], ['S', 'Sincronizar con Aules'], ['?', 'Ver los atajos'], ['Esc', 'Cerrar']];
+function mostrarAtajos() {
+  if (document.getElementById('atajos')) return;
+  const capa = document.createElement('div'); capa.id = 'atajos'; capa.className = 'buscador'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-label', 'Atajos de teclado');
+  capa.innerHTML = `<div class="buscador-caja atajos"><h2>Atajos de teclado</h2><dl>${ATAJOS.map(([k, t]) => `<div><dt>${k.split('  ').map((x) => x.split(' ').map((y) => ['luego', 'o'].includes(y) ? ` ${y} ` : `<kbd>${y}</kbd>`).join('')).join(' ')}</dt><dd>${t}</dd></div>`).join('')}</dl></div>`;
+  capa.addEventListener('click', () => capa.remove());
+  document.body.append(capa);
+}
+let tiempoG = 0;
+document.addEventListener('keydown', (ev) => {
+  const escribiendo = ev.target.closest && ev.target.closest('input, textarea, select, [contenteditable], .CodeMirror');
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); return abrirBuscador(); }
+  if (ev.key === 'Escape') { cerrarBuscador(); const a = document.getElementById('atajos'); if (a) a.remove(); return; }
+  if (escribiendo || ev.ctrlKey || ev.metaKey || ev.altKey || !S.curso || document.getElementById('lab')?.hidden === false) return;
+  const k = ev.key.toLowerCase();
+  if (Date.now() - tiempoG < 1200) {
+    const ir = { i: 'inicio', m: 'modulos', c: 'calendario', e: 'ejercicios', n: 'notas', a: 'ajustes' }[k];
+    tiempoG = 0; if (ir) { ev.preventDefault(); location.hash = ir; } return;
+  }
+  if (k === 'g') tiempoG = Date.now();
+  else if (k === '/') { ev.preventDefault(); abrirBuscador(); }
+  else if (ev.key === '?') mostrarAtajos();
+  else if (k === 's') sincronizarAules();
+});
+
 // ---------- acciones (delegadas) ----------
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') cerrarLab(); });
 document.addEventListener('click', async (ev) => {
@@ -891,6 +1039,19 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'cerrar-lab') cerrarLab();
   else if (acc === 'lab-ir' && el.dataset.v) abrirLab(el.dataset.v);
   else if (acc === 'sync') sincronizarAules();
+  else if (acc === 'buscar') abrirBuscador();
+  else if (acc === 'atajos') mostrarAtajos();
+  else if (acc === 'ics') { const n = exportarIcs(); el.textContent = n ? `${n} entregas exportadas` : 'No hay entregas pendientes'; }
+  else if (acc === 'visto') { LS.del('doodle-novedades'); render(); }
+  else if (acc === 'papel') { cambiar('marcas', el.dataset.v, { papel: !marca(el.dataset.v).papel }); render(); }
+  else if (acc === 'ocultar') { const o = !marca(el.dataset.v).oculta; cambiar('marcas', el.dataset.v, { oculta: o }); if (o && location.hash === '#tarea-' + el.dataset.v) history.back(); else render(); }
+  else if (acc === 'recuperar') { cambiar(el.dataset.sec, el.dataset.v, { borrado: false }); render(); }
+  else if (acc === 'contador') { Notification.requestPermission().then(() => { actualizarContador(); render(); }); }
+  else if (acc === 'ver-copias') verCopias(document.getElementById('copias-gh'));
+  else if (acc === 'recuperar-copia') {
+    try { const { sobre } = await leerArchivo(el.dataset.v); S.prog = mezclar(S.prog, await descifrar(S.pass, sobre)); cambiar('ej', '_importado', {}); el.textContent = 'Recuperada'; }
+    catch (e) { el.textContent = 'No se pudo abrir esta copia'; }
+  }
   else if (acc === 'trabajar') trabajarEnTarea(el.dataset.v);
   else if (acc === 'enunciado') { const a = document.querySelector('.taller-enun'), abierto = el.getAttribute('aria-expanded') === 'true'; a.hidden = abierto; el.setAttribute('aria-expanded', String(!abierto)); }
   else if (acc === 'borrar-trabajo') { if (el.dataset.confirmar !== 'si') { el.dataset.confirmar = 'si'; el.textContent = '¿Seguro?'; return; } cambiar('trabajos', el.dataset.v, { borrado: true }); render(); }
@@ -918,6 +1079,7 @@ document.addEventListener('change', async (ev) => {
   else if (acc === 'lab-hecho') cambiar('ej', el.dataset.id, { hecho: el.checked });
   else if (el.id === 'w-tipo') { cambiar('trabajos', S.montado, { tipo: el.value }); render(true); }
   else if (el.id === 'w-titulo') cambiar('trabajos', S.montado, { titulo: el.value.trim() || 'Sin nombre' });
+  else if (el.id === 't-privada') cambiar('marcas', el.dataset.clave, { nota: el.value });
   else if (acc === 'hecha') { cambiar('tareas', el.dataset.id, { hecha: el.checked }); render(); }
   else if (acc === 'nota') cambiar('tareas', el.dataset.id, { nota: el.value === '' ? null : Math.max(0, +el.value) });
   else if (el.id === 'importar' && el.files[0]) {

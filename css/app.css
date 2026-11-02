@@ -571,3 +571,34 @@ input:focus, select:focus, textarea:focus { border-color: var(--acento); box-sha
   .cal-layout { grid-template-columns: minmax(0, 1fr); }
 }
 @media (min-width: 1300px) { .cal-layout { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+
+/* ---------- búsqueda y atajos ---------- */
+kbd { font: 500 11.5px var(--f-texto); padding: 2px 6px; border: 1px solid var(--linea-fuerte); border-bottom-width: 2px; border-radius: 5px; background: var(--panel); color: var(--suave); }
+.lateral-buscar { display: flex; gap: 10px; align-items: center; width: 100%; padding: 6px 10px; border: 0; border-radius: 6px; background: none; color: var(--suave); font: 400 14px var(--f-texto); cursor: pointer; text-align: left; }
+.lateral-buscar:hover { background: var(--hover); color: var(--texto); }
+.lateral-buscar .ic { width: 18px; height: 18px; }
+.lateral-buscar kbd { margin-left: auto; }
+.barra-sup .boton.mini { padding: 7px; border: 0; background: none; }
+.estado-movil { margin-left: auto; }
+.buscador { position: fixed; inset: 0; z-index: 60; background: rgba(15, 15, 15, 0.45); display: grid; justify-items: center; align-items: start;
+  padding: max(10vh, calc(env(safe-area-inset-top, 0px) + 16px)) max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); animation: entrar 0.15s ease-out both; }
+.buscador-caja { width: min(640px, 100%); max-height: 70vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--panel); border-radius: 12px; box-shadow: 0 16px 50px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--linea); overflow: hidden; }
+.buscador-caja input { border: 0; border-bottom: 1px solid var(--linea); border-radius: 0; padding: 16px 18px; font-size: 17px; box-shadow: none !important; }
+.buscador-caja ul { list-style: none; margin: 0; padding: 6px; overflow: auto; }
+.buscador-caja li { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 9px 12px; border-radius: 6px; cursor: pointer; }
+.buscador-caja li[aria-selected="true"] { background: var(--activo); }
+.b-tipo { font-size: 12px; color: var(--tenue); }
+.b-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-texto small { margin-left: 8px; color: var(--suave); font-size: 12.5px; }
+.b-nada { display: block !important; }
+.buscador-pie { margin: 0; padding: 9px 16px; border-top: 1px solid var(--linea); font-size: 12px; }
+.atajos { padding: 20px 22px; grid-template-rows: auto; gap: 14px; }
+.atajos h2 { font-size: 16px; }
+.atajos dl { margin: 0; display: grid; gap: 8px; }
+.atajos dl div { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; }
+.atajos dd { margin: 0; color: var(--suave); }
+@media (hover: none) { .buscador-pie, .lateral-buscar kbd { display: none; } }
+
+/* ---------- novedades ---------- */
+.novedades .lista .chip { white-space: normal; text-align: right; }
+.novedades > header .boton { padding: 5px 10px; }
