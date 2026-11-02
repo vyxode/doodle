@@ -602,3 +602,54 @@ kbd { font: 500 11.5px var(--f-texto); padding: 2px 6px; border: 1px solid var(-
 /* ---------- novedades ---------- */
 .novedades .lista .chip { white-space: normal; text-align: right; }
 .novedades > header .boton { padding: 5px 10px; }
+
+/* ---------- notas: lo que necesitas y evolución ---------- */
+.necesito { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 15px; }
+.necesito select, .necesito input { width: auto; padding: 5px 8px; font-size: 15px; }
+.necesito input { width: 64px; }
+.necesito-res { flex-basis: 100%; margin: 4px 0 0; color: var(--suave); }
+.necesito-res b { color: var(--texto); font-size: 17px; }
+.grafica { width: 100%; height: auto; max-height: 190px; margin-top: 6px; overflow: visible; }
+.g-rej { stroke: var(--linea); stroke-width: 1; }
+.g-cinco { stroke: var(--linea-fuerte); stroke-dasharray: 4 4; }
+.g-et { fill: var(--tenue); font-size: 11px; }
+.g-media { fill: none; stroke: var(--acento); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.g-punto { fill: var(--panel); stroke: var(--texto); stroke-width: 1.5; }
+.g-punto.susp { stroke: var(--rojo); }
+.g-fin { fill: var(--acento); font-size: 13px; font-weight: 600; }
+.nota-modulo .panel { gap: 8px; }
+
+/* ---------- progreso por tema ---------- */
+.temas-prog { display: grid; background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); }
+.tema-prog { display: grid; gap: 6px; padding: 14px 18px; }
+.tema-prog + .tema-prog { border-top: 1px solid var(--linea); }
+.tp-cab { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.tp-cab b { font-weight: 500; }
+.tema-prog.hecho .barra i { background: var(--ok); }
+
+/* ---------- resumen de la semana ---------- */
+.resumen-semana { background: var(--panel-2); border-color: var(--panel-2); }
+.resumen-semana p { margin: 0; }
+
+/* ---------- planificador ---------- */
+.plan-cab { display: flex; gap: 10px; align-items: center; }
+.plan-semana { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.plan-dia { background: var(--panel-2); border-radius: var(--radio); padding: 10px; display: grid; gap: 6px; align-content: start; min-height: 120px; min-width: 0; }
+.plan-dia.hoy { box-shadow: inset 0 0 0 1px var(--acento); }
+.plan-dia h3 { font-size: 13px; font-weight: 600; text-transform: capitalize; }
+.plan-vacio { margin: 0; font-size: 13px; }
+.plan-tarea { background: var(--panel); border: 1px solid var(--linea); border-radius: 6px; padding: 8px 10px; display: grid; gap: 4px; min-width: 0; cursor: grab; }
+.plan-tarea a { font-weight: 500; font-size: 14px; text-decoration: none; overflow-wrap: anywhere; }
+.plan-tarea small { font-size: 12px; }
+.plan-tarea select { font-size: 13px; padding: 5px 8px; }
+.plan-tarea .boton { justify-self: start; }
+.plan-sin { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+@media (max-width: 1000px) { .plan-semana { grid-template-columns: 1fr; } .plan-dia { min-height: 0; } }
+
+/* ---------- modo concentración ---------- */
+.pomo { position: fixed; z-index: 55; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 12px; align-items: center;
+  padding: 10px 12px 10px 16px; background: var(--texto); color: var(--fondo); border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); font-size: 13px; }
+.pomo b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.pomo .boton { background: transparent; color: inherit; border-color: color-mix(in srgb, var(--fondo) 35%, transparent); }
+.pomo-fase { opacity: 0.75; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 900px) { .pomo { bottom: 20px; } }
