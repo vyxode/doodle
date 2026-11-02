@@ -83,6 +83,7 @@ assert.ok(!crudo.includes('Programación') && !crudo.includes('SECRETO'), 'el fi
 const curso = await descifrar('demo', JSON.parse(crudo));
 assert.equal(curso.cursos.length, 6);
 assert.ok(!JSON.stringify(curso).includes('SECRETO'), 'no se guardan enlaces con token');
+assert.equal(curso.cursos[0].secciones[0].elementos[0].archivos[0].nombre, 'tema1.pdf');
 const t4 = curso.cursos[0].tareas[2];
 assert.equal(t4.estado, 'draft'); assert.equal(t4.nota, null);
 assert.equal(curso.cursos[0].tareas[0].nota, 8.5);
@@ -107,6 +108,17 @@ const mysql = "CREATE DATABASE tienda;\nUSE tienda;\nCREATE TABLE cliente (id IN
 let ultimo; for (const x of sentencias(adaptarMysql(mysql))) ultimo = db.exec(x.sql);
 assert.equal(ultimo[0].values[0][0], 2, 'el script de MySQL funciona en SQLite');
 db.close();
+{ // las soluciones de la práctica de SQL funcionan y se comparan bien
+  const { BD_PRACTICA, mismoResultado, EJ_SQL } = await import('./js/herramientas.js');
+  const db2 = new SQL.Database(); db2.exec(BD_PRACTICA);
+  const q = (x) => db2.exec(x)[0];
+  assert.ok(mismoResultado(q("SELECT nombre FROM cliente WHERE ciudad = 'Valencia'"), q("SELECT nombre FROM cliente WHERE ciudad LIKE 'Valencia' ORDER BY nombre DESC"), false));
+  assert.ok(!mismoResultado(q('SELECT nombre, precio FROM producto WHERE precio < 20 ORDER BY precio DESC'), q('SELECT nombre, precio FROM producto WHERE precio < 20 ORDER BY precio'), true));
+  assert.equal(q("SELECT p.nombre FROM linea l JOIN producto p ON p.id = l.id_producto GROUP BY p.id ORDER BY SUM(l.cantidad) DESC LIMIT 1").values[0][0], 'Cuaderno A4');
+  assert.equal(q('SELECT COUNT(*) FROM cliente WHERE id NOT IN (SELECT id_cliente FROM pedido)').values[0][0], 1);
+  for (const ej of EJ_SQL) assert.ok(q(ej.solucion).values.length > 0, ej.titulo + ' devuelve filas');
+  db2.close();
+}
 
 // --- HTML ---
 assert.deepEqual(revisarHtml('<!DOCTYPE html><html><head><title>a</title></head><body><p>x<li>y</body></html>').map((a) => a.txt), []);
@@ -126,6 +138,50 @@ assert.equal((xml.match(/<mxCell /g) || []).length, 2 + 4 + 2 + 1, 'raíz + nodo
 assert.ok(xml.includes('source="na"') && xml.includes('shape=link'));
 await writeFile('/tmp/doodle-prueba.drawio', xml); await writeFile('/tmp/doodle-prueba.svg', svgExportable(dg));
 await promisify(execFile)('python3', ['-c', 'import xml.dom.minidom as m; m.parse("/tmp/doodle-prueba.drawio"); m.parse("/tmp/doodle-prueba.svg")']); // XML bien formado
+
+// --- corrección automática de C# con soluciones de referencia ---
+{
+  const { comprobarCaso } = await import('./js/herramientas.js');
+  globalThis.window = globalThis.window || {};
+  new Function('window', await readFile('js/csharp.js', 'utf8'))(globalThis.window);
+  new Function('window', await readFile('js/pruebas.js', 'utf8'))(globalThis.window);
+  const P = globalThis.window.PRUEBAS_CS, run = (src, e) => globalThis.window.CSharp.run(src, e, 1);
+  const main = (cuerpo) => `using System;\nclass P { static void Main() {\n${cuerpo}\n} }`;
+  const ref = {
+    'prog-4.1.1.1': main('int[] a = new int[4]; double s = 0; for (int i = 0; i < 4; i++) { Console.Write("Número {0}: ", i + 1); a[i] = Convert.ToInt32(Console.ReadLine()); s += a[i]; } Console.WriteLine("Media: {0}", s / 4); for (int i = 0; i < 4; i++) Console.Write(a[i] + " ");'),
+    'prog-4.1.3.4': main('int[] d = {31,28,31,30,31,30,31,31,30,31,30,31}; Console.Write("Mes: "); int m = Convert.ToInt32(Console.ReadLine()); Console.Write("Día: "); int dia = Convert.ToInt32(Console.ReadLine()); int t = dia; for (int i = 0; i < m - 1; i++) t += d[i]; Console.WriteLine("Es el día número {0} del año", t);'),
+    'prog-4.1.3.8': main('double[] v = new double[3]; double s = 0; for (int i = 0; i < 3; i++) { v[i] = Convert.ToDouble(Console.ReadLine()); s += v[i] * v[i]; } Console.WriteLine("Módulo: " + Math.Sqrt(s));'),
+    'prog-4.2.5': main('int[,] m = new int[3,3]; for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) m[i,j] = Convert.ToInt32(Console.ReadLine()); int det = m[0,0]*(m[1,1]*m[2,2]-m[1,2]*m[2,1]) - m[0,1]*(m[1,0]*m[2,2]-m[1,2]*m[2,0]) + m[0,2]*(m[1,0]*m[2,1]-m[1,1]*m[2,0]); Console.WriteLine("Determinante: " + det);'),
+    'prog-4.4.3.2': main('string f = Console.ReadLine(); for (int i = f.Length - 1; i >= 0; i--) Console.Write(f[i]); Console.WriteLine();'),
+    'prog-4.4.4.2': main('string n = Console.ReadLine(); for (int i = 1; i <= n.Length; i++) Console.WriteLine(n.Substring(0, i));'),
+    'prog-4.6.1': main('Console.Write("Nombre: "); string n = Console.ReadLine(); string a = Console.ReadLine(); int e = Convert.ToInt32(Console.ReadLine()); Console.WriteLine(n + ", " + a + ", " + e);'),
+    'prog-4.7.1': main('double[] v = new double[6]; for (int i = 0; i < 6; i++) v[i] = Convert.ToDouble(Console.ReadLine()); Array.Sort(v); foreach (double x in v) Console.Write(x + " ");'),
+    'prog-4.7.2': main('string[] v = new string[5]; for (int i = 0; i < 5; i++) v[i] = Console.ReadLine(); Array.Sort(v); foreach (string x in v) Console.WriteLine(x);'),
+  };
+  for (const [id, src] of Object.entries(ref)) for (const caso of P[id]) { const r = comprobarCaso(run(src, caso.e), caso); assert.ok(r.ok, id + ': ' + r.motivo + ' · salida: ' + JSON.stringify(r.salida)); }
+  // y que un programa mal hecho no pase
+  const mal = comprobarCaso(run(main('int[] a = new int[4]; for (int i = 0; i < 4; i++) a[i] = Convert.ToInt32(Console.ReadLine()); Console.WriteLine("Media: " + (a[0]+a[1]+a[2]+a[3]) / 4);'), P['prog-4.1.1.1'][1].e), P['prog-4.1.1.1'][1]);
+  assert.ok(!mal.ok && /1,25/.test(mal.motivo), 'división entera detectada: ' + mal.motivo);
+  assert.match(comprobarCaso(run(main('Console.ReadLine();'), []), { e: ['x'] }).motivo, /más datos/);
+}
+
+// --- E/R → relacional ---
+const { erARelacional } = await import('./js/diagrama.js');
+const er = (nodos, aristas) => erARelacional({ notacion: 'er', nodos: nodos.map((n, i) => ({ x: i * 100, y: n.y || 0, ...n })), aristas: aristas.map((a, i) => ({ id: 'e' + i, ...a })) });
+let r = er([{ id: 'c', tipo: 'entidad', texto: 'Cliente' }, { id: 'cd', tipo: 'atributo', texto: 'dni', clave: true }, { id: 'cn', tipo: 'atributo', texto: 'nombre' },
+  { id: 'r', tipo: 'relacion', texto: 'realiza' }, { id: 'p', tipo: 'entidad', texto: 'Pedido' }, { id: 'pn', tipo: 'atributo', texto: 'num', clave: true }],
+  [{ de: 'c', a: 'cd' }, { de: 'c', a: 'cn' }, { de: 'p', a: 'pn' }, { de: 'c', a: 'r', etDe: '(1,1)' }, { de: 'r', a: 'p', etA: '(0,N)' }]);
+assert.equal(r.esquema, 'CLIENTE(#dni, nombre)\nPEDIDO(#num, dni → CLIENTE)', r.esquema);
+assert.equal(r.diagrama.aristas.length, 1);
+r = er([{ id: 'a', tipo: 'entidad', texto: 'ALUMNO' }, { id: 'ad', tipo: 'atributo', texto: 'dni', clave: true }, { id: 'r', tipo: 'relacion', texto: 'cursa', card: 'N:M', y: 50 },
+  { id: 'rn', tipo: 'atributo', texto: 'nota' }, { id: 's', tipo: 'entidad', texto: 'ASIGNATURA' }, { id: 'sc', tipo: 'atributo', texto: 'cod', clave: true },
+  { id: 'tel', tipo: 'atributo', texto: 'telefono', multivaluado: true }],
+  [{ de: 'a', a: 'ad' }, { de: 's', a: 'sc' }, { de: 'a', a: 'r' }, { de: 'r', a: 's' }, { de: 'r', a: 'rn' }, { de: 'a', a: 'tel' }]);
+assert.equal(r.esquema, 'ALUMNO(#dni)\nASIGNATURA(#cod)\nALUMNO_TELEFONO(#dni → ALUMNO, #telefono)\nCURSA(#dni → ALUMNO, #cod → ASIGNATURA, nota)', r.esquema);
+r = er([{ id: 'e', tipo: 'entidad', texto: 'Edificio' }, { id: 'ec', tipo: 'atributo', texto: 'cod', clave: true }, { id: 'r', tipo: 'relacion-debil', texto: 'tiene' },
+  { id: 'au', tipo: 'debil', texto: 'Aula' }, { id: 'an', tipo: 'atributo', texto: 'num', clave: true }],
+  [{ de: 'e', a: 'ec' }, { de: 'au', a: 'an' }, { de: 'e', a: 'r' }, { de: 'r', a: 'au' }]);
+assert.equal(r.esquema, 'EDIFICIO(#cod)\nAULA(#num, #cod → EDIFICIO)', r.esquema);
 
 // --- Java: el mini JUnit y el lanzador con un javac real ---
 const { LIB_JAVA } = await import('./js/herramientas.js');

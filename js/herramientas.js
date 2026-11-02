@@ -476,3 +476,112 @@ export function montarJava(cont, datos, alCambiar) {
   abrir(0);
   return { foco: () => ed && ed.foco() };
 }
+
+// ======================= corrección automática de C# =======================
+// r es el resultado del simulador (window.CSharp.run). Se mira solo lo que el programa escribe tras el último dato.
+export function comprobarCaso(r, caso) {
+  if (r.status === 'input') return { ok: false, motivo: 'El programa pidió más datos de los previstos (' + caso.e.length + ').' };
+  if (r.status !== 'done') return { ok: false, motivo: r.error || 'El programa no terminó.' };
+  let ult = -1; r.segs.forEach((s, i) => { if (s.t !== 'out') ult = i; });
+  const salida = r.segs.slice(ult + 1).filter((s) => s.t === 'out').map((s) => s.s).join('');
+  const nums = (salida.match(/-?\d+(?:[.,]\d+)?/g) || []).map((x) => parseFloat(x.replace(',', '.')));
+  const igual = (a, b) => Math.abs(a - b) < 0.01 + Math.abs(b) * 1e-9;
+  let desde = 0;
+  for (const esperado of caso.n || []) {
+    const vale = [].concat(esperado), pos = nums.findIndex((x, i) => i >= (caso.orden ? desde : 0) && vale.some((v) => igual(x, v)));
+    if (pos < 0) return { ok: false, motivo: `Esperaba ver ${vale.map(String).join(' o ').replace(/\./g, ',')}${caso.orden ? ' en ese orden' : ''}.`, salida };
+    desde = pos + 1;
+  }
+  const norm = (s) => { s = s.toLowerCase().replace(/\r/g, '').split('\n').map((l) => l.trimEnd()).join('\n'); return caso.sinEspacios ? s.replace(/[ \t]+/g, '') : s; };
+  const sal = norm(salida); desde = 0;
+  for (const t of caso.t || []) {
+    const pos = sal.indexOf(norm(t), caso.orden ? desde : 0);
+    if (pos < 0) return { ok: false, motivo: `Esperaba ver «${t.replace(/\n/g, '⏎')}»${caso.orden ? ' en ese orden' : ''}.`, salida };
+    desde = pos + norm(t).length;
+  }
+  if (caso.veces) { const [t, k] = caso.veces, n = sal.split(norm(t)).length - 1; if (n < k) return { ok: false, motivo: `«${t}» debería salir al menos ${k} veces y sale ${n}.`, salida }; }
+  return { ok: true, salida };
+}
+
+// ======================= práctica de SQL con corrección =======================
+export const BD_PRACTICA = `
+CREATE TABLE cliente (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL, ciudad TEXT, alta DATE);
+CREATE TABLE categoria (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL);
+CREATE TABLE producto (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL, precio REAL NOT NULL, stock INTEGER NOT NULL, id_categoria INTEGER REFERENCES categoria(id));
+CREATE TABLE pedido (id INTEGER PRIMARY KEY, id_cliente INTEGER NOT NULL REFERENCES cliente(id), fecha DATE NOT NULL);
+CREATE TABLE linea (id_pedido INTEGER REFERENCES pedido(id), id_producto INTEGER REFERENCES producto(id), cantidad INTEGER NOT NULL, PRIMARY KEY (id_pedido, id_producto));
+INSERT INTO cliente VALUES (1,'Ana Torres','Valencia','2025-09-14'),(2,'Luis Martí','Alicante','2025-10-02'),(3,'Marta Soler','Valencia','2026-01-20'),(4,'Pablo Ruiz','Castellón','2026-02-11'),(5,'Lucía Gil','Elche',NULL),(6,'Jorge Vidal','Valencia','2026-03-05');
+INSERT INTO categoria VALUES (1,'Informática'),(2,'Papelería'),(3,'Libros'),(4,'Electrónica');
+INSERT INTO producto VALUES (1,'Ratón inalámbrico',19.9,40,1),(2,'Teclado mecánico',74.5,12,1),(3,'Monitor 24"',149,7,1),(4,'Cuaderno A4',3.2,300,2),(5,'Bolígrafos (10)',4.5,150,2),(6,'Aprende SQL',29.95,18,3),(7,'Programación en C#',34,9,3),(8,'Auriculares',39.99,0,4),(9,'Memoria USB 64 GB',12.5,60,4),(10,'Mochila portátil',45,5,NULL);
+INSERT INTO pedido VALUES (1,1,'2026-09-03'),(2,2,'2026-09-10'),(3,1,'2026-09-21'),(4,3,'2026-10-01'),(5,4,'2026-10-05'),(6,3,'2026-10-12'),(7,6,'2026-10-20');
+INSERT INTO linea VALUES (1,1,1),(1,4,5),(2,2,1),(2,6,1),(3,9,2),(3,5,3),(4,3,1),(4,1,2),(5,7,1),(6,6,2),(6,4,10),(7,2,1),(7,9,1),(7,1,1);`;
+export const EJ_SQL = [
+  ['Todos los clientes', 'Muestra todos los datos de todos los clientes.', 'SELECT * FROM cliente'],
+  ['Nombre y precio', 'Muestra el nombre y el precio de cada producto.', 'SELECT nombre, precio FROM producto'],
+  ['Clientes de Valencia', 'Nombre de los clientes que viven en Valencia.', "SELECT nombre FROM cliente WHERE ciudad = 'Valencia'"],
+  ['Productos baratos', 'Nombre y precio de los productos que cuestan menos de 20 €, del más barato al más caro.', 'SELECT nombre, precio FROM producto WHERE precio < 20 ORDER BY precio'],
+  ['Sin existencias', 'Nombre de los productos con stock 0.', 'SELECT nombre FROM producto WHERE stock = 0'],
+  ['Sin fecha de alta', 'Nombre de los clientes que no tienen fecha de alta.', 'SELECT nombre FROM cliente WHERE alta IS NULL'],
+  ['Empiezan por M', 'Nombre de los productos cuyo nombre empieza por «M».', "SELECT nombre FROM producto WHERE nombre LIKE 'M%'"],
+  ['Ciudades distintas', 'Lista de ciudades de los clientes, sin repetir y sin vacíos, en orden alfabético.', 'SELECT DISTINCT ciudad FROM cliente WHERE ciudad IS NOT NULL ORDER BY ciudad'],
+  ['Precio medio', 'Precio medio de todos los productos (una sola columna).', 'SELECT AVG(precio) FROM producto'],
+  ['Clientes por ciudad', 'Cuántos clientes hay en cada ciudad: ciudad y número.', 'SELECT ciudad, COUNT(*) FROM cliente GROUP BY ciudad'],
+  ['Producto y categoría', 'Nombre de cada producto y el nombre de su categoría (solo los que tienen categoría).', 'SELECT p.nombre, c.nombre FROM producto p JOIN categoria c ON p.id_categoria = c.id'],
+  ['Todos con su categoría', 'Igual que el anterior, pero incluyendo también los productos sin categoría.', 'SELECT p.nombre, c.nombre FROM producto p LEFT JOIN categoria c ON p.id_categoria = c.id'],
+  ['Pedidos de Ana', 'Número (id) y fecha de los pedidos de «Ana Torres».', "SELECT pe.id, pe.fecha FROM pedido pe JOIN cliente c ON pe.id_cliente = c.id WHERE c.nombre = 'Ana Torres'"],
+  ['Clientes con más de un pedido', 'Nombre de los clientes que han hecho más de un pedido.', 'SELECT c.nombre FROM cliente c JOIN pedido p ON p.id_cliente = c.id GROUP BY c.id HAVING COUNT(*) > 1'],
+  ['Clientes sin pedidos', 'Nombre de los clientes que no han hecho ningún pedido.', 'SELECT nombre FROM cliente WHERE id NOT IN (SELECT id_cliente FROM pedido)'],
+  ['Importe de cada pedido', 'Id de cada pedido y su importe total (precio × cantidad), del más caro al más barato.', 'SELECT l.id_pedido, SUM(p.precio * l.cantidad) AS total FROM linea l JOIN producto p ON p.id = l.id_producto GROUP BY l.id_pedido ORDER BY total DESC'],
+  ['El más vendido', 'Nombre del producto del que más unidades se han vendido.', 'SELECT p.nombre FROM linea l JOIN producto p ON p.id = l.id_producto GROUP BY p.id ORDER BY SUM(l.cantidad) DESC LIMIT 1'],
+  ['Por encima de la media', 'Nombre y precio de los productos más caros que el precio medio.', 'SELECT nombre, precio FROM producto WHERE precio > (SELECT AVG(precio) FROM producto)'],
+].map(([titulo, enunciado, solucion], i) => ({ id: 'q' + (i + 1), titulo, enunciado, solucion }));
+// Compara resultados: mismas filas (y en el mismo orden si la solución usa ORDER BY); los nombres de columna dan igual.
+export function mismoResultado(a, b, conOrden) {
+  const filas = (r) => (r ? r.values.map((f) => JSON.stringify(f.map((v) => (typeof v === 'number' ? Math.round(v * 100) / 100 : v)))) : []);
+  const fa = filas(a), fb = filas(b);
+  if ((a ? a.columns.length : 0) !== (b ? b.columns.length : 0) || fa.length !== fb.length) return false;
+  if (!conOrden) { fa.sort(); fb.sort(); }
+  return fa.every((f, i) => f === fb[i]);
+}
+export function montarPracticaSql(cont, datos, alCambiar) {
+  const d = { codigo: { ...((datos && datos.codigo) || {}) }, resueltos: { ...((datos && datos.resueltos) || {}) }, actual: (datos && datos.actual) || 'q1' };
+  const guardar = () => alCambiar({ codigo: d.codigo, resueltos: d.resueltos, actual: d.actual });
+  let ed = null;
+  function pintar() {
+    const ej = EJ_SQL.find((x) => x.id === d.actual) || EJ_SQL[0];
+    cont.innerHTML = `<div class="hz practica">
+      <nav class="pr-lista" aria-label="Ejercicios">${EJ_SQL.map((x, i) => `<button type="button" data-pr="ir" data-v="${x.id}" aria-current="${x.id === ej.id}"><span>${d.resueltos[x.id] ? '✓' : i + 1}</span>${esc(x.titulo)}</button>`).join('')}
+        <p class="suave">${Object.keys(d.resueltos).length} de ${EJ_SQL.length} resueltos</p></nav>
+      <div class="pr-trabajo">
+        <div class="pr-enun"><b>${esc(ej.titulo)}</b><p>${esc(ej.enunciado)}</p></div>
+        <div class="barra-lab"><button type="button" class="boton principal" data-pr="comprobar">Comprobar</button><button type="button" class="boton mini" data-pr="ejecutar">Solo ejecutar</button>
+          <details class="pr-esquema"><summary>Ver las tablas</summary><pre>${esc(BD_PRACTICA.match(/CREATE TABLE[^;]+;/g).join('\n').replace(/ (INTEGER|TEXT|REAL|DATE)( NOT NULL)?/g, '').replace(/ REFERENCES \w+\(\w+\)/g, '→'))}</pre></details></div>
+        <div class="editor"></div>
+        <div class="sql-salida" aria-live="polite"></div>
+      </div></div>`;
+    ed = crearEditor(cont.querySelector('.editor'), d.codigo[ej.id] || 'SELECT ', { modo: 'text/x-sql', etiqueta: 'Tu consulta', alCambiar: (v) => { d.codigo[ej.id] = v; guardar(); }, alEjecutar: () => ejecutar(true) });
+  }
+  const tabla = (r) => (r ? `<div class="tabla-caja"><table><thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${r.values.map((f) => `<tr>${f.map((v) => `<td>${v === null ? '<span class="suave">NULL</span>' : esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : '<p class="suave">(sin filas)</p>');
+  async function ejecutar(comprobar) {
+    const salida = cont.querySelector('.sql-salida'), ej = EJ_SQL.find((x) => x.id === d.actual);
+    let SQL; try { SQL = await motorSql(); } catch (e) { salida.innerHTML = `<div class="aviso error"><b>No se pudo cargar el motor SQL</b></div>`; return; }
+    const db = new SQL.Database(); db.exec(BD_PRACTICA);
+    let tuyo;
+    try { const sts = sentencias(ed.get()); tuyo = sts.length ? db.exec(sts[sts.length - 1].sql)[0] : null; }
+    catch (e) { salida.innerHTML = `<div class="aviso error"><b>Error en la consulta</b><span class="mono">${esc(e.message)}</span></div>`; db.close(); return; }
+    if (!comprobar) { salida.innerHTML = tabla(tuyo); db.close(); return; }
+    const sol = db.exec(ej.solucion)[0]; db.close();
+    const bien = mismoResultado(tuyo, sol, /order\s+by/i.test(ej.solucion));
+    if (bien) { d.resueltos[ej.id] = true; guardar(); }
+    salida.innerHTML = `<div class="aviso ${bien ? 'ok' : 'error'}"><b>${bien ? 'Correcto' : 'Todavía no'}</b>${bien ? '' : `<span>Tu resultado tiene ${tuyo ? tuyo.values.length : 0} filas y ${tuyo ? tuyo.columns.length : 0} columnas; el esperado, ${sol ? sol.values.length : 0} y ${sol ? sol.columns.length : 0}.</span>`}</div>
+      ${bien ? '' : `<details class="plegable"><summary>Ver el resultado esperado</summary>${tabla(sol)}</details>`}<p class="suave">Tu resultado:</p>${tabla(tuyo)}`;
+    if (bien) { const b = cont.querySelector(`[data-pr="ir"][data-v="${ej.id}"] span`); if (b) b.textContent = '✓'; }
+  }
+  cont.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-pr]'); if (!b) return;
+    if (b.dataset.pr === 'ir') { d.actual = b.dataset.v; guardar(); pintar(); }
+    else ejecutar(b.dataset.pr === 'comprobar');
+  });
+  pintar();
+  return { foco: () => ed && ed.foco() };
+}
