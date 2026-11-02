@@ -27,7 +27,10 @@ const S = {
 };
 function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {} }; }
 const guardarCfg = () => LS.set('doodle-cfg', S.cfg);
-const aplicarTema = () => { document.documentElement.dataset.theme = S.cfg.tema === 'claro' ? 'light' : 'dark'; };
+const aplicarTema = () => { // sin elegir: sigue al sistema
+  const t = { claro: 'light', oscuro: 'dark' }[S.cfg.tema];
+  if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+};
 aplicarTema();
 
 // ---------- formato ----------
@@ -51,7 +54,7 @@ function cuenta(ts) {
 const claveDia = (ts) => { const d = new Date(ts * 1000); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); };
 const sinAcentos = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 // ---------- colores por módulo (automáticos; el rojo queda reservado para lo urgente) ----------
-const PALETA = ['#3D8BFF', '#2ED47A', '#FFB020', '#B26BFF', '#FF5FA2', '#22D3C5', '#FF7A1A', '#D9D24A'];
+const PALETA = ['var(--texto)']; // estilo monocromo: los módulos se distinguen por el nombre, no por el color
 function colorDe(modulo) {
   const i = cursos().findIndex((c) => nombreModulo(c.nombre) === modulo);
   if (i >= 0) return PALETA[i % PALETA.length];
@@ -262,7 +265,7 @@ function entrarDemo() {
   render();
 }
 
-const LOGO = '<span class="logo" aria-label="Doodle">DOOD<b>LE</b></span>';
+const LOGO = '<span class="logo">Doodle</span>';
 function pintarBloqueo(error) {
   const hay = S.sobreCurso || LS.get('doodle-curso') || LS.get('doodle-prog');
   app.innerHTML = `
@@ -312,13 +315,13 @@ function render(forzar) {
   app.innerHTML = `
   <div class="marco">
     <aside class="lateral">
-      <a href="#inicio" class="lateral-logo">${LOGO}<small>DAM · 1.º</small></a>
+      <a href="#inicio" class="lateral-logo">${LOGO}<small>DAM, primer curso</small></a>
       <nav aria-label="Secciones">${NAV.map(([id, t]) => `<a href="#${id}" ${id === base ? 'aria-current="page"' : ''}>${icono(id)}<span>${t}</span></a>`).join('')}</nav>
       <div class="lateral-pie" id="estado-pc"></div>
     </aside>
     <div class="principal">
       <header class="barra-sup">${LOGO}<div class="estado-movil" id="estado-movil"></div></header>
-      ${S.demo ? '<div class="demo-banda">Datos de ejemplo · nada de esto es tuyo · <a href="#" id="salir-demo">Salir</a></div>' : ''}
+      ${S.demo ? '<div class="demo-banda">Estás viendo datos de ejemplo. <a href="#" id="salir-demo">Salir</a></div>' : ''}
       <main class="vista" id="vista"></main>
     </div>
     <nav class="inferior" aria-label="Secciones">${NAV_MOVIL.map(([id, t]) => `<a href="#${id}" ${id === baseMovil ? 'aria-current="page"' : ''}>${icono(id)}<span>${t}</span></a>`).join('')}</nav>
@@ -347,17 +350,17 @@ window.addEventListener('hashchange', () => { if (S.curso) { render(true); windo
 const cabecera = (titulo, extra = '', ante = '') => `<header class="cab-vista">${ante ? `<span class="antetitulo">${ante}</span>` : ''}<h1>${titulo}</h1>${extra ? `<div class="cab-extra">${extra}</div>` : ''}</header>`;
 const cifra = (valor, texto, clase = '') => `<div class="cifra corte ${clase}"><b>${valor}</b><small>${texto}</small></div>`;
 const vacio = (t) => `<p class="vacio">${t}</p>`;
-// Fecha en palabras: «Hoy · 23:59», «Mañana · 18:25», «Jueves · 08:01», «Hace 3 días», «10 nov».
-const F_SEMANA = F({ weekday: 'long' });
+// Fecha en palabras: «Hoy a las 23:59», «Jueves a las 08:01», «Hace 3 días», «mié, 11 nov a las 18:25».
+const F_SEMANA = F({ weekday: 'long' }), F_DIA_MES = F({ day: 'numeric', month: 'short' });
 const inicioDia = (ts) => new Date(ts * 1000).setHours(0, 0, 0, 0) / 1000;
 function cuando(ts) {
   const dd = Math.round((inicioDia(ts) - inicioDia(ahora())) / D), hora = fHora(ts);
-  if (dd === 0) return 'Hoy · ' + hora;
-  if (dd === 1) return 'Mañana · ' + hora;
-  if (dd === -1) return 'Ayer · ' + hora;
+  if (dd === 0) return 'Hoy a las ' + hora;
+  if (dd === 1) return 'Mañana a las ' + hora;
+  if (dd === -1) return 'Ayer a las ' + hora;
   if (dd < 0) return `Hace ${-dd} días`;
-  if (dd < 7) { const w = F_SEMANA.format(ts * 1000); return w[0].toUpperCase() + w.slice(1) + ' · ' + hora; }
-  return fCorta(ts) + ' · ' + hora;
+  if (dd < 7) { const w = F_SEMANA.format(ts * 1000); return w[0].toUpperCase() + w.slice(1) + ' a las ' + hora; }
+  return F_DIA_MES.format(ts * 1000) + ' a las ' + hora;
 }
 function fila(i) {
   const t = i.tarea, s = t ? situacion(t) : 'evento', urg = t && urgente(t);
@@ -370,7 +373,7 @@ function fila(i) {
     </div>` : '';
   return `<div class="fila corte s-${s} ${urg ? 'urgente' : ''}" style="--mod:${colorDe(i.modulo)}">
     <span class="cuando">${cuando(i.fecha)}</span>
-    <div class="que">${titulo}<small><i class="punto-mod"></i>${esc(i.modulo || '—')}${t && t.origen === 'propia' ? ' · añadida por ti' : ''}</small>${propia}</div>
+    <div class="que">${titulo}<small><i class="punto-mod"></i>${esc(i.modulo || '—')}${t && t.origen === 'propia' ? ', añadida por ti' : ''}</small>${propia}</div>
     ${i.chip ? `<span class="chip ${i.chip[0]}">${esc(i.chip[1])}</span>` : '<span></span>'}
   </div>`;
 }
@@ -387,7 +390,7 @@ function listaFilas(items, vacioTxt) {
     const i0 = g.items[0], urg = g.items.some((i) => i.tarea && urgente(i.tarea));
     return `<details class="grupo-filas corte ${urg ? 'urgente' : ''}" style="--mod:${colorDe(i0.modulo)}">
       <summary class="fila"><span class="cuando">${cuando(i0.fecha)}</span>
-        <div class="que"><strong>${g.items.length} tareas de ${esc(i0.modulo)}</strong><small>${esc(g.items.slice(0, 3).map((i) => i.nombre.replace(/^(Exercic?i|Ejercicio|Tasca|Tarea)\s*/i, '')).join(' · '))}${g.items.length > 3 ? ' …' : ''}</small></div>
+        <div class="que"><strong>${g.items.length} tareas de ${esc(i0.modulo)}</strong><small>${esc(g.items.slice(0, 3).map((i) => i.nombre.replace(/^(Exercic?i|Ejercicio|Tasca|Tarea)\s*/i, '')).join(', '))}${g.items.length > 3 ? '…' : ''}</small></div>
         <span class="chip ${urg ? 'mal' : 'info'}">Ver ${g.items.length}</span></summary>
       <div class="lista">${g.items.map(fila).join('')}</div></details>`;
   }).join('')}</div>`;
@@ -414,27 +417,27 @@ function vistaInicio() {
   const medias = cursos().map(mediaCurso).filter((m) => m != null);
   const pendientes = T.filter(porHacer).length;
   const notas = T.filter((t) => t.nota10 != null).sort((a, b) => (b.enviada || b.entrega || 0) - (a.enviada || a.entrega || 0)).slice(0, 5);
+  const hoy = fDia(h);
+  const frase = urg.length ? `Tienes <span class="rojo">${urg.length} ${urg.length === 1 ? 'entrega urgente' : 'entregas urgentes'}</span>.`
+    : siguiente ? `Nada urgente. Lo siguiente es <a href="#tarea-${esc(siguiente.tarea.clave)}">${esc(siguiente.nombre)}</a>, ${cuando(siguiente.fecha).toLowerCase()}.`
+    : 'No tienes entregas pendientes.';
   return `
-  ${cabecera('Inicio', `<span class="suave">${fDia(h)}</span>`)}
-  <section class="bloque bloque-urgente corte ${urg.length ? '' : 'tranquilo'}">
-    <div class="lineas-velocidad" aria-hidden="true"></div>
-    <header><h2>${urg.length ? 'Urgente' : 'Nada urgente'}</h2><span class="suave">${urg.length ? 'Vence en 3 días o ya ha vencido y aún se admite' : siguiente ? 'Lo siguiente que vence:' : 'No tienes entregas pendientes.'}</span></header>
-    ${urg.length ? listaFilas(urg, '') : siguiente ? `<div class="lista">${fila(siguiente)}</div>` : ''}
-  </section>
+  <header class="portada"><p class="fecha">${hoy[0].toUpperCase() + hoy.slice(1)}</p><h1>${frase}</h1></header>
+  ${urg.length ? `<section class="bloque bloque-urgente"><header><h2>Urgente</h2><span class="suave">Vence en 3 días o ya ha vencido y aún se admite</span></header>${listaFilas(urg, '')}</section>` : ''}
   <div class="cifras">
     ${cifra(medias.length ? fNota(medias.reduce((a, b) => a + b) / medias.length) : '—', 'Media general')}
     ${cifra(pendientes, pendientes === 1 ? 'Entrega pendiente' : 'Entregas pendientes', pendientes ? '' : 'bien')}
     ${cifra(T.filter((t) => t.hecha).length, 'Entregadas')}
   </div>
   <div class="dos-col">
-    <section class="bloque"><header><h2>Próximas dos semanas</h2><a href="#calendario">Calendario →</a></header>
+    <section class="bloque"><header><h2>Próximas dos semanas</h2><a href="#calendario">Calendario</a></header>
       ${listaFilas(proximas, 'Nada más en las próximas dos semanas.')}</section>
     <div class="columna">
-      <section class="bloque"><header><h2>Módulos</h2><a href="#modulos">Ver todos →</a></header>
+      <section class="bloque"><header><h2>Módulos</h2><a href="#modulos">Ver todos</a></header>
         <div class="mini-mods">${cursos().map((c) => { const m = mediaCurso(c), pend = T.filter((t) => t.cursoId === c.id && porHacer(t)).length;
           return `<a class="mini-mod" href="#modulo-${c.id}" style="--mod:${colorDe(nombreModulo(c.nombre))}"><span class="mm-nombre">${esc(nombreModulo(c.nombre))}</span>
             <span class="mm-pend ${pend ? '' : 'suave'}">${pend ? pend + ' por entregar' : 'Al día'}</span><b style="color:${notaColor(m)}">${fNota(m)}</b></a>`; }).join('')}</div></section>
-      <section class="bloque"><header><h2>Últimas notas</h2><a href="#notas">Todas →</a></header>
+      <section class="bloque"><header><h2>Últimas notas</h2><a href="#notas">Todas</a></header>
         ${notas.length ? `<div class="lista">${notas.map((t) => `<a class="nota-fila" href="#tarea-${esc(t.clave)}" style="--mod:${colorDe(t.modulo)}"><span class="nf-nombre">${esc(t.nombre)}<small>${esc(t.modulo)}</small></span><b class="${t.nota10 < 5 ? 'susp' : ''}">${fNota(t.nota10)}</b></a>`).join('')}</div>` : vacio('Aún no hay notas.')}</section>
     </div>
   </div>`;
@@ -468,7 +471,7 @@ function vistaModulo(id) {
   const plegado = (titulo, items) => (items.length ? `<details class="plegable"><summary>${titulo} <span class="suave">(${items.length})</span></summary>${listaFilas(items, '')}</details>` : '');
   const secTareas = `<section class="bloque"><header><h2>Por entregar</h2></header>
       ${listaFilas(conFecha((t) => porHacer(t) || situacion(t) === 'futura'), 'Nada pendiente en este módulo.')}
-      ${sinFecha.length ? `<p class="suave">Sin fecha: ${sinFecha.map((t) => `<a href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>`).join(' · ')}</p>` : ''}
+      ${sinFecha.length ? `<p class="suave">Sin fecha: ${sinFecha.map((t) => `<a href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>`).join(', ')}</p>` : ''}
       ${plegado('Entregadas', hechas)}${plegado('Cerradas o antiguas sin entregar', perdidas)}</section>`;
   const conNota = c.notas.filter((n) => n.nota != null && n.max);
   const secNotas = `<section class="bloque"><header><h2>Calificaciones</h2><span class="suave">Media ${fNota(mediaCurso(c))} / 10</span></header>
@@ -477,7 +480,7 @@ function vistaModulo(id) {
   const secContenido = `<section class="bloque"><header><h2>Contenido</h2><a href="${esc(c.url)}" target="_blank" rel="noopener">Abrir en Aules ↗</a></header>
     ${c.secciones.filter((s) => s.elementos.length || s.resumen).map((s, i, arr) => `<details class="seccion corte" ${i === arr.length - 1 ? 'open' : ''}><summary>${esc(s.nombre || 'General')} <span class="suave">· ${s.elementos.length}</span></summary>
       ${s.resumen ? `<p class="suave pre">${esc(s.resumen)}</p>` : ''}
-      <ul>${s.elementos.map((e) => `<li>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.nombre)}</a>` : esc(e.nombre)} <small>· ${esc(TIPOS[e.tipo] || e.tipo)}${e.archivos.length ? ' · ' + esc(e.archivos.join(', ')) : ''}</small></li>`).join('')}</ul>
+      <ul>${s.elementos.map((e) => `<li>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.nombre)}</a>` : esc(e.nombre)} <small>${esc(TIPOS[e.tipo] || e.tipo)}${e.archivos.length ? ': ' + esc(e.archivos.join(', ')) : ''}</small></li>`).join('')}</ul>
     </details>`).join('') || vacio('Sin contenido.')}</section>`;
   const secEj = `<section class="bloque"><header><h2>Ejercicios y trabajos</h2><a href="#ejercicios" data-acc="ir-ejercicios" data-modulo="${esc(nombre)}">Abrir en Ejercicios</a></header>${listaEjercicios(nombre)}</section>`;
   const cuerpo = { tareas: secTareas, notas: secNotas, contenido: secContenido, ejercicios: secEj }[tab]
@@ -541,14 +544,14 @@ function vistaNotas() {
   const T = tareas();
   const porModulo = cursos().map((c) => [nombreModulo(c.nombre), mediaCurso(c), colorDe(nombreModulo(c.nombre))]).filter(([, m]) => m != null);
   const propias = T.filter((t) => t.origen === 'propia' && t.nota10 != null);
-  return cabecera('Notas', '<span class="suave">Todo sobre 10 · la línea marca el 5</span>') + `
+  return cabecera('Notas', '<span class="suave">Todas las notas sobre 10. La línea vertical marca el 5.</span>') + `
   <section class="bloque"><header><h2>Media por módulo</h2></header>${barras(porModulo)}</section>
   <div class="rejilla-notas">${cursos().map((c) => {
     const ns = c.notas.filter((n) => n.nota != null && n.max), nombre = nombreModulo(c.nombre);
     return ns.length ? `<section class="bloque"><header><h2 class="h-mod" style="--mod:${colorDe(nombre)}"><i class="punto-mod"></i>${esc(nombre)}</h2><a href="#modulo-${c.id}">Detalle</a></header>
       ${barras(ns.map((n) => [n.nombre, n.nota / n.max * 10, colorDe(nombre)]))}</section>` : '';
   }).join('')}</div>
-  ${propias.length ? `<section class="bloque"><header><h2>Notas que has añadido tú</h2></header>${barras(propias.map((t) => [t.modulo + ' · ' + t.nombre, t.nota10, colorDe(t.modulo)]))}</section>` : ''}`;
+  ${propias.length ? `<section class="bloque"><header><h2>Notas que has añadido tú</h2></header>${barras(propias.map((t) => [t.modulo + ': ' + t.nombre, t.nota10, colorDe(t.modulo)]))}</section>` : ''}`;
 }
 
 function vistaMas() {
@@ -568,7 +571,7 @@ function vistaAjustes() {
       <p class="suave">El token se saca abriendo <span class="mono">aules.edu.gva.es/fp/login/token.php?service=moodle_mobile_app&amp;username=…&amp;password=…</span> y copiando el valor de <span class="mono">"token"</span>. Se guarda cifrado con tu contraseña en este dispositivo.</p>
       ${demo || `<form id="f-aules" class="rejilla-form">
         <label class="campo"><span>Dirección de Aules</span><input type="text" id="a-url" value="${esc(S.aules ? S.aules.url : 'https://aules.edu.gva.es/fp')}" required></label>
-        <label class="campo"><span>Token</span><input type="password" id="a-token" autocomplete="off" placeholder="${S.aules ? 'Ya guardado · pega otro para cambiarlo' : '32 letras y números'}" ${S.aules ? '' : 'required'}></label>
+        <label class="campo"><span>Token</span><input type="password" id="a-token" autocomplete="off" placeholder="${S.aules ? 'Ya guardado. Pega otro para cambiarlo' : '32 letras y números'}" ${S.aules ? '' : 'required'}></label>
         <div class="campo campo-boton"><div class="fila-botones"><button class="boton principal">Guardar y sincronizar</button>${S.aules ? '<button type="button" class="boton peligro" data-acc="quitar-aules">Quitar</button>' : ''}</div></div>
       </form><p class="suave" id="aules-estado" role="status"></p>`}
     </div></section>
@@ -583,14 +586,13 @@ function vistaAjustes() {
       </ol>
       ${demo || `<form id="f-pat" class="rejilla-form">
         ${location.hostname.endsWith('.github.io') ? '' : `<label class="campo"><span>Repositorio</span><input type="text" id="p-repo" value="${esc(S.cfg.repo || 'vyxode/doodle')}" required></label>`}
-        <label class="campo"><span>Clave de GitHub</span><input type="password" id="p-pat" autocomplete="off" placeholder="${S.pat ? 'Ya guardada · pega otra para cambiarla' : 'github_pat_…'}" ${S.pat ? '' : 'required'}></label>
+        <label class="campo"><span>Clave de GitHub</span><input type="password" id="p-pat" autocomplete="off" placeholder="${S.pat ? 'Ya guardada. Pega otra para cambiarla' : 'github_pat_…'}" ${S.pat ? '' : 'required'}></label>
         <div class="campo campo-boton"><div class="fila-botones"><button class="boton principal">Guardar</button>${S.pat ? '<button type="button" class="boton peligro" data-acc="quitar-pat">Quitar</button>' : ''}</div></div>
       </form><p class="suave" id="pat-estado" role="status"></p>`}
     </div></section>
   <section class="bloque"><header><h2>Apariencia</h2></header>
     <div class="panel corte"><div class="seg" role="group" aria-label="Tema">
-      <button type="button" data-acc="tema" data-v="oscuro" aria-pressed="${S.cfg.tema !== 'claro'}">Oscuro</button>
-      <button type="button" data-acc="tema" data-v="claro" aria-pressed="${S.cfg.tema === 'claro'}">Claro</button></div></div></section>
+      ${[['', 'Como el sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']].map(([k, t]) => `<button type="button" data-acc="tema" data-v="${k}" aria-pressed="${(S.cfg.tema || '') === k}">${t}</button>`).join('')}</div></div></section>
   <section class="bloque"><header><h2>Copia de seguridad</h2></header>
     <div class="panel corte"><p>Descarga tu progreso en un archivo (sin cifrar) o recupéralo de una copia. Al recuperar se mezcla con lo que ya tienes.</p>
       <div class="fila-botones"><button class="boton" data-acc="exportar">Descargar copia</button>
@@ -661,7 +663,7 @@ function simular(req) {
 const PLANTILLA = 'using System;\n\nclass Program {\n\tpublic static void Main() {\n\t\t\n\t}\n}\n';
 function montarCsharp(cont, datos, alCambiar) {
   cont.innerHTML = `<div class="hz hz-cs">
-    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button><span class="suave atajo">Ctrl + Intro · admite lo visto hasta el tema 4</span><span class="estado-guardado" aria-live="polite"></span></div>
+    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button><span class="suave atajo">Ctrl + Intro ejecuta. Admite lo visto hasta el tema 4.</span><span class="estado-guardado" aria-live="polite"></span></div>
     <div class="editor"></div>
     <div class="consola" tabindex="-1" aria-label="Consola del programa"><span class="vacia">Pulsa Ejecutar para lanzar el programa.</span></div>
     <div class="cs-aviso" aria-live="polite"></div></div>`;
@@ -669,7 +671,7 @@ function montarCsharp(cont, datos, alCambiar) {
   let entradas = [], semilla = 1, ocupado = false;
   const ed = crearEditor(cont.querySelector('.editor'), (datos && datos.codigo) || PLANTILLA, {
     modo: 'text/x-csharp', etiqueta: 'Código C#', alEjecutar: () => lanzar([]),
-    alCambiar: (v) => { alCambiar({ codigo: v }); estado.textContent = S.demo ? 'Guardado en este navegador' : S.pat ? 'Guardado · se sincroniza en unos segundos' : 'Guardado en este dispositivo'; },
+    alCambiar: (v) => { alCambiar({ codigo: v }); estado.textContent = S.demo ? 'Guardado en este navegador' : S.pat ? 'Guardado. Se sincroniza en unos segundos' : 'Guardado en este dispositivo'; },
   });
   async function lanzar(ent, misma) {
     if (ocupado) return; ocupado = true; btn.disabled = true;
@@ -695,7 +697,7 @@ function montarCsharp(cont, datos, alCambiar) {
     if (r.status === 'done') { aviso.className = 'aviso ok'; aviso.textContent = 'Programa terminado.'; lugar.append(aviso); return; }
     aviso.className = 'aviso error';
     const b = document.createElement('b');
-    b.textContent = (r.status === 'compile' ? 'Error de compilación en la línea ' + r.line : r.status === 'exception' ? 'El programa se ha parado en la línea ' + r.line : 'Programa detenido' + (r.line ? ' (línea ' + r.line + ')' : '')) + (r.code && r.code !== 'SIM' ? ' · ' + r.code : '');
+    b.textContent = (r.status === 'compile' ? 'Error de compilación en la línea ' + r.line : r.status === 'exception' ? 'El programa se ha parado en la línea ' + r.line : 'Programa detenido' + (r.line ? ' (línea ' + r.line + ')' : '')) + (r.code && r.code !== 'SIM' ? ' (' + r.code + ')' : '');
     const m = document.createElement('span'); m.textContent = r.error;
     aviso.append(b, m);
     if (r.line) { const ir = document.createElement('button'); ir.type = 'button'; ir.className = 'boton mini'; ir.textContent = 'Ir a la línea ' + r.line; ir.addEventListener('click', () => ed.ir(r.line)); aviso.append(ir); ed.marcar(r.line); }
@@ -719,12 +721,12 @@ function vistaTarea(clave) {
   const t = tareas().find((x) => x.clave === clave);
   if (!t) return cabecera('Tarea') + vacio('Esa tarea ya no está en Aules. <a href="#inicio">Volver</a>');
   const c = t.cursoId && cursos().find((x) => x.id === t.cursoId), est = estadoTarea(t), tr = trabajoDeTarea(clave), h = herramientaPara(t.modulo, t.nombre);
-  const fecha = (et, ts) => (ts ? `<div><dt>${et}</dt><dd>${fCorta(ts)} · ${fHora(ts)}</dd></div>` : '');
+  const fecha = (et, ts) => (ts ? `<div><dt>${et}</dt><dd>${fCorta(ts)}, ${fHora(ts)}</dd></div>` : '');
   return `<div class="cab-modulo corte trama-esquina" style="--mod:${colorDe(t.modulo)}">
       <a href="${c ? '#modulo-' + c.id : '#calendario'}" class="antetitulo">← ${esc(t.modulo)}</a><h1>${esc(t.nombre)}</h1>
       ${est ? `<span class="chip ${est[0]}">${esc(est[1])}</span>` : ''}</div>
     <div class="aviso-tarea s-${situacion(t)}" style="--mod:${colorDe(t.modulo)}">${{
-      hecha: `Entregada${t.enviada ? ' el ' + fCorta(t.enviada) : ''}${t.nota10 != null ? ' · nota ' + fNota(t.nota10) + ' / 10' : ' · sin nota todavía'}.`,
+      hecha: `Entregada${t.enviada ? ' el ' + fCorta(t.enviada) : ''}${t.nota10 != null ? '. Nota: ' + fNota(t.nota10) + ' sobre 10' : '. Aún sin nota'}.`,
       futura: `Aún no se puede entregar: se abre el ${fCorta(t.apertura)} a las ${fHora(t.apertura)}.`,
       cerrada: 'Cerrada: Aules ya no admite entregas de esta tarea.',
       antigua: `Venció hace más de dos semanas (${fCorta(t.entrega)}). Si aún cuenta, pregunta al profesor.`,
@@ -759,7 +761,7 @@ function vistaTrabajo(id) {
   return `<div class="taller" id="taller" style="--mod:${colorDe(w.modulo)}">
     <header class="taller-cab corte">
       <a class="boton mini" href="${t ? '#tarea-' + esc(w.tarea) : '#ejercicios'}">←</a>
-      <div class="taller-titulo"><span class="antetitulo">${esc(w.modulo || 'Sin módulo')}${t && t.entrega ? ' · entrega ' + fCorta(t.entrega) : ''}</span><input type="text" id="w-titulo" value="${esc(w.titulo)}" aria-label="Nombre del trabajo"></div>
+      <div class="taller-titulo"><span class="antetitulo">${esc(w.modulo || 'Sin módulo')}${t && t.entrega ? ', entrega el ' + fCorta(t.entrega) : ''}</span><input type="text" id="w-titulo" value="${esc(w.titulo)}" aria-label="Nombre del trabajo"></div>
       <select id="w-tipo" aria-label="Herramienta">${Object.entries(HERR).map(([k, v]) => `<option value="${k}" ${k === w.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select>
       ${t && t.enunciado ? '<button type="button" class="boton mini" data-acc="enunciado" aria-expanded="false">Enunciado</button>' : ''}
     </header>
@@ -800,7 +802,7 @@ function vistaEjercicios() {
     </form></details>
   ${(window.EJERCICIOS || []).some((x) => x.modulo === m) || Object.values(S.prog.ejPropios).some((e) => e.modulo === m) ? `<details class="panel corte"><summary>+ Añadir un ejercicio de C# al catálogo</summary>
     <form id="f-ej" class="rejilla-form">
-      <label class="campo"><span>Tema</span><input type="text" id="e-tema" required placeholder="Tema 5 · Funciones"></label>
+      <label class="campo"><span>Tema</span><input type="text" id="e-tema" required placeholder="Tema 5: funciones"></label>
       <label class="campo"><span>Número</span><input type="text" id="e-n" placeholder="5.1.1"></label>
       <label class="campo campo-ancho"><span>Enunciado</span><textarea id="e-texto" required></textarea></label>
       <div class="campo campo-boton"><button class="boton principal">Añadir ejercicio</button></div>
@@ -814,10 +816,10 @@ function listaEjercicios(modulo) {
   const libres = trabajos().filter((w) => w.modulo === modulo && !w.tarea).sort((a, b) => (b.t || 0) - (a.t || 0));
   let html = '';
   const filaEj = (t) => { const est = estadoTarea(t), w = conTrabajo(t);
-    return `<div class="ej ej-t corte s-${situacion(t)}"><span class="ej-num">${t.entrega ? cuando(t.entrega).replace(/ · .*/, '') : 'Sin fecha'}</span>
+    return `<div class="ej ej-t corte s-${situacion(t)}"><span class="ej-num">${t.entrega ? cuando(t.entrega).replace(/ a las .*/, '') : 'Sin fecha'}</span>
       <a class="ej-txt ej-tarea" href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>
       ${est ? `<span class="chip ${est[0]}">${esc(est[1])}</span>` : '<span></span>'}
-      <div class="ej-acc">${w ? `<a class="boton mini principal" href="#trabajo-${w.id}">Seguir · ${esc(HERR[w.tipo])}</a>` : `<button type="button" class="boton mini" data-acc="trabajar" data-v="${esc(t.clave)}">Empezar</button>`}</div></div>`; };
+      <div class="ej-acc">${w ? `<a class="boton mini principal" href="#trabajo-${w.id}">Seguir (${esc(HERR[w.tipo])})</a>` : `<button type="button" class="boton mini" data-acc="trabajar" data-v="${esc(t.clave)}">Empezar</button>`}</div></div>`; };
   const orden = (a, b) => (a.entrega || 9e9) - (b.entrega || 9e9);
   const activas = ts.filter((t) => porHacer(t) || situacion(t) === 'futura' || conTrabajo(t) && !t.hecha).sort(orden), resto = ts.filter((t) => !activas.includes(t)).sort((a, b) => orden(b, a));
   if (ts.length) html += `<section class="bloque" style="--mod:${color}"><header><h2>Tareas de Aules</h2></header>
