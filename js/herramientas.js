@@ -399,30 +399,36 @@ export function montarJava(cont, datos, alCambiar) {
     const codigo = await window.cheerpjRunMain('com.sun.tools.javac.Main', rutaApp('tools.jar') + ':' + lib, '-encoding', 'UTF-8', '-nowarn', '-d', '/files/', '-cp', lib, ...d.archivos.map((a) => '/str/' + a.nombre), ...extra);
     return { codigo, cp: lib };
   }
+  // CheerpJ escribe la salida en #console, que vive oculto en <body> y no se toca: aquí solo se copia a la vista.
   const consola = () => document.getElementById('console');
-  // Espera a que aparezca la marca de fin que escribe el lanzador (CheerpJ no avisa de otra forma).
-  function esperarFin(limite = 30000) {
+  const limpia = (t) => t.split('\n').filter((l) => !l.startsWith('\u0000')).join('\n').replace(/\u0000FIN/g, '').replace(/\/str\//g, '');
+  // Espera la marca de fin que escribe el lanzador (CheerpJ no avisa de otra forma), mostrando la salida según llega.
+  function esperarFin(pre, limite) {
     return new Promise((ok) => {
       const c = consola(), t0 = Date.now();
-      const mira = () => { if (c.textContent.includes('\u0000FIN') || Date.now() - t0 > limite) return ok(Date.now() - t0 > limite); setTimeout(mira, 120); };
+      const mira = () => {
+        pre.textContent = limpia(c.textContent);
+        if (c.textContent.includes('\u0000FIN') || Date.now() - t0 > limite) return ok(Date.now() - t0 > limite);
+        setTimeout(mira, 150);
+      };
       mira();
     });
   }
   async function ejecutar(tests) {
     if (ocupado) return; ocupado = true;
     const btns = cont.querySelectorAll('[data-j="ejecutar"],[data-j="tests"]'); btns.forEach((b) => { b.disabled = true; });
-    resTests.innerHTML = '';
+    resTests.innerHTML = ''; ed.limpiar();
     const aviso = (t) => { salida.innerHTML = `<span class="vacia">${esc(t)}</span>`; };
     try {
       if (!d.archivos.some((a) => (tests ? esTest(a) : tieneMain(a)))) throw new Error(tests ? 'No hay ninguna clase con @Test. Añade una con «+ Test».' : 'Ninguna clase tiene «public static void main(String[] args)».');
       await arrancarJvm(aviso);
       aviso('Compilando…');
       const c = consola(); c.textContent = '';
-      salida.innerHTML = ''; salida.append(c); c.hidden = false;
       const { codigo, cp } = await compilar();
+      const pre = document.createElement('pre'); salida.innerHTML = ''; salida.append(pre);
       if (codigo !== 0) {
         const lin = (c.textContent.match(/\/str\/([\w.]+\.java):(\d+):/) || []);
-        c.textContent = c.textContent.replace(/\/str\//g, '');
+        pre.textContent = limpia(c.textContent);
         const nombre = lin[1], n = +lin[2];
         if (nombre) { const i = d.archivos.findIndex((a) => a.nombre === nombre); if (i >= 0 && i !== d.activo) abrir(i); ed.marcar(n); }
         salida.insertAdjacentHTML('beforeend', '<div class="aviso error"><b>Error de compilación</b><span>Revisa el mensaje de arriba: indica el archivo y la línea.</span></div>');
@@ -431,7 +437,7 @@ export function montarJava(cont, datos, alCambiar) {
       c.textContent = '';
       const args = tests ? ['--tests', ...d.archivos.filter(esTest).map(nombreClase)] : [nombreClase(d.archivos.find(tieneMain))];
       window.cheerpjRunMain('doodle.Lanzador', cp, ...args);
-      const agotado = await esperarFin(tests ? 60000 : 30000);
+      const agotado = await esperarFin(pre, tests ? 60000 : 30000);
       const texto = c.textContent;
       if (tests) {
         const filas = texto.split('\n').filter((l) => l.startsWith('\u0000OK ') || l.startsWith('\u0000MAL '));
@@ -441,7 +447,7 @@ export function montarJava(cont, datos, alCambiar) {
           return `<li class="${ok ? 'ok' : 'mal'}"><b>${ok ? '✓' : '✗'} ${esc(nom)}</b>${msg ? `<span>${esc(msg)}</span>` : ''}</li>`;
         }).join('')}</ul>`;
       }
-      c.textContent = texto.split('\n').filter((l) => !l.startsWith('\u0000')).join('\n').replace(/\u0000FIN/g, '');
+      if (!pre.textContent.trim()) pre.remove();
       if (agotado) salida.insertAdjacentHTML('beforeend', '<div class="aviso error"><b>El programa no ha terminado</b><span>¿Un bucle infinito o espera más datos? Recarga la página para pararlo.</span></div>');
       else if (!tests) salida.insertAdjacentHTML('beforeend', '<div class="aviso ok">Programa terminado.</div>');
     } catch (e) { salida.innerHTML = `<div class="aviso error"><b>No se pudo ejecutar</b><span>${esc(e.message)}</span></div>`; }
