@@ -25,6 +25,13 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      # GitHub Pages cachea 10 min: cada publicación pide sus propios .js y .css para no mezclar versiones
+      - name: Versionar recursos
+        run: |
+          V=${GITHUB_SHA::8}
+          sed -i -E "s#(from '\./[a-z]+\.js)'#\1?v=$V'#g" js/*.js
+          sed -i -E "s#(src=\"js/[a-z]+\.js)\"#\1?v=$V\"#g; s#(href=\"css/[a-z]+\.css)\"#\1?v=$V\"#g" index.html
+          grep -c "?v=$V" index.html js/app.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
