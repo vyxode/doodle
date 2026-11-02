@@ -19,7 +19,7 @@ export function nombreModulo(n) {
 // los saltos de línea del código HTML no cuentan (Aules los mete al partir líneas largas); solo <br> y los párrafos
 const texto = (html) => (html || '').replace(/\s*\n\s*/g, ' ').replace(/<br\s*\/?>|<\/(p|div|li|h\d)>/gi, '\n').replace(/<[^>]+>/g, '')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
-  .replace(/\n{3,}/g, '\n\n').trim();
+  .replace(/[ \t]*\n[ \t]*/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 
 // Moodle espera los arrays como clave[0]=..., clave[1]=...
 function aplanar(obj, form, pre = '') {
