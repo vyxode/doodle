@@ -1,0 +1,42 @@
+// Pruebas automáticas de los ejercicios de C# (tema 4). Cada caso da las entradas (una por línea, como si
+// se tecleasen) y lo que debe aparecer en lo que el programa escribe DESPUÉS del último dato:
+//   n: números que deben salir (un array dentro = vale cualquiera de ellos), en orden si orden: true
+//   t: textos que deben salir (sin distinguir mayúsculas; con sinEspacios se ignoran los espacios)
+//   veces: [texto, mínimo de veces]
+window.PRUEBAS_CS = {
+  'prog-4.1.1.1': [{ e: ['2', '4', '6', '8'], n: [5, 2, 4, 6, 8] }, { e: ['1', '1', '1', '2'], n: [1.25] }],
+  'prog-4.1.1.2': [{ e: ['1', '2', '3', '4', '5'], n: [5, 4, 3, 2, 1], orden: true }],
+  'prog-4.1.2.1': [{ e: ['2'], n: [28] }, { e: ['4'], n: [30] }, { e: ['12'], n: [31] }],
+  'prog-4.1.3.1': [{ e: ['1', '2', '3', '4', '5', '6'], n: [6, 5, 4, 3, 2, 1], orden: true }],
+  'prog-4.1.3.2': [{ e: ['3', '2', '4', '9'], n: [5] }, { e: ['2', '1', '2'], n: [1.5] }],
+  'prog-4.1.3.3': [{ e: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], n: [5.5, 6, 7, 8, 9, 10] }],
+  'prog-4.1.3.4': [{ e: ['2', '15'], n: [46] }, { e: ['12', '31'], n: [365] }, { e: ['1', '1'], n: [1] }],
+  'prog-4.1.3.5': [{ e: ['15', '2'], n: [[319, 320]] }, { e: ['31', '12'], n: [[0, 1]] }],
+  'prog-4.1.3.8': [{ e: ['2', '-5', '7'], n: [8.83] }, { e: ['3', '4', '0'], n: [5] }],
+  'prog-4.1.3.9': [{ e: ['1', '2', '3', '4', '5', '6'], n: [5, 7, 9], orden: true }],
+  'prog-4.1.3.10': [{ e: ['1', '2', '3', '4', '5', '6'], n: [32] }],
+  'prog-4.1.3.11': [{ e: ['3', '9', '1', '4'], n: [9] }, { e: ['-5', '-2', '-9', '-7'], n: [-2] }],
+  'prog-4.2.1': [{ e: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '20', '19', '18', '17', '16', '15', '14', '13', '12', '11'], n: [10, 20] }],
+  'prog-4.2.4': [{ e: ['1', '2', '3', '4'], n: [-2] }, { e: ['2', '0', '0', '3'], n: [6] }],
+  'prog-4.2.5': [{ e: ['1', '2', '3', '0', '1', '4', '5', '6', '0'], n: [1] }, { e: ['2', '0', '0', '0', '3', '0', '0', '0', '4'], n: [24] }],
+  'prog-4.4.1.1': [{ e: ['Ana'], veces: ['Ana', 5] }],
+  'prog-4.4.1.2': [{ e: ['Pepe'], t: ['Pepe'] }],
+  'prog-4.4.1.4': [{ e: ['6', '3', 'suma'], n: [9] }, { e: ['6', '3', 'resta'], n: [3] }],
+  'prog-4.4.2.1': [{ e: ['Juan'], t: ['J'] }],
+  'prog-4.4.3.1': [{ e: ['Juan'], t: ['J u a n'] }],
+  'prog-4.4.3.2': [{ e: ['Hola mundo'], t: ['odnum aloH'] }],
+  'prog-4.4.3.4': [{ e: ['99999999999999999999', '1'], t: ['100000000000000000000'] }, { e: ['123', '877'], t: ['1000'] }],
+  'prog-4.4.3.5': [{ e: ['12345678901234567890', '10'], t: ['123456789012345678900'] }, { e: ['99', '99'], t: ['9801'] }],
+  'prog-4.4.4.1': [{ e: ['Juan'], t: ['J u a n'] }],
+  'prog-4.4.4.2': [{ e: ['Juan'], t: ['J\nJu\nJua\nJuan'] }],
+  'prog-4.4.6.2': [{ e: ['hola    que   tal'], t: ['hola que tal'] }],
+  'prog-4.4.7.1': [{ e: ['uno dos tres'], t: ['tres dos uno'] }],
+  'prog-4.4.7.2': [{ e: ['1 2 3 4'], n: [10] }, { e: ['10 -4'], n: [6] }],
+  'prog-4.4.9.1': [{ e: ['murcielago'], t: ['morcoologo'] }],
+  'prog-4.4.10.1': [{ e: ['Hola'], t: ['Hola', '----'] }],
+  'prog-4.5.1': [{ e: ['Juan'], t: ['J u a n'] }],
+  'prog-4.5.3': [{ e: ['1 2 3 4'], n: [10] }],
+  'prog-4.6.1': [{ e: ['Ana', 'López', '20'], t: ['Ana,López,20'], sinEspacios: true }],
+  'prog-4.7.1': [{ e: ['3', '1,5', '2', '-1', '0', '10'], n: [-1, 0, 1.5, 2, 3, 10], orden: true }],
+  'prog-4.7.2': [{ e: ['pera', 'ana', 'zorro', 'melón', 'kiwi'], t: ['ana', 'kiwi', 'melón', 'pera', 'zorro'], orden: true }],
+};

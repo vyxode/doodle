@@ -4,8 +4,9 @@
 //   (data/curso.enc y data/progreso.enc) para tenerlo igual en todos tus dispositivos.
 import { cifrar, descifrar } from './cripto.js';
 import { descargarAules, raizAules, nombreModulo } from './aules.js';
-import { crearEditor, montarSql, montarWeb, montarKanban, montarJava } from './herramientas.js';
-import { montarDiagrama } from './diagrama.js';
+import { crearEditor, montarSql, montarWeb, montarKanban, montarJava, cargarScript, comprobarCaso, montarPracticaSql, EJ_SQL } from './herramientas.js';
+const EJ_SQL_N = EJ_SQL.length;
+import { montarDiagrama, svgExportable } from './diagrama.js';
 
 const D = 86400;
 const URGENTE = 3 * D; // a menos de 3 días: en rojo
@@ -26,7 +27,7 @@ const S = {
   filtro: { modulo: '' }, tabModulo: 'todo', mes: null, diaSel: null, recordar: false,
   objetivos: {}, semanaPlan: 0, calVista: 'mes', pomo: null,
 };
-function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {}, marcas: {}, plan: {}, tiempo: {} }; }
+function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {}, marcas: {}, plan: {}, tiempo: {}, repaso: {} }; }
 const guardarCfg = () => LS.set('doodle-cfg', S.cfg);
 const aplicarTema = () => { // sin elegir: sigue al sistema
   const t = { claro: 'light', oscuro: 'dark' }[S.cfg.tema];
@@ -268,6 +269,7 @@ async function entrar(pass) {
   S.pat = S.cfg.patSobre ? (await descifrar(pass, S.cfg.patSobre).catch(() => ({}))).pat || null : null;
   S.aules = S.cfg.aulesSobre ? await descifrar(pass, S.cfg.aulesSobre).catch(() => null) : null;
   if (S.recordar) { LS.set('doodle-recordar', pass); S.recordar = false; }
+  if (location.hash.startsWith('#config-')) { try { await aplicarConfig(location.hash.slice(8)); } catch (e) { /* código de otra contraseña */ } location.hash = 'inicio'; }
   render();
   if (S.pat) {
     estadoSync('Leyendo GitHub…', 'ambar');
@@ -333,7 +335,7 @@ const NAV = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Cale
 const NAV_MOVIL = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['mas', 'Más']];
 
 function render(forzar) {
-  const v = location.hash.slice(1) || 'inicio';
+  const v = location.hash.startsWith('#config-') ? 'inicio' : location.hash.slice(1) || 'inicio';
   // shortcut: con un trabajo abierto, los repintados (sincronizar, etc.) no lo vuelven a montar para no perder deshacer y selección
   if (v === 'trabajo-' + S.montado && document.getElementById('taller') && !forzar) return pintarEstado();
   S.montado = null;
@@ -358,7 +360,7 @@ function render(forzar) {
   const vista = document.getElementById('vista');
   document.body.classList.toggle('en-taller', v.startsWith('trabajo-'));
   vista.innerHTML = v.startsWith('modulo-') ? vistaModulo(+v.slice(7)) : v.startsWith('tarea-') ? vistaTarea(v.slice(6)) : v.startsWith('trabajo-') ? vistaTrabajo(v.slice(8))
-    : ({ inicio: vistaInicio, modulos: vistaModulos, calendario: vistaCalendario, notas: vistaNotas, ejercicios: vistaEjercicios, ajustes: vistaAjustes, mas: vistaMas }[v] || vistaInicio)();
+    : ({ inicio: vistaInicio, modulos: vistaModulos, calendario: vistaCalendario, notas: vistaNotas, ejercicios: vistaEjercicios, ajustes: vistaAjustes, mas: vistaMas, repaso: vistaRepaso }[v] || vistaInicio)();
   if (v.startsWith('trabajo-')) montarTrabajo(v.slice(8));
   actualizarContador();
   const sd = document.getElementById('salir-demo');
@@ -514,7 +516,9 @@ function vistaModulo(id) {
   const secContenido = `<section class="bloque"><header><h2>Contenido</h2><a href="${esc(c.url)}" target="_blank" rel="noopener">Abrir en Aules ↗</a></header>
     ${c.secciones.filter((s) => s.elementos.length || s.resumen).map((s, i, arr) => `<details class="seccion corte" ${i === arr.length - 1 ? 'open' : ''}><summary>${esc(s.nombre || 'General')} <span class="suave">· ${s.elementos.length}</span></summary>
       ${s.resumen ? `<p class="suave pre">${esc(s.resumen)}</p>` : ''}
-      <ul>${s.elementos.map((e) => `<li>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.nombre)}</a>` : esc(e.nombre)} <small>${esc(TIPOS[e.tipo] || e.tipo)}${e.archivos.length ? ': ' + esc(e.archivos.join(', ')) : ''}</small></li>`).join('')}</ul>
+      <ul>${s.elementos.map((e) => { const fs = archivosDe(e).filter((f) => f.url);
+        return `<li>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.nombre)}</a>` : esc(e.nombre)} <small>${esc(TIPOS[e.tipo] || e.tipo)}</small>
+        ${fs.length ? `<span class="archivos">${fs.map((f) => { const k = 'f' + archivosPorId.size; archivosPorId.set(k, f); return `<button type="button" class="archivo" data-acc="archivo" data-v="${k}">${esc(f.nombre)}${f.tam ? ` <small>${tamano(f.tam)}</small>` : ''}</button>`; }).join('')}</span>` : archivosDe(e).length ? `<small>: ${esc(archivosDe(e).map((f) => f.nombre).join(', '))}</small>` : ''}</li>`; }).join('')}</ul>
     </details>`).join('') || vacio('Sin contenido.')}</section>`;
   const secEj = `<section class="bloque"><header><h2>Ejercicios y trabajos</h2><a href="#ejercicios" data-acc="ir-ejercicios" data-modulo="${esc(nombre)}">Abrir en Ejercicios</a></header>${listaEjercicios(nombre)}</section>`;
   const cuerpo = { tareas: secTareas, notas: secNotas, contenido: secContenido, ejercicios: secEj }[tab]
@@ -780,6 +784,13 @@ function vistaAjustes() {
         <div class="campo campo-boton"><div class="fila-botones"><button class="boton principal">Guardar</button>${S.pat ? '<button type="button" class="boton peligro" data-acc="quitar-pat">Quitar</button>' : ''}</div></div>
       </form><p class="suave" id="pat-estado" role="status"></p>`}
     </div></section>
+  <section class="bloque"><header><h2>Otro dispositivo</h2></header>
+    <div class="panel corte">
+      <p>Pasa la conexión con Aules y GitHub a tu móvil u otro ordenador sin volver a pegar claves.</p>
+      ${demo || `<div class="fila-botones"><button type="button" class="boton" data-acc="ver-qr">Mostrar código QR</button></div><div id="qr-caja"></div>
+      <form id="f-config" class="rejilla-form"><label class="campo campo-ancho"><span>¿Vienes de otro dispositivo? Pega aquí el código</span><input type="text" id="c-codigo" autocomplete="off" required></label>
+        <div class="campo campo-boton"><button class="boton">Usar este código</button></div></form><p class="suave" id="config-estado" role="status"></p>`}
+    </div></section>
   <section class="bloque"><header><h2>Apariencia</h2></header>
     <div class="panel corte"><div class="seg" role="group" aria-label="Tema">
       ${[['', 'Como el sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']].map(([k, t]) => `<button type="button" data-acc="tema" data-v="${k}" aria-pressed="${(S.cfg.tema || '') === k}">${t}</button>`).join('')}</div></div></section>
@@ -806,7 +817,7 @@ function vistaAjustes() {
 }
 
 // ---------- herramientas de trabajo ----------
-const HERR = { diagrama: 'Diagrama', sql: 'SQL', java: 'Java', csharp: 'C#', web: 'HTML/CSS', kanban: 'Tablero', notas: 'Notas' };
+const HERR = { diagrama: 'Diagrama', sql: 'SQL', practica: 'Práctica SQL', java: 'Java', csharp: 'C#', web: 'HTML/CSS', kanban: 'Tablero', notas: 'Notas' };
 // Herramienta (y notación de diagrama) más probable según el módulo y el nombre de la tarea.
 function herramientaPara(modulo, nombre = '') {
   const n = sinAcentos(nombre), m = sinAcentos(modulo);
@@ -864,9 +875,9 @@ function simular(req) {
   return cola;
 }
 const PLANTILLA = 'using System;\n\nclass Program {\n\tpublic static void Main() {\n\t\t\n\t}\n}\n';
-function montarCsharp(cont, datos, alCambiar) {
+function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar) {
   cont.innerHTML = `<div class="hz hz-cs">
-    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button><span class="suave atajo">Ctrl + Intro ejecuta. Admite lo visto hasta el tema 4.</span><span class="estado-guardado" aria-live="polite"></span></div>
+    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button>${pruebas ? `<button type="button" class="boton" data-cs="comprobar">Comprobar (${pruebas.length} prueba${pruebas.length === 1 ? '' : 's'})</button>` : ''}<span class="suave atajo">Ctrl + Intro ejecuta. Admite lo visto hasta el tema 4.</span><span class="estado-guardado" aria-live="polite"></span></div>
     <div class="editor"></div>
     <div class="consola" tabindex="-1" aria-label="Consola del programa"><span class="vacia">Pulsa Ejecutar para lanzar el programa.</span></div>
     <div class="cs-aviso" aria-live="polite"></div></div>`;
@@ -907,6 +918,17 @@ function montarCsharp(cont, datos, alCambiar) {
     lugar.append(aviso);
   }
   btn.addEventListener('click', () => lanzar([]));
+  const bc = cont.querySelector('[data-cs=comprobar]');
+  if (bc) bc.addEventListener('click', async () => {
+    bc.disabled = true; lugar.textContent = '';
+    const res = [];
+    for (const caso of pruebas) res.push({ caso, ...comprobarCaso(await simular({ src: ed.get(), inputs: caso.e, seed: 1 }), caso) });
+    bc.disabled = false;
+    const bien = res.filter((x) => x.ok).length, todo = bien === res.length;
+    lugar.innerHTML = `<div class="aviso ${todo ? 'ok' : 'error'}"><b>${todo ? 'Todas las pruebas pasan' : `${bien} de ${res.length} pruebas pasan`}</b>
+      <ul class="pruebas">${res.map((x) => `<li class="${x.ok ? 'ok' : 'mal'}">${x.ok ? '✓' : '✗'} Entrada: <code>${esc(x.caso.e.join(' ⏎ '))}</code>${x.ok ? '' : `<br><span>${esc(x.motivo)}</span>`}</li>`).join('')}</ul></div>`;
+    if (todo && alAprobar) alAprobar();
+  });
   return { foco: () => ed.foco() };
 }
 function montarNotas(cont, datos, alCambiar, titulo) {
@@ -972,8 +994,10 @@ function vistaTrabajo(id) {
       <select id="w-tipo" aria-label="Herramienta">${Object.entries(HERR).map(([k, v]) => `<option value="${k}" ${k === w.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select>
       ${t && t.enunciado ? '<button type="button" class="boton mini" data-acc="enunciado" aria-expanded="false">Enunciado</button>' : ''}
       <button type="button" class="boton mini" data-acc="pomodoro" data-v="${esc(w.modulo || '')}">${S.pomo ? 'Parar' : 'Concentrarme'}</button>
+      <button type="button" class="boton mini" data-acc="pdf" data-v="${esc(id)}" title="Un PDF con tu nombre, el enunciado y tu trabajo, listo para subir a Aules">PDF</button>
     </header>
     ${t && t.enunciado ? `<aside class="taller-enun panel corte" hidden><p class="pre">${esc(t.enunciado)}</p></aside>` : ''}
+    ${S.aviso ? `<div class="aviso taller-aviso"><span class="pre">${esc(S.aviso)}</span><button type="button" class="boton mini" data-acc="cerrar-aviso">Entendido</button></div>` : ''}
     <div class="taller-herr" id="taller-herr"></div>
   </div>`;
 }
@@ -983,7 +1007,12 @@ function montarTrabajo(id) {
   S.montado = id;
   const guardar = (datos) => { const act = S.prog.trabajos[id]; cambiar('trabajos', id, { datos: { ...act.datos, [act.tipo]: datos } }); };
   const datos = (w.datos || {})[w.tipo];
-  const h = { diagrama: () => montarDiagrama(caja, datos, guardar, { notacion: w.notacion, titulo: w.titulo }), sql: () => montarSql(caja, datos, guardar), java: () => montarJava(caja, datos, guardar),
+  const alRelacional = (res) => {
+    const nuevo = crearTrabajo({ titulo: w.titulo + ' (relacional)', modulo: w.modulo, tipo: 'diagrama', notacion: 'relacional', datos: { diagrama: res.diagrama } });
+    S.aviso = 'Modelo relacional generado. Revísalo: ' + (res.avisos.length ? res.avisos.join(' ') : 'comprueba las claves ajenas y las cardinalidades.') + '\n\n' + res.esquema;
+    location.hash = 'trabajo-' + nuevo;
+  };
+  const h = { diagrama: () => montarDiagrama(caja, datos, guardar, { notacion: w.notacion, titulo: w.titulo, alRelacional }), sql: () => montarSql(caja, datos, guardar), practica: () => montarPracticaSql(caja, datos, guardar), java: () => montarJava(caja, datos, guardar),
     csharp: () => montarCsharp(caja, datos, guardar), web: () => montarWeb(caja, datos, guardar), kanban: () => montarKanban(caja, datos, guardar), notas: () => montarNotas(caja, datos, guardar, w.titulo) }[w.tipo] || (() => montarNotas(caja, datos, guardar, w.titulo));
   h();
 }
@@ -1015,8 +1044,64 @@ function vistaEjercicios() {
       <label class="campo campo-ancho"><span>Enunciado</span><textarea id="e-texto" required></textarea></label>
       <div class="campo campo-boton"><button class="boton principal">Añadir ejercicio</button></div>
     </form></details>` : ''}
+  ${(window.REPASO || {})[m] ? `<section class="bloque"><div class="panel practica-cta"><div><b>Repaso para el examen</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
+  ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}`;
 }
+// ---------- repaso (cajas de Leitner: acertar sube de caja y espacia la próxima vez; fallar vuelve a la 1) ----------
+const DIAS_CAJA = [0, 1, 3, 7, 14, 30];
+// shortcut: el id es la posición de la pregunta en js/repaso.js; si se reordenan, el progreso se descoloca
+function pendientesRepaso(m) {
+  const ahora = Date.now();
+  return (window.REPASO[m] || []).map((_, i) => m + ':' + i).filter((id) => (S.prog.repaso[id]?.sig || 0) <= ahora)
+    .sort((a, b) => (S.prog.repaso[a]?.caja || 0) - (S.prog.repaso[b]?.caja || 0));
+}
+function empezarRepaso(m) {
+  const cola = pendientesRepaso(m).slice(0, 10);
+  S.rep = { modulo: m, cola, hechas: 0, bien: 0, resp: null, orden: null };
+  location.hash === '#repaso' ? render() : (location.hash = 'repaso');
+}
+function vistaRepaso() {
+  const R = S.rep;
+  if (!R) { location.hash = 'ejercicios'; return ''; }
+  const m = R.modulo, cab = cabecera('Repaso · ' + m, '<a href="#ejercicios" class="suave">Volver a Ejercicios</a>');
+  if (!R.cola.length) {
+    const quedan = pendientesRepaso(m).length;
+    return cab + `<div class="panel repaso-fin"><b>${R.hechas ? `${R.bien} de ${R.hechas} a la primera` : 'Nada que repasar ahora'}</b>
+      <p class="suave">Las que aciertas vuelven dentro de unos días; las que fallas, en esta misma tanda.</p>
+      ${quedan ? `<button type="button" class="boton principal" data-acc="repasar" data-v="${esc(m)}">Seguir (${quedan})</button>` : ''}</div>`;
+  }
+  const id = R.cola[0], q = window.REPASO[m][+id.split(':').pop()];
+  if (!R.orden) R.orden = q.o.map((_, i) => i).sort(() => Math.random() - 0.5);
+  const caja = S.prog.repaso[id]?.caja || 0;
+  return cab + `<div class="panel repaso">
+    <div class="suave repaso-meta">Quedan ${R.cola.length} · ${caja ? 'caja ' + caja + ' de 5' : 'nueva'}</div>
+    <p class="repaso-p">${esc(q.p)}</p>
+    <div class="repaso-ops">${R.orden.map((i) => {
+      const cls = R.resp == null ? '' : i === q.c ? 'bien' : i === R.resp ? 'mal' : '';
+      return `<button type="button" class="repaso-op ${cls}" data-acc="rep-resp" data-v="${i}" ${R.resp != null ? 'disabled' : ''}>${esc(q.o[i])}</button>`;
+    }).join('')}</div>
+    ${R.resp == null ? '' : `<p class="repaso-x"><b>${R.resp === q.c ? 'Correcto.' : 'No.'}</b> ${esc(q.x)}</p>
+      <button type="button" class="boton principal" data-acc="rep-sig" autofocus>Siguiente</button>`}
+  </div>`;
+}
+function responderRepaso(i) {
+  const R = S.rep, id = R.cola[0], q = window.REPASO[R.modulo][+id.split(':').pop()];
+  if (R.resp != null) return;
+  R.resp = i;
+  const acierto = i === q.c, prev = S.prog.repaso[id] || {}, primera = !R.fallos?.includes(id);
+  const caja = acierto ? Math.min(5, (prev.caja || 0) + 1) : 1;
+  cambiar('repaso', id, { caja, sig: acierto ? Date.now() + DIAS_CAJA[caja] * 864e5 - 36e5 : 0 });
+  if (primera) { R.hechas++; if (acierto) R.bien++; }
+  if (!acierto) R.fallos = [...(R.fallos || []), id];
+  render();
+}
+function siguienteRepaso() {
+  const R = S.rep, id = R.cola.shift(), q = window.REPASO[R.modulo][+id.split(':').pop()];
+  if (R.resp !== q.c) R.cola.push(id); // la fallada vuelve al final de la tanda
+  R.resp = null; R.orden = null; render();
+}
+
 function listaEjercicios(modulo) {
   const color = colorDe(modulo);
   const conTrabajo = (t) => trabajoDeTarea(t.clave);
@@ -1082,13 +1167,108 @@ function abrirLab(id) {
   document.body.classList.add('con-lab');
   capa.hidden = false;
   const caja = capa.querySelector('#lab-trabajo');
-  const h = e.lenguaje === 'csharp' ? montarCsharp(caja, g, (d) => cambiar('ej', id, { codigo: d.codigo })) : montarNotas(caja, { texto: g.codigo }, (d) => cambiar('ej', id, { codigo: d.texto }), e.n);
+  const h = e.lenguaje === 'csharp' ? montarCsharp(caja, g, (d) => cambiar('ej', id, { codigo: d.codigo }), (window.PRUEBAS_CS || {})[id], () => {
+    cambiar('ej', id, { hecho: true }); const c = capa.querySelector('[data-acc=lab-hecho]'); if (c) c.checked = true;
+  }) : montarNotas(caja, { texto: g.codigo }, (d) => cambiar('ej', id, { codigo: d.texto }), e.n);
   h.foco();
 }
 function cerrarLab() {
   const capa = document.getElementById('lab'); if (!capa || capa.hidden) return;
   capa.hidden = true; capa.innerHTML = ''; document.body.classList.remove('con-lab');
   if ((location.hash.slice(1) || 'inicio') === 'ejercicios' || location.hash.startsWith('#modulo-')) render();
+}
+
+// ---------- apuntes de Aules dentro de Doodle ----------
+const archivosDe = (e) => (e.archivos || []).map((f) => (typeof f === 'string' ? { nombre: f } : f));
+const archivosPorId = new Map(); // se rellena al pintar: el id del botón apunta al archivo
+const tamano = (b) => (b > 1e6 ? (b / 1e6).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' kB');
+async function traerArchivo(f) {
+  const cache = 'caches' in window ? await caches.open('doodle-apuntes') : null;
+  if (S.aules && f.url) {
+    try {
+      const r = await fetch(f.url + (f.url.includes('?') ? '&' : '?') + 'token=' + S.aules.token);
+      if (!r.ok) throw new Error('Aules respondió ' + r.status);
+      if (cache) cache.put(f.url, r.clone()).catch(() => {});
+      return await r.blob();
+    } catch (e) { const hit = cache && await cache.match(f.url); if (hit) return hit.blob(); throw e; }
+  }
+  const hit = cache && await cache.match(f.url || '');
+  if (hit) return hit.blob();
+  throw new Error(S.demo ? 'Con datos de ejemplo no hay archivos reales.' : 'Conecta Aules en Ajustes para abrir los apuntes.');
+}
+async function abrirArchivo(f) {
+  let capa = document.getElementById('visor');
+  if (!capa) { capa = document.createElement('div'); capa.id = 'visor'; document.body.append(capa); }
+  capa.className = 'lab-capa visor'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-label', f.nombre);
+  capa.innerHTML = `<header class="lab-cab"><button type="button" class="boton mini" data-acc="cerrar-visor">Cerrar</button><span class="lab-titulo">${esc(f.nombre)}</span><div class="fila-botones" id="visor-acc"></div></header>
+    <div class="visor-cuerpo"><p class="suave">Abriendo…</p></div>`;
+  capa.hidden = false; document.body.classList.add('con-lab');
+  const cuerpo = capa.querySelector('.visor-cuerpo');
+  try {
+    const blob = await traerArchivo(f), url = URL.createObjectURL(blob), tipo = blob.type || f.tipo || '';
+    capa.querySelector('#visor-acc').innerHTML = `<a class="boton mini" href="${url}" download="${esc(f.nombre)}">Descargar</a><a class="boton mini" href="${url}" target="_blank" rel="noopener">Abrir aparte</a>`;
+    cuerpo.innerHTML = tipo.includes('pdf') ? `<iframe src="${url}" title="${esc(f.nombre)}"></iframe>`
+      : tipo.startsWith('image/') ? `<img src="${url}" alt="${esc(f.nombre)}">`
+      : tipo.startsWith('audio/') || tipo.startsWith('video/') ? `<video src="${url}" controls playsinline></video>`
+      : tipo.startsWith('text/') ? `<pre class="visor-texto">${esc(await blob.text())}</pre>`
+      : `<div class="panel"><p>Este tipo de archivo (${esc(f.nombre.split('.').pop())}) no se puede ver dentro del navegador.</p><div class="fila-botones"><a class="boton principal" href="${url}" download="${esc(f.nombre)}">Descargar</a></div></div>`;
+  } catch (e) { cuerpo.innerHTML = `<div class="aviso error"><b>No se pudo abrir</b><span>${esc(e.message)}</span></div>`; }
+}
+function cerrarVisor() {
+  const c = document.getElementById('visor'); if (!c || c.hidden) return false;
+  c.querySelectorAll('[href^="blob:"]').forEach((a) => URL.revokeObjectURL(a.href));
+  c.hidden = true; c.innerHTML = ''; document.body.classList.remove('con-lab'); return true;
+}
+
+// ---------- exportar un trabajo a PDF (con el diálogo de imprimir: «Guardar como PDF») ----------
+function exportarPdf(id) {
+  const w = S.prog.trabajos[id]; if (!w) return;
+  const t = w.tarea && tareas(true).find((x) => x.clave === w.tarea), d = (w.datos || {})[w.tipo] || {};
+  const pre = (txt) => `<pre>${esc(txt || '')}</pre>`;
+  const cuerpo = {
+    diagrama: () => (d.nodos && d.nodos.length ? svgExportable(d) : '<p>(Diagrama vacío)</p>'),
+    csharp: () => pre(d.codigo), sql: () => pre(d.codigo), notas: () => `<div class="pdf-texto">${esc(d.texto || '')}</div>`,
+    java: () => (d.archivos || []).map((a) => `<h3>${esc(a.nombre)}</h3>${pre(a.codigo)}`).join(''),
+    web: () => `<h3>index.html</h3>${pre(d.html)}<h3>estilos.css</h3>${pre(d.css)}`,
+    kanban: () => (d.columnas || []).map((c) => `<h3>${esc(c.nombre)}</h3><ul>${(d.tarjetas || []).filter((x) => x.col === c.id).map((x) => `<li><b>${esc(x.titulo)}</b>${x.desc ? `<br>${esc(x.desc)}` : ''}</li>`).join('')}</ul>`).join(''),
+  }[w.tipo] || (() => '');
+  const alumno = (S.curso && S.curso.usuario || '').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+  const caja = document.createElement('div'); caja.id = 'imprimir';
+  caja.innerHTML = `<header><h1>${esc(w.titulo)}</h1><p>${[alumno, w.modulo, new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })].filter(Boolean).map(esc).join(', ')}</p></header>
+    ${t && t.enunciado ? `<section><h2>Enunciado</h2><div class="pdf-texto">${esc(t.enunciado)}</div></section>` : ''}
+    <section><h2>Solución</h2>${cuerpo()}</section>`;
+  document.body.append(caja);
+  const quitar = () => { caja.remove(); window.removeEventListener('afterprint', quitar); };
+  window.addEventListener('afterprint', quitar);
+  setTimeout(() => window.print(), 50);
+}
+
+// ---------- configurar otro dispositivo (QR o código) ----------
+async function codigoConfig() {
+  const sobre = await cifrar(S.pass, { aules: S.aules, pat: S.pat, repo: repo() });
+  return btoa(JSON.stringify(sobre)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function mostrarQr(caja) {
+  if (!S.aules && !S.pat) { caja.innerHTML = '<p class="suave">Primero conecta Aules o GitHub en este dispositivo.</p>'; return; }
+  caja.innerHTML = '<p class="suave">Preparando…</p>';
+  const codigo = await codigoConfig(), enlace = location.origin + location.pathname + '#config-' + codigo;
+  let qr = '';
+  try {
+    await cargarScript('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js');
+    const q = window.qrcode(0, 'L'); q.addData(enlace); q.make(); qr = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+  } catch (e) { qr = ''; }
+  caja.innerHTML = `${qr ? `<div class="qr">${qr}</div>` : ''}
+    <p>Escanéalo con la cámara del otro dispositivo, o copia este código y pégalo allí en Ajustes. Va cifrado: hará falta tu contraseña de Doodle.</p>
+    <div class="fila-botones"><button type="button" class="boton" data-acc="copiar-config" data-v="${codigo}">Copiar código</button></div>
+    <p class="suave">En el iPhone, la app de la pantalla de inicio y Safari guardan los datos por separado: si escaneas con la cámara se abrirá Safari. Para la app, mejor pega el código.</p>`;
+}
+async function aplicarConfig(codigo) {
+  const sobre = JSON.parse(atob(codigo.trim().replace(/-/g, '+').replace(/_/g, '/')));
+  const c = await descifrar(S.pass, sobre);
+  if (c.aules) { S.aules = c.aules; S.cfg.aulesSobre = await cifrar(S.pass, c.aules); }
+  if (c.pat) { S.pat = c.pat; S.cfg.patSobre = await cifrar(S.pass, { pat: c.pat }); }
+  if (c.repo && !location.hostname.endsWith('.github.io')) S.cfg.repo = c.repo;
+  guardarCfg();
 }
 
 // ---------- calendario del iPhone (.ics con aviso el día antes) ----------
@@ -1136,7 +1316,7 @@ function resultados(q) {
   for (const t of tareas()) if (vale(t.nombre, t.modulo, t.privada)) out.push({ tipo: 'Tarea', nombre: t.nombre, extra: t.modulo + (t.entrega ? ', ' + cuando(t.entrega).toLowerCase() : ''), ir: '#tarea-' + t.clave });
   for (const w of trabajos()) if (vale(w.titulo, w.modulo, HERR[w.tipo])) out.push({ tipo: 'Trabajo', nombre: w.titulo, extra: HERR[w.tipo] + ', ' + (w.modulo || ''), ir: '#trabajo-' + w.id });
   for (const e of catalogo()) if (vale(e.n, e.texto, e.tema)) out.push({ tipo: 'Ejercicio', nombre: (e.n ? e.n + ' ' : '') + e.texto.slice(0, 90), extra: e.tema, lab: e.id });
-  for (const c of cursos()) for (const sec of c.secciones) for (const el of sec.elementos) if (el.url && vale(el.nombre, sec.nombre, el.archivos.join(' '))) out.push({ tipo: 'Apuntes', nombre: el.nombre, extra: nombreModulo(c.nombre) + ', ' + (sec.nombre || ''), url: el.url });
+  for (const c of cursos()) for (const sec of c.secciones) for (const el of sec.elementos) if (el.url && vale(el.nombre, sec.nombre, archivosDe(el).map((f) => f.nombre).join(' '))) out.push({ tipo: 'Apuntes', nombre: el.nombre, extra: nombreModulo(c.nombre) + ', ' + (sec.nombre || ''), url: el.url });
   return out.slice(0, 40);
 }
 function abrirBuscador() {
@@ -1193,7 +1373,7 @@ document.addEventListener('keydown', (ev) => {
 });
 
 // ---------- acciones (delegadas) ----------
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') cerrarLab(); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !cerrarVisor()) cerrarLab(); });
 document.addEventListener('click', async (ev) => {
   const el = ev.target.closest('[data-acc]'); if (!el || el.tagName === 'INPUT') return;
   const acc = el.dataset.acc, ej = el.closest('.ej');
@@ -1202,6 +1382,16 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'lab-ir' && el.dataset.v) abrirLab(el.dataset.v);
   else if (acc === 'sync') sincronizarAules();
   else if (acc === 'buscar') abrirBuscador();
+  else if (acc === 'practicar-sql') { const w = trabajos().find((x) => x.tipo === 'practica'); location.hash = 'trabajo-' + (w ? w.id : crearTrabajo({ titulo: 'Práctica de SQL', modulo: 'Bases de Datos', tipo: 'practica' })); }
+  else if (acc === 'repasar') empezarRepaso(el.dataset.v);
+  else if (acc === 'rep-resp') responderRepaso(+el.dataset.v);
+  else if (acc === 'rep-sig') siguienteRepaso();
+  else if (acc === 'pdf') exportarPdf(el.dataset.v);
+  else if (acc === 'cerrar-aviso') { S.aviso = ''; el.closest('.aviso').remove(); }
+  else if (acc === 'archivo') { const f = archivosPorId.get(el.dataset.v); if (f) abrirArchivo(f); }
+  else if (acc === 'cerrar-visor') cerrarVisor();
+  else if (acc === 'ver-qr') mostrarQr(document.getElementById('qr-caja'));
+  else if (acc === 'copiar-config') { try { await navigator.clipboard.writeText(el.dataset.v); el.textContent = 'Copiado'; } catch (e) { el.textContent = 'No se pudo copiar'; } }
   else if (acc === 'pomodoro') { iniciarPomodoro(el.dataset.v); el.textContent = S.pomo ? 'Parar' : 'Concentrarme'; }
   else if (acc === 'pomo-parar') { pararPomodoro(); document.querySelectorAll('[data-acc=pomodoro]').forEach((b) => { b.textContent = 'Concentrarme'; }); }
   else if (acc === 'cal-vista') { S.calVista = el.dataset.v; if (location.hash !== '#calendario') location.hash = 'calendario'; else render(); }
@@ -1288,6 +1478,10 @@ document.addEventListener('submit', async (ev) => {
       location.hash = 'inicio'; render();
       if (S.pat) subirCurso(sobre).catch(errSync);
     } catch (e) { S.aules = anterior; msg.textContent = e.message; }
+  } else if (f.id === 'f-config') {
+    const msg = document.getElementById('config-estado');
+    try { await aplicarConfig(val('c-codigo')); msg.textContent = 'Listo. Sincronizando…'; render(); sincronizarAules(); }
+    catch (e) { msg.textContent = 'Ese código no sirve: tiene que venir de un dispositivo con la misma contraseña de Doodle.'; }
   } else if (f.id === 'f-pat') {
     const msg = document.getElementById('pat-estado'), nuevo = val('p-pat');
     if (document.getElementById('p-repo')) { S.cfg.repo = val('p-repo'); guardarCfg(); }

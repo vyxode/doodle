@@ -289,6 +289,7 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
       <button type="button" class="boton mini" data-dg="png">PNG</button>
       <button type="button" class="boton mini" data-dg="svg">SVG</button>
       <button type="button" class="boton mini principal" data-dg="drawio" title="Archivo que abre draw.io">.drawio</button>
+      ${opciones.alRelacional ? '<button type="button" class="boton mini dg-relacional" data-dg="relacional" title="Crea un diagrama relacional nuevo a partir de este E/R">Pasar a relacional</button>' : ''}
     </div>
     <div class="dg-area">
       <svg class="dg-svg" tabindex="0" aria-label="Lienzo del diagrama"><defs><pattern id="dg-rejilla" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" class="dg-punto"/></pattern></defs>
@@ -308,6 +309,7 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
     Object.assign(d, JSON.parse(desde.pop())); sel = null; pintar(); pintarInsp(); guardar();
   }
   function pintarPaleta() {
+    const br = cont.querySelector('.dg-relacional'); if (br) br.hidden = d.notacion !== 'er';
     cont.querySelector('.dg-paleta').innerHTML = Object.entries(FORMAS).filter(([, f]) => f.not.includes(d.notacion))
       .map(([k, f]) => `<button type="button" class="boton mini" data-forma="${k}">+ ${f.n}</button>`).join('');
   }
@@ -540,9 +542,84 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
     else if (a === 'invertir') { const e = d.aristas.find((x) => x.id === sel.id); apuntar(); [e.de, e.a] = [e.a, e.de]; [e.etDe, e.etA] = [e.etA, e.etDe]; pintar(); pintarInsp(); guardar(); }
     else if (a === 'svg') descargar(nombre + '.svg', new Blob([svgExportable(d)], { type: 'image/svg+xml' }));
     else if (a === 'drawio') descargar(nombre + '.drawio', new Blob([aDrawio(d, nombre)], { type: 'application/xml' }));
+    else if (a === 'relacional') opciones.alRelacional(erARelacional(d));
     else if (a === 'png') { b.disabled = true; try { descargar(nombre + '.png', await aPng(d)); } finally { b.disabled = false; } }
   });
   pintarPaleta(); pintar(); pintarInsp();
   if (!datos || !datos.vista) requestAnimationFrame(ajustar);
   return { destruir() { cont.innerHTML = ''; } };
+}
+
+// ---------- paso de E/R (Chen) a modelo relacional ----------
+// Cardinalidad junto a una entidad = cuántas de ESA entidad se relacionan con una de la otra: (0,N) junto a PEDIDO
+// en CLIENTE—realiza—PEDIDO significa que un cliente tiene muchos pedidos, así que la clave ajena va en PEDIDO.
+// Si faltan esas etiquetas se usa la cardinalidad del rombo («1:N», en el orden en que se conectaron) y, si tampoco hay, N:M.
+export function erARelacional(d) {
+  const N = new Map(d.nodos.map((n) => [n.id, n]));
+  const vecinos = (id) => d.aristas.filter((e) => e.de === id || e.a === id).map((e) => ({ otro: N.get(e.de === id ? e.a : e.de), et: e.de === id ? e.etA : e.etDe })).filter((v) => v.otro);
+  const limpio = (s) => String(s || '').trim().replace(/\s+/g, '_');
+  const tablas = new Map(), avisos = [];
+  const atributos = (id) => vecinos(id).filter((v) => v.otro.tipo === 'atributo').map((v) => v.otro);
+  const columnasDe = (atrs) => atrs.filter((a) => !a.derivado && !a.multivaluado).map((a) => ({ n: limpio(a.texto), pk: !!a.clave }));
+  for (const en of d.nodos.filter((n) => n.tipo === 'entidad' || n.tipo === 'debil')) tablas.set(en.id, { id: en.id, nombre: limpio(en.texto).toUpperCase(), cols: columnasDe(atributos(en.id)), x: en.x, y: en.y });
+  const pks = (id) => tablas.get(id).cols.filter((c) => c.pk);
+  const ajena = (destino, origenId, comoPk) => {
+    const t = tablas.get(destino), ref = tablas.get(origenId);
+    if (!pks(origenId).length) avisos.push(`${ref.nombre} no tiene clave: marca un atributo como clave.`);
+    for (const c of pks(origenId)) {
+      const nombre = t.cols.some((x) => x.n === c.n) ? c.n + '_' + ref.nombre.toLowerCase() : c.n;
+      t.cols.push({ n: nombre, pk: !!comoPk, fk: ref.nombre });
+    }
+  };
+  // jerarquías: cada subtipo lleva la clave del supertipo (el que está más arriba en el dibujo)
+  for (const isa of d.nodos.filter((n) => n.tipo === 'isa')) {
+    const ents = vecinos(isa.id).map((v) => v.otro).filter((o) => tablas.has(o.id)).sort((a, b) => a.y - b.y);
+    for (const hijo of ents.slice(1)) ajena(hijo.id, ents[0].id, !pks(hijo.id).length);
+  }
+  const max = (et) => { const m = String(et || '').match(/,\s*([^)\s]+)\s*\)/); return m ? (m[1] === '1' ? 1 : 'N') : null; };
+  const relaciones = d.nodos.filter((n) => n.tipo === 'relacion' || n.tipo === 'relacion-debil');
+  // primero las relaciones débiles: la entidad débil necesita la clave del propietario para tener la suya
+  relaciones.sort((a, b) => (b.tipo === 'relacion-debil') - (a.tipo === 'relacion-debil'));
+  for (const r of relaciones) {
+    const lados = vecinos(r.id).filter((v) => tablas.has(v.otro.id)), atrs = columnasDe(atributos(r.id)), nombre = limpio(r.texto).toUpperCase();
+    if (lados.length < 2) { avisos.push(`La relación ${nombre} necesita al menos dos entidades conectadas.`); continue; }
+    const debil = lados.find((l) => l.otro.tipo === 'debil');
+    if (lados.length === 2 && (r.tipo === 'relacion-debil' || debil)) {
+      const dl = debil || lados[1], fuerte = lados.find((l) => l !== dl);
+      ajena(dl.otro.id, fuerte.otro.id, true); tablas.get(dl.otro.id).cols.push(...atrs); continue;
+    }
+    if (lados.length === 2) {
+      const [A, B] = lados; let ma = max(A.et), mb = max(B.et);
+      if (ma == null || mb == null) { const c = String(r.card || '').toUpperCase().split(/[:x×]/); if (c.length === 2) { ma = c[0].trim() === '1' ? 1 : 'N'; mb = c[1].trim() === '1' ? 1 : 'N'; } else { ma = mb = 'N'; avisos.push(`${nombre}: sin cardinalidades, se ha tratado como N:M.`); } }
+      if (ma === 'N' && mb === 'N') {
+        const t = { id: r.id, nombre, cols: [], x: r.x, y: r.y }; tablas.set(r.id, t);
+        ajena(r.id, A.otro.id, true); ajena(r.id, B.otro.id, true); t.cols.push(...atrs);
+      } else {
+        const [lleva, apunta] = ma === 'N' ? [A, B] : [B, A]; // la clave ajena va en el lado «muchos» (o en el primero si es 1:1)
+        ajena(lleva.otro.id, apunta.otro.id, false); tablas.get(lleva.otro.id).cols.push(...atrs);
+      }
+      continue;
+    }
+    const t = { id: r.id, nombre, cols: [], x: r.x, y: r.y }; tablas.set(r.id, t); // ternaria o más: tabla propia
+    for (const l of lados) ajena(r.id, l.otro.id, true);
+    t.cols.push(...atrs);
+  }
+  // atributos multivaluados: tabla aparte con la clave de la entidad
+  for (const en of d.nodos.filter((n) => tablas.has(n.id) && (n.tipo === 'entidad' || n.tipo === 'debil'))) {
+    for (const a of atributos(en.id).filter((x) => x.multivaluado)) {
+      const id = en.id + '_' + a.id, t = { id, nombre: tablas.get(en.id).nombre + '_' + limpio(a.texto).toUpperCase(), cols: [], x: en.x, y: en.y + 1 };
+      tablas.set(id, t); ajena(id, en.id, true); t.cols.push({ n: limpio(a.texto), pk: true });
+    }
+  }
+  // dibujo: tablas en rejilla, en el orden aproximado del E/R; flechas de cada clave ajena a su tabla
+  const lista = [...tablas.values()].sort((a, b) => a.y - b.y || a.x - b.x), porNombre = new Map(lista.map((t) => [t.nombre, t]));
+  const col = (c) => (c.pk ? 'PK ' : '') + (c.fk ? 'FK ' : '') + c.n;
+  const nodos = lista.map((t, i) => ({ id: 't' + i, tipo: 'tabla', texto: t.nombre, columnas: t.cols.map(col).join('\n'), x: 40 + (i % 3) * 280, y: 40 + Math.floor(i / 3) * 240, _t: t }));
+  const aristas = [];
+  for (const n of nodos) for (const ref of new Set(n._t.cols.filter((c) => c.fk).map((c) => c.fk))) {
+    const dest = nodos.find((m) => m._t === porNombre.get(ref)); if (dest && dest !== n) aristas.push({ id: n.id + '-' + dest.id, de: n.id, a: dest.id, estilo: 'fk' });
+  }
+  nodos.forEach((n) => delete n._t);
+  const esquema = lista.map((t) => `${t.nombre}(${t.cols.map((c) => (c.pk ? '#' : '') + c.n + (c.fk ? ' → ' + c.fk : '')).join(', ')})`).join('\n');
+  return { diagrama: { notacion: 'relacional', nodos, aristas }, esquema, avisos };
 }

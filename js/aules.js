@@ -89,8 +89,8 @@ export async function descargarAules(urlAules, token) {
         nombre: s.name, resumen: texto(s.summary),
         elementos: (s.modules || []).filter((m) => m.uservisible !== false).map((m) => ({
           id: m.id, nombre: m.name, tipo: m.modname, url: m.url || '',
-          // los enlaces a ficheros llevan el token: no se guardan, se abre la página de Aules
-          archivos: (m.contents || []).filter((f) => f.type === 'file').map((f) => f.filename),
+          // fileurl no lleva el token (se añade al abrirlo desde la web)
+          archivos: (m.contents || []).filter((f) => f.type === 'file').map((f) => ({ nombre: f.filename, url: (f.fileurl || '').replace(/[?&]token=[^&]*/, ''), tipo: f.mimetype || '', tam: f.filesize || 0 })),
         })),
       })),
       tareas,
