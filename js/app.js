@@ -60,7 +60,8 @@ function colorDe(modulo) {
 }
 
 // ---------- datos derivados ----------
-const cursos = () => (S.curso && S.curso.cursos) || [];
+const CONVALIDADOS = new Set(['Itinerario para la Empleabilidad I']); // no se muestran en ninguna parte
+const cursos = () => ((S.curso && S.curso.cursos) || []).filter((c) => !CONVALIDADOS.has(nombreModulo(c.nombre)));
 function tareas() {
   const out = [];
   for (const c of cursos()) for (const t of c.tareas) {
@@ -102,7 +103,7 @@ function agenda() {
   const items = tareas().filter((t) => t.entrega).map((t) => ({ fecha: t.entrega, nombre: t.nombre, modulo: t.modulo, url: t.url, tarea: t, chip: estadoTarea(t) }));
   const porId = Object.fromEntries(cursos().map((c) => [c.id, nombreModulo(c.nombre)]));
   for (const e of (S.curso && S.curso.eventos) || []) {
-    if (e.tipo === 'assign') continue; // ya salen como tareas
+    if (e.tipo === 'assign' || (e.curso && !porId[e.curso])) continue; // las tareas ya salen; lo de módulos ocultos, no
     items.push({ fecha: e.fecha, nombre: e.nombre, modulo: porId[e.curso] || '', url: e.url, chip: ['info', e.tipo === 'quiz' ? 'Cuestionario' : 'Evento'] });
   }
   return items.sort((a, b) => a.fecha - b.fecha);
