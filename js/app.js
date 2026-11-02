@@ -61,7 +61,8 @@ function colorDe(modulo) {
 
 // ---------- datos derivados ----------
 const CONVALIDADOS = new Set(['Itinerario para la Empleabilidad I']); // no se muestran en ninguna parte
-const cursos = () => ((S.curso && S.curso.cursos) || []).filter((c) => !CONVALIDADOS.has(nombreModulo(c.nombre)));
+// sin tareas ni notas (p. ej. Tutoría) no es un módulo que seguir
+const cursos = () => ((S.curso && S.curso.cursos) || []).filter((c) => !CONVALIDADOS.has(nombreModulo(c.nombre)) && (c.tareas.length || c.notas.length));
 function tareas() {
   const out = [];
   for (const c of cursos()) for (const t of c.tareas) {
@@ -74,11 +75,20 @@ function tareas() {
   }
   return out;
 }
-// Urgente: vence en 3 días o venció hace menos de 2 semanas. Lo más antiguo (fechas que el profesor
-// no actualizó de otros cursos) va aparte como «atrasada» para no llenar la portada.
+// Lo que importa de una tarea es si todavía se puede entregar:
+// hecha · futura (aún no abre) · cerrada (pasó el cierre o Aules ya no deja) · retraso (venció pero se admite)
+// · antigua (venció hace más de 2 semanas: fechas que el profesor no actualizó de otros cursos) · pendiente.
 const ATRASADA = 14 * D;
-const urgente = (t) => !t.hecha && !!t.entrega && t.entrega - ahora() <= URGENTE && ahora() - t.entrega < ATRASADA;
-const atrasada = (t) => !t.hecha && !!t.entrega && ahora() - t.entrega >= ATRASADA;
+function situacion(t) {
+  const h = ahora();
+  if (t.hecha) return 'hecha';
+  if (t.apertura && t.apertura > h) return 'futura';
+  if ((t.cierre && t.cierre < h) || (t.editable === false && t.entrega && t.entrega < h)) return 'cerrada';
+  if (t.entrega && t.entrega < h) return h - t.entrega >= ATRASADA ? 'antigua' : 'retraso';
+  return 'pendiente';
+}
+const porHacer = (t) => ['pendiente', 'retraso'].includes(situacion(t));
+const urgente = (t) => situacion(t) === 'retraso' || (situacion(t) === 'pendiente' && !!t.entrega && t.entrega - ahora() <= URGENTE);
 function mediaCurso(c) {
   if (c.notaCurso && c.notaCurso.nota != null && c.notaCurso.max) return c.notaCurso.nota / c.notaCurso.max * 10;
   const ns = c.notas.filter((n) => n.nota != null && n.max).map((n) => n.nota / n.max * 10);
@@ -93,11 +103,17 @@ function catalogo() {
 const modulosCatalogo = () => [...new Set(catalogo().map((e) => e.modulo))];
 const cursoDeModulo = (m) => cursos().find((c) => nombreModulo(c.nombre) === m);
 const hecho = (e) => !!(S.prog.ej[e.id] || {}).hecho;
+// Etiqueta solo cuando aporta algo: una tarea pendiente normal no lleva chip.
 function estadoTarea(t) {
-  if (t.hecha) return t.nota10 != null ? ['ok', fNota(t.nota10) + ' / 10'] : ['ok', 'Entregada'];
-  if (t.entrega && t.entrega < ahora()) return atrasada(t) ? ['ojo', 'Atrasada'] : ['mal', 'Sin entregar'];
+  const s = situacion(t);
+  if (s === 'hecha') return t.nota10 != null ? ['ok', fNota(t.nota10) + ' / 10'] : ['ok', 'Entregada'];
+  if (s === 'futura') return ['info', 'Se abre ' + fCorta(t.apertura)];
+  if (s === 'cerrada') return ['gris', 'Cerrada'];
+  if (s === 'antigua') return ['gris', 'Antigua'];
+  if (s === 'retraso') return ['mal', 'Con retraso'];
   if (t.estado === 'draft') return ['ojo', 'Borrador'];
-  return [urgente(t) ? 'mal' : 'info', t.tipo === 'examen' ? 'Examen' : 'Pendiente'];
+  if (t.tipo === 'examen') return ['info', 'Examen'];
+  return urgente(t) ? ['mal', 'Urgente'] : null;
 }
 function agenda() {
   const items = tareas().filter((t) => t.entrega).map((t) => ({ fecha: t.entrega, nombre: t.nombre, modulo: t.modulo, url: t.url, tarea: t, chip: estadoTarea(t) }));
@@ -331,8 +347,20 @@ window.addEventListener('hashchange', () => { if (S.curso) { render(true); windo
 const cabecera = (titulo, extra = '', ante = '') => `<header class="cab-vista">${ante ? `<span class="antetitulo">${ante}</span>` : ''}<h1>${titulo}</h1>${extra ? `<div class="cab-extra">${extra}</div>` : ''}</header>`;
 const cifra = (valor, texto, clase = '') => `<div class="cifra corte ${clase}"><b>${valor}</b><small>${texto}</small></div>`;
 const vacio = (t) => `<p class="vacio">${t}</p>`;
-function fila(i, conFecha = true) {
-  const t = i.tarea, urg = t ? urgente(t) : false, pasada = t && !t.hecha && i.fecha < ahora();
+// Fecha en palabras: «Hoy · 23:59», «Mañana · 18:25», «Jueves · 08:01», «Hace 3 días», «10 nov».
+const F_SEMANA = F({ weekday: 'long' });
+const inicioDia = (ts) => new Date(ts * 1000).setHours(0, 0, 0, 0) / 1000;
+function cuando(ts) {
+  const dd = Math.round((inicioDia(ts) - inicioDia(ahora())) / D), hora = fHora(ts);
+  if (dd === 0) return 'Hoy · ' + hora;
+  if (dd === 1) return 'Mañana · ' + hora;
+  if (dd === -1) return 'Ayer · ' + hora;
+  if (dd < 0) return `Hace ${-dd} días`;
+  if (dd < 7) { const w = F_SEMANA.format(ts * 1000); return w[0].toUpperCase() + w.slice(1) + ' · ' + hora; }
+  return fCorta(ts) + ' · ' + hora;
+}
+function fila(i) {
+  const t = i.tarea, s = t ? situacion(t) : 'evento', urg = t && urgente(t);
   const titulo = t ? `<a href="#tarea-${esc(t.clave)}">${esc(i.nombre)}</a>` : i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.nombre)} ↗</a>` : `<strong>${esc(i.nombre)}</strong>`;
   const propia = t && t.origen === 'propia' ? `
     <div class="fila-propia">
@@ -340,11 +368,29 @@ function fila(i, conFecha = true) {
       <label class="casilla">Nota <input type="number" min="0" step="0.01" class="nota-in" data-acc="nota" data-id="${esc(t.clave)}" value="${t.nota ?? ''}"> / ${t.max || 10}</label>
       <button class="boton mini peligro" data-acc="borrar-tarea" data-id="${esc(t.clave)}">Borrar</button>
     </div>` : '';
-  return `<div class="fila corte ${urg ? 'urgente' : ''} ${t && t.hecha ? 'hecha' : ''}" style="--mod:${colorDe(i.modulo)}">
-    <span class="cuando">${t && !t.hecha ? `<b class="${pasada ? 'pasada' : ''}">${cuenta(i.fecha)}</b>` : ''}${conFecha ? `<small>${fCorta(i.fecha)} · ${fHora(i.fecha)}</small>` : `<small>${fHora(i.fecha)}</small>`}</span>
-    <div class="que">${titulo}<small><i class="punto-mod"></i>${esc(i.modulo || '—')}${t && t.origen === 'propia' ? ' · tuya' : ''}</small>${propia}</div>
-    <span class="chip ${i.chip[0]}">${esc(i.chip[1])}</span>
+  return `<div class="fila corte s-${s} ${urg ? 'urgente' : ''}" style="--mod:${colorDe(i.modulo)}">
+    <span class="cuando">${cuando(i.fecha)}</span>
+    <div class="que">${titulo}<small><i class="punto-mod"></i>${esc(i.modulo || '—')}${t && t.origen === 'propia' ? ' · añadida por ti' : ''}</small>${propia}</div>
+    ${i.chip ? `<span class="chip ${i.chip[0]}">${esc(i.chip[1])}</span>` : '<span></span>'}
   </div>`;
+}
+// Varias tareas del mismo módulo el mismo día (p. ej. 10 ejercicios de BD) se juntan en una fila desplegable.
+function listaFilas(items, vacioTxt) {
+  if (!items.length) return vacio(vacioTxt);
+  const grupos = [];
+  for (const i of items) {
+    const k = claveDia(i.fecha) + '|' + i.modulo, g = grupos.find((x) => x.k === k);
+    if (g) g.items.push(i); else grupos.push({ k, items: [i] });
+  }
+  return `<div class="lista">${grupos.map((g) => {
+    if (g.items.length < 3) return g.items.map(fila).join('');
+    const i0 = g.items[0], urg = g.items.some((i) => i.tarea && urgente(i.tarea));
+    return `<details class="grupo-filas corte ${urg ? 'urgente' : ''}" style="--mod:${colorDe(i0.modulo)}">
+      <summary class="fila"><span class="cuando">${cuando(i0.fecha)}</span>
+        <div class="que"><strong>${g.items.length} tareas de ${esc(i0.modulo)}</strong><small>${esc(g.items.slice(0, 3).map((i) => i.nombre.replace(/^(Exercic?i|Ejercicio|Tasca|Tarea)\s*/i, '')).join(' · '))}${g.items.length > 3 ? ' …' : ''}</small></div>
+        <span class="chip ${urg ? 'mal' : 'info'}">Ver ${g.items.length}</span></summary>
+      <div class="lista">${g.items.map(fila).join('')}</div></details>`;
+  }).join('')}</div>`;
 }
 function barras(filas) { // [nombre, nota/10, color]
   if (!filas.length) return vacio('Aún no hay notas.');
@@ -359,65 +405,71 @@ const notaColor = (m) => (m == null ? 'var(--suave)' : m >= 5 ? 'var(--texto)' :
 // ---------- vistas ----------
 function vistaInicio() {
   const T = tareas(), h = ahora(), ag = agenda();
+  if (!cursos().length && !T.length) return cabecera('Inicio') + `<section class="bloque bienvenida corte"><div class="lineas-velocidad" aria-hidden="true"></div>
+    <h2>Conecta tu Aules</h2><p>Doodle trae tus tareas, fechas de entrega y notas de Aules. Solo hay que hacerlo una vez en cada dispositivo.</p>
+    <div class="fila-botones"><a class="boton principal" href="#ajustes">Conectar Aules</a><a class="boton" href="#ejercicios">Ir a los ejercicios</a></div></section>`;
   const urg = ag.filter((i) => i.tarea && urgente(i.tarea));
-  const proximas = ag.filter((i) => i.fecha >= h && i.fecha <= h + 14 * D && !(i.tarea && (i.tarea.hecha || urgente(i.tarea))));
+  const proximas = ag.filter((i) => i.fecha >= h && i.fecha <= h + 14 * D && (i.tarea ? porHacer(i.tarea) && !urgente(i.tarea) : true));
+  const siguiente = ag.find((i) => i.tarea && porHacer(i.tarea) && i.fecha >= h);
   const medias = cursos().map(mediaCurso).filter((m) => m != null);
-  const cat = catalogo();
-  const notas = T.filter((t) => t.nota10 != null).sort((a, b) => (b.entrega || 0) - (a.entrega || 0)).slice(0, 6);
+  const pendientes = T.filter(porHacer).length;
+  const notas = T.filter((t) => t.nota10 != null).sort((a, b) => (b.enviada || b.entrega || 0) - (a.enviada || a.entrega || 0)).slice(0, 5);
   return `
   ${cabecera('Inicio', `<span class="suave">${fDia(h)}</span>`)}
-  <section class="bloque bloque-urgente corte">
+  <section class="bloque bloque-urgente corte ${urg.length ? '' : 'tranquilo'}">
     <div class="lineas-velocidad" aria-hidden="true"></div>
-    <header><h2>Urgente</h2><span class="chip ${urg.length ? 'mal' : 'ok'}">${urg.length ? urg.length + (urg.length === 1 ? ' entrega' : ' entregas') : 'Todo bajo control'}</span></header>
-    <div class="lista">${urg.length ? urg.map((i) => fila(i)).join('') : vacio('Nada vence en los próximos 3 días.')}</div>
+    <header><h2>${urg.length ? 'Urgente' : 'Nada urgente'}</h2><span class="suave">${urg.length ? 'Vence en 3 días o ya ha vencido y aún se admite' : siguiente ? 'Lo siguiente que vence:' : 'No tienes entregas pendientes.'}</span></header>
+    ${urg.length ? listaFilas(urg, '') : siguiente ? `<div class="lista">${fila(siguiente)}</div>` : ''}
   </section>
   <div class="cifras">
-    ${cifra(medias.length ? fNota(medias.reduce((a, b) => a + b) / medias.length) : '—', 'Media general / 10')}
-    ${cifra(`${T.filter((t) => t.hecha).length}<span>/${T.length}</span>`, 'Tareas entregadas')}
-    ${cifra(`${T.filter((t) => !t.hecha && t.entrega >= h).length}`, 'Pendientes')}
-    ${cifra(`${cat.filter(hecho).length}<span>/${cat.length}</span>`, 'Ejercicios hechos')}
+    ${cifra(medias.length ? fNota(medias.reduce((a, b) => a + b) / medias.length) : '—', 'Media general')}
+    ${cifra(pendientes, pendientes === 1 ? 'Entrega pendiente' : 'Entregas pendientes', pendientes ? '' : 'bien')}
+    ${cifra(T.filter((t) => t.hecha).length, 'Entregadas')}
   </div>
   <div class="dos-col">
-    <section class="bloque"><header><h2>Próximos 14 días</h2><a href="#calendario">Calendario</a></header>
-      <div class="lista">${proximas.length ? proximas.map((i) => fila(i)).join('') : vacio('Nada más programado.')}</div></section>
+    <section class="bloque"><header><h2>Próximas dos semanas</h2><a href="#calendario">Calendario →</a></header>
+      ${listaFilas(proximas, 'Nada más en las próximas dos semanas.')}</section>
     <div class="columna">
-      <section class="bloque"><header><h2>Módulos</h2><a href="#modulos">Ver todos</a></header>
-        ${cursos().length ? `<div class="mini-mods">${cursos().map((c) => { const m = mediaCurso(c), pend = T.filter((t) => t.cursoId === c.id && !t.hecha).length;
-          return `<a class="mini-mod" href="#modulo-${c.id}" style="--mod:${colorDe(nombreModulo(c.nombre))}"><i class="punto-mod"></i><span class="mm-nombre">${esc(nombreModulo(c.nombre))}</span>
-            <span class="mm-pend ${pend ? '' : 'suave'}">${pend ? pend + ' pend.' : 'al día'}</span><b style="color:${notaColor(m)}">${fNota(m)}</b></a>`; }).join('')}</div>`
-        : vacio('Conecta Aules en <a href="#ajustes">Ajustes</a> para ver tus módulos.')}</section>
-      <section class="bloque"><header><h2>Últimas notas</h2><a href="#notas">Todas</a></header>
-        ${notas.length ? `<div class="lista">${notas.map((t) => `<div class="nota-fila" style="--mod:${colorDe(t.modulo)}"><i class="punto-mod"></i><span class="nf-nombre">${esc(t.nombre)}<small>${esc(t.modulo)}</small></span><b class="${t.nota10 < 5 ? 'susp' : ''}">${fNota(t.nota10)}</b></div>`).join('')}</div>` : vacio('Aún no hay notas.')}</section>
+      <section class="bloque"><header><h2>Módulos</h2><a href="#modulos">Ver todos →</a></header>
+        <div class="mini-mods">${cursos().map((c) => { const m = mediaCurso(c), pend = T.filter((t) => t.cursoId === c.id && porHacer(t)).length;
+          return `<a class="mini-mod" href="#modulo-${c.id}" style="--mod:${colorDe(nombreModulo(c.nombre))}"><span class="mm-nombre">${esc(nombreModulo(c.nombre))}</span>
+            <span class="mm-pend ${pend ? '' : 'suave'}">${pend ? pend + ' por entregar' : 'Al día'}</span><b style="color:${notaColor(m)}">${fNota(m)}</b></a>`; }).join('')}</div></section>
+      <section class="bloque"><header><h2>Últimas notas</h2><a href="#notas">Todas →</a></header>
+        ${notas.length ? `<div class="lista">${notas.map((t) => `<a class="nota-fila" href="#tarea-${esc(t.clave)}" style="--mod:${colorDe(t.modulo)}"><span class="nf-nombre">${esc(t.nombre)}<small>${esc(t.modulo)}</small></span><b class="${t.nota10 < 5 ? 'susp' : ''}">${fNota(t.nota10)}</b></a>`).join('')}</div>` : vacio('Aún no hay notas.')}</section>
     </div>
-  </div>
-  ${(() => { const at = ag.filter((i) => i.tarea && atrasada(i.tarea)); return at.length ? `<details class="bloque panel corte"><summary>${at.length} tarea${at.length === 1 ? '' : 's'} atrasada${at.length === 1 ? '' : 's'} (hace más de 2 semanas)</summary><div class="lista">${at.map((i) => fila(i)).join('')}</div></details>` : ''; })()}
-  ${(S.curso.avisos || []).length ? `<section class="bloque"><header><h2>Avisos de Aules</h2></header><div class="panel corte"><p class="suave">Aules no dejó leer estas partes; el resto está al día.</p><ul class="mono">${S.curso.avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul></div></section>` : ''}`;
+  </div>`;
 }
 
 function vistaModulos() {
   if (!cursos().length) return cabecera('Módulos') + vacio('Cuando conectes Aules en <a href="#ajustes">Ajustes</a>, aquí aparecerán tus módulos.');
   const T = tareas();
-  return cabecera('Módulos', `<span class="suave">${cursos().length} en Aules</span>`) + `<div class="modulos">
+  return cabecera('Módulos', '<span class="suave">Tareas, notas y apuntes de cada asignatura</span>') + `<div class="modulos">
     ${cursos().map((c) => {
-      const m = mediaCurso(c), ts = T.filter((t) => t.cursoId === c.id), pend = ts.filter((t) => !t.hecha), urg = pend.filter(urgente).length;
+      const m = mediaCurso(c), ts = T.filter((t) => t.cursoId === c.id), pend = ts.filter(porHacer), urg = pend.filter(urgente).length, hechas = ts.filter((t) => t.hecha).length;
       return `<a class="modulo corte trama-esquina" href="#modulo-${c.id}" style="--mod:${colorDe(nombreModulo(c.nombre))}">
         <span class="codigo">${esc(c.corto)}</span><h3>${esc(nombreModulo(c.nombre))}</h3>
         <div class="mod-nota"><b style="color:${notaColor(m)}">${fNota(m)}</b><small>/ 10</small></div>
-        <div class="barra"><i style="width:${ts.length ? (ts.length - pend.length) / ts.length * 100 : 0}%"></i></div>
-        <div class="mod-pie"><span>${ts.length - pend.length}/${ts.length} entregadas</span>${urg ? `<span class="chip mal">${urg} urgente${urg > 1 ? 's' : ''}</span>` : pend.length ? `<span class="chip info">${pend.length} pendiente${pend.length > 1 ? 's' : ''}</span>` : '<span class="chip ok">Al día</span>'}</div>
+        <div class="mod-pie"><span>${hechas} entregada${hechas === 1 ? '' : 's'}</span>${urg ? `<span class="chip mal">${urg} urgente${urg > 1 ? 's' : ''}</span>` : pend.length ? `<span class="chip info">${pend.length} por entregar</span>` : '<span class="chip ok">Al día</span>'}</div>
       </a>`;
     }).join('')}</div>`;
 }
 
-const TABS_MOD = [['todo', 'Todo'], ['tareas', 'Tareas'], ['notas', 'Notas'], ['contenido', 'Contenido'], ['ejercicios', 'Ejercicios']];
+const TABS_MOD = [['todo', 'Resumen'], ['tareas', 'Tareas'], ['notas', 'Notas'], ['ejercicios', 'Trabajar'], ['contenido', 'Apuntes']];
 const TIPOS = { resource: 'archivo', assign: 'tarea', quiz: 'cuestionario', forum: 'foro', url: 'enlace', page: 'página', folder: 'carpeta', label: 'etiqueta', h5pactivity: 'H5P', choice: 'consulta', lesson: 'lección', workshop: 'taller', glossary: 'glosario', feedback: 'encuesta', book: 'libro', scorm: 'SCORM' };
 function vistaModulo(id) {
   const c = cursos().find((x) => x.id === id);
   if (!c) return cabecera('Módulo') + vacio('Ese módulo no está en los datos de Aules. <a href="#modulos">Volver</a>');
   const nombre = nombreModulo(c.nombre), color = colorDe(nombre), tab = S.tabModulo;
   const ts = tareas().filter((t) => t.cursoId === id).sort((a, b) => (a.entrega || 9e9) - (b.entrega || 9e9));
-  const secTareas = `<section class="bloque"><header><h2>Tareas</h2><span class="suave">${ts.filter((t) => t.hecha).length}/${ts.length} entregadas</span></header>
-    ${ts.length ? `<div class="lista">${ts.map((t) => fila({ fecha: t.entrega, nombre: t.nombre, modulo: nombre, url: t.url, tarea: t, chip: estadoTarea(t) })).join('')}</div>` : vacio('Este módulo no tiene tareas en Aules.')}</section>`;
+  const item = (t) => ({ fecha: t.entrega, nombre: t.nombre, modulo: nombre, url: t.url, tarea: t, chip: estadoTarea(t) });
+  const conFecha = (f) => ts.filter((t) => t.entrega && f(t)).map(item);
+  const sinFecha = ts.filter((t) => !t.entrega && !t.hecha);
+  const hechas = conFecha((t) => t.hecha).reverse(), perdidas = conFecha((t) => ['cerrada', 'antigua'].includes(situacion(t))).reverse();
+  const plegado = (titulo, items) => (items.length ? `<details class="plegable"><summary>${titulo} <span class="suave">(${items.length})</span></summary>${listaFilas(items, '')}</details>` : '');
+  const secTareas = `<section class="bloque"><header><h2>Por entregar</h2></header>
+      ${listaFilas(conFecha((t) => porHacer(t) || situacion(t) === 'futura'), 'Nada pendiente en este módulo.')}
+      ${sinFecha.length ? `<p class="suave">Sin fecha: ${sinFecha.map((t) => `<a href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>`).join(' · ')}</p>` : ''}
+      ${plegado('Entregadas', hechas)}${plegado('Cerradas o antiguas sin entregar', perdidas)}</section>`;
   const conNota = c.notas.filter((n) => n.nota != null && n.max);
   const secNotas = `<section class="bloque"><header><h2>Calificaciones</h2><span class="suave">Media ${fNota(mediaCurso(c))} / 10</span></header>
     ${barras(conNota.map((n) => [n.nombre, n.nota / n.max * 10, color]))}
@@ -429,9 +481,9 @@ function vistaModulo(id) {
     </details>`).join('') || vacio('Sin contenido.')}</section>`;
   const secEj = `<section class="bloque"><header><h2>Ejercicios y trabajos</h2><a href="#ejercicios" data-acc="ir-ejercicios" data-modulo="${esc(nombre)}">Abrir en Ejercicios</a></header>${listaEjercicios(nombre)}</section>`;
   const cuerpo = { tareas: secTareas, notas: secNotas, contenido: secContenido, ejercicios: secEj }[tab]
-    || `<div class="cifras">${cifra(fNota(mediaCurso(c)), 'Media / 10')}${cifra(`${ts.filter((t) => t.hecha).length}<span>/${ts.length}</span>`, 'Entregadas')}${cifra(ts.filter(urgente).length, 'Urgentes', ts.some(urgente) ? 'alerta' : '')}${c.progreso != null ? cifra(Math.round(c.progreso) + '%', 'Progreso en Aules') : ''}</div>` + secTareas + secNotas + secContenido;
+    || `<div class="cifras">${cifra(fNota(mediaCurso(c)), 'Media')}${cifra(ts.filter(porHacer).length, 'Por entregar', ts.some(urgente) ? 'alerta' : '')}${cifra(ts.filter((t) => t.hecha).length, 'Entregadas')}</div>` + secTareas + secNotas;
   return `<div class="cab-modulo corte trama-esquina" style="--mod:${color}">
-      <a href="#modulos" class="antetitulo">← Módulos · ${esc(c.corto)}</a><h1>${esc(nombre)}</h1>
+      <a href="#modulos" class="antetitulo">← Módulos</a><h1>${esc(nombre)}</h1>
       <a class="boton mini" href="${esc(c.url)}" target="_blank" rel="noopener">Aules ↗</a></div>
     <div class="tabs" role="tablist">${TABS_MOD.map(([k, t]) => `<button type="button" role="tab" data-acc="tab-mod" data-v="${k}" aria-selected="${k === tab}">${t}</button>`).join('')}</div>
     ${cuerpo}`;
@@ -451,12 +503,12 @@ function vistaCalendario() {
   for (let d = 1; d <= dias; d++) {
     const k = y * 10000 + (mo + 1) * 100 + d, its = porDia[k] || [];
     celdas += `<button type="button" class="dia-cal ${k === kHoy ? 'hoy' : ''} ${k === S.diaSel ? 'sel' : ''} ${its.some((i) => i.tarea && urgente(i.tarea)) ? 'con-urgente' : ''}" data-acc="dia" data-v="${k}" aria-label="${d}${its.length ? ', ' + its.length + ' cosas' : ''}">
-      <span>${d}</span><span class="puntos">${its.slice(0, 4).map((i) => `<i style="--mod:${colorDe(i.modulo)}" class="${i.tarea && i.tarea.hecha ? 'tenue' : ''}"></i>`).join('')}</span></button>`;
+      <span>${d}</span><span class="puntos">${its.slice(0, 4).map((i) => `<i style="--mod:${colorDe(i.modulo)}" class="${i.tarea && !porHacer(i.tarea) ? 'tenue' : ''}"></i>`).join('')}${its.length > 4 ? `<b>+${its.length - 4}</b>` : ''}</span></button>`;
   }
   const sel = porDia[S.diaSel] || [];
   const selFecha = new Date(Math.floor(S.diaSel / 10000), Math.floor(S.diaSel / 100) % 100 - 1, S.diaSel % 100, 12);
   const mods = [...new Set([...cursos().map((c) => nombreModulo(c.nombre)), ...modulosCatalogo()])];
-  const proximas = agenda().filter((i) => i.fecha >= ahora() && i.fecha <= ahora() + 7 * D && !(i.tarea && i.tarea.hecha));
+  const proximas = agenda().filter((i) => i.fecha >= ahora() && i.fecha <= ahora() + 7 * D && (!i.tarea || porHacer(i.tarea)));
   return `${cabecera('Calendario')}
   <div class="cal-layout">
     <section class="calendario corte">
@@ -469,7 +521,7 @@ function vistaCalendario() {
     </section>
     <div class="columna">
       <section class="bloque"><header><h2>${esc(F_DIA.format(selFecha))}</h2></header>
-        <div class="lista">${sel.length ? sel.map((i) => fila(i, false)).join('') : vacio('Nada este día.')}</div></section>
+        ${listaFilas(sel, 'Nada este día.')}</section>
       <details class="panel corte"><summary>+ Añadir tarea o examen propio</summary>
         <form id="f-tarea" class="rejilla-form">
           <label class="campo"><span>Qué es</span><input type="text" id="t-nombre" required placeholder="Examen tema 4"></label>
@@ -482,7 +534,7 @@ function vistaCalendario() {
         </form></details>
     </div>
   </div>
-  <section class="bloque"><header><h2>Próximos 7 días</h2></header><div class="lista">${proximas.length ? proximas.map((i) => fila(i)).join('') : vacio('Semana libre.')}</div></section>`;
+  <section class="bloque"><header><h2>Por entregar esta semana</h2></header>${listaFilas(proximas, 'Semana libre.')}</section>`;
 }
 
 function vistaNotas() {
@@ -511,6 +563,7 @@ function vistaAjustes() {
   return cabecera('Ajustes') + `
   <section class="bloque"><header><h2>Conexión con Aules</h2><span class="punto" data-ok="${S.aules ? 'si' : 'no'}">${S.aules ? 'Conectado' : 'Sin conectar'}</span></header>
     <div class="panel corte">
+      ${(S.curso.avisos || []).length ? `<details class="plegable"><summary>Aules no dejó leer ${S.curso.avisos.length} cosa${S.curso.avisos.length === 1 ? '' : 's'} en la última sincronización</summary><ul class="mono">${S.curso.avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul></details>` : ''}
       <p>Doodle descarga tus tareas, entregas y notas desde este navegador. Se actualiza al abrir la app si los datos tienen más de 2 horas, y cuando pulsas <b>Sincronizar</b>.</p>
       <p class="suave">El token se saca abriendo <span class="mono">aules.edu.gva.es/fp/login/token.php?service=moodle_mobile_app&amp;username=…&amp;password=…</span> y copiando el valor de <span class="mono">"token"</span>. Se guarda cifrado con tu contraseña en este dispositivo.</p>
       ${demo || `<form id="f-aules" class="rejilla-form">
@@ -669,7 +722,16 @@ function vistaTarea(clave) {
   const fecha = (et, ts) => (ts ? `<div><dt>${et}</dt><dd>${fCorta(ts)} · ${fHora(ts)}</dd></div>` : '');
   return `<div class="cab-modulo corte trama-esquina" style="--mod:${colorDe(t.modulo)}">
       <a href="${c ? '#modulo-' + c.id : '#calendario'}" class="antetitulo">← ${esc(t.modulo)}</a><h1>${esc(t.nombre)}</h1>
-      <span class="chip ${est[0]}">${esc(est[1])}</span></div>
+      ${est ? `<span class="chip ${est[0]}">${esc(est[1])}</span>` : ''}</div>
+    <div class="aviso-tarea s-${situacion(t)}" style="--mod:${colorDe(t.modulo)}">${{
+      hecha: `Entregada${t.enviada ? ' el ' + fCorta(t.enviada) : ''}${t.nota10 != null ? ' · nota ' + fNota(t.nota10) + ' / 10' : ' · sin nota todavía'}.`,
+      futura: `Aún no se puede entregar: se abre el ${fCorta(t.apertura)} a las ${fHora(t.apertura)}.`,
+      cerrada: 'Cerrada: Aules ya no admite entregas de esta tarea.',
+      antigua: `Venció hace más de dos semanas (${fCorta(t.entrega)}). Si aún cuenta, pregunta al profesor.`,
+      retraso: `Venció ${cuando(t.entrega).toLowerCase()}, pero Aules todavía la admite${t.cierre ? ' hasta el ' + fCorta(t.cierre) + ' a las ' + fHora(t.cierre) : ''}.`,
+      pendiente: t.entrega ? `Entrega: ${cuando(t.entrega).toLowerCase()}${t.cierre && t.cierre > t.entrega ? ' (se admite hasta el ' + fCorta(t.cierre) + ')' : ''}.` : 'Sin fecha de entrega.',
+    }[situacion(t)]}
+      ${t.url && porHacer(t) ? `<a class="boton principal" href="${esc(t.url)}" target="_blank" rel="noopener">Entregar en Aules ↗</a>` : ''}</div>
     <div class="dos-col">
       <section class="bloque"><header><h2>Enunciado</h2>${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">Abrir en Aules ↗</a>` : ''}</header>
         <div class="panel corte"><p class="pre">${t.enunciado ? esc(t.enunciado) : '<span class="suave">Esta tarea no tiene enunciado escrito en Aules.</span>'}</p>
@@ -678,11 +740,11 @@ function vistaTarea(clave) {
         <section class="bloque trabajar corte">
           <div class="lineas-velocidad" aria-hidden="true"></div>
           <header><h2>Trabajar en Doodle</h2></header>
-          ${tr ? `<p>Tienes un trabajo empezado con <b>${esc(HERR[tr.tipo])}</b>.</p><div class="fila-botones"><a class="boton principal" href="#trabajo-${tr.id}">Continuar ▸</a></div>`
-            : `<p>Se abrirá con <b>${esc(HERR[h.tipo])}</b>${h.notacion ? ' (' + esc({ er: 'E/R Chen', relacional: 'modelo relacional', uml: 'UML', casos: 'casos de uso' }[h.notacion]) + ')' : ''}. Podrás cambiar de herramienta dentro.</p><div class="fila-botones"><button type="button" class="boton principal" data-acc="trabajar" data-v="${esc(clave)}">Empezar ▸</button></div>`}
+          ${tr ? `<p>Ya lo tienes empezado con <b>${esc(HERR[tr.tipo])}</b>. Lo que hagas se guarda solo; cuando acabes, descárgalo y súbelo a Aules.</p><div class="fila-botones"><a class="boton principal" href="#trabajo-${tr.id}">Seguir trabajando</a></div>`
+            : `<p>Se abrirá <b>${esc(HERR[h.tipo])}</b>${h.notacion ? ' (' + esc({ er: 'E/R en notación Chen', relacional: 'modelo relacional', uml: 'UML', casos: 'casos de uso' }[h.notacion]) + ')' : ''}. Si no es la herramienta que necesitas, puedes cambiarla dentro.</p><div class="fila-botones"><button type="button" class="boton principal" data-acc="trabajar" data-v="${esc(clave)}">Empezar a trabajar</button></div>`}
         </section>
         <section class="bloque"><header><h2>Datos</h2></header>
-          <dl class="datos-tarea panel corte">${fecha('Entrega', t.entrega)}${fecha('Se abre', t.apertura)}${fecha('Cierre', t.cierre)}${fecha('Enviada', t.enviada)}
+          <dl class="datos-tarea panel corte">${fecha('Entrega', t.entrega)}${fecha('Se abre', t.apertura)}${fecha('Cierre', t.cierre)}${t.hecha ? fecha('Enviada', t.enviada) : ''}
             <div><dt>Nota</dt><dd>${t.nota10 != null ? `<b>${fNota(t.nota10)}</b> / 10` : '—'}</dd></div></dl></section>
         ${t.comentario ? `<section class="bloque"><header><h2>Comentario del profesor</h2></header><div class="panel corte"><p class="pre">${esc(t.comentario)}</p></div></section>` : ''}
       </div>
@@ -723,9 +785,10 @@ function modulosTaller() {
 }
 function vistaEjercicios() {
   const mods = modulosTaller();
-  if (!mods.includes(S.filtro.modulo)) S.filtro.modulo = mods[0] || '';
+  // de entrada, el módulo con más cosas por entregar
+  if (!mods.includes(S.filtro.modulo)) { const T = tareas().filter(porHacer); S.filtro.modulo = [...mods].sort((a, b) => T.filter((t) => t.modulo === b).length - T.filter((t) => t.modulo === a).length)[0] || ''; }
   const m = S.filtro.modulo;
-  return cabecera('Ejercicios') + `
+  return cabecera('Ejercicios', '<span class="suave">Haz aquí las tareas: diagramas, SQL, Java, C#, web… Todo se guarda solo.</span>') + `
   <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="filtro-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
   <details class="panel corte"><summary>+ Nuevo trabajo libre</summary>
     <form id="f-trabajo" class="rejilla-form">
@@ -747,24 +810,27 @@ function vistaEjercicios() {
 function listaEjercicios(modulo) {
   const color = colorDe(modulo);
   const conTrabajo = (t) => trabajoDeTarea(t.clave);
-  const ts = tareas().filter((t) => t.modulo === modulo && t.origen === 'aules').sort((a, b) => (b.entrega || 0) - (a.entrega || 0));
+  const ts = tareas().filter((t) => t.modulo === modulo && t.origen === 'aules');
   const libres = trabajos().filter((w) => w.modulo === modulo && !w.tarea).sort((a, b) => (b.t || 0) - (a.t || 0));
   let html = '';
-  if (ts.length) html += `<section class="bloque" style="--mod:${color}"><header><h2>Tareas de Aules</h2><span class="suave num">${ts.filter((t) => conTrabajo(t)).length} empezadas · ${ts.filter((t) => t.hecha).length} entregadas</span></header>
-    <div class="lista">${ts.map((t) => { const est = estadoTarea(t), w = conTrabajo(t);
-      return `<div class="ej ej-t corte ${t.hecha ? 'hecho' : ''}"><span class="ej-num">${t.entrega ? fCorta(t.entrega).replace(/^\w+,?\s*/, '') : '—'}</span>
-        <a class="ej-txt ej-tarea" href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>
-        <span class="chip ${est[0]}">${esc(est[1])}</span>
-        <div class="ej-acc">${w ? `<a class="boton mini principal" href="#trabajo-${w.id}">${esc(HERR[w.tipo])} ▸</a>` : `<button type="button" class="boton mini" data-acc="trabajar" data-v="${esc(t.clave)}">Empezar ▸</button>`}</div></div>`; }).join('')}</div></section>`;
+  const filaEj = (t) => { const est = estadoTarea(t), w = conTrabajo(t);
+    return `<div class="ej ej-t corte s-${situacion(t)}"><span class="ej-num">${t.entrega ? cuando(t.entrega).replace(/ · .*/, '') : 'Sin fecha'}</span>
+      <a class="ej-txt ej-tarea" href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>
+      ${est ? `<span class="chip ${est[0]}">${esc(est[1])}</span>` : '<span></span>'}
+      <div class="ej-acc">${w ? `<a class="boton mini principal" href="#trabajo-${w.id}">Seguir · ${esc(HERR[w.tipo])}</a>` : `<button type="button" class="boton mini" data-acc="trabajar" data-v="${esc(t.clave)}">Empezar</button>`}</div></div>`; };
+  const orden = (a, b) => (a.entrega || 9e9) - (b.entrega || 9e9);
+  const activas = ts.filter((t) => porHacer(t) || situacion(t) === 'futura' || conTrabajo(t) && !t.hecha).sort(orden), resto = ts.filter((t) => !activas.includes(t)).sort((a, b) => orden(b, a));
+  if (ts.length) html += `<section class="bloque" style="--mod:${color}"><header><h2>Tareas de Aules</h2></header>
+    <div class="lista">${activas.map(filaEj).join('') || vacio('No tienes nada pendiente aquí.')}</div>
+    ${resto.length ? `<details class="plegable"><summary>Entregadas, cerradas y antiguas <span class="suave">(${resto.length})</span></summary><div class="lista">${resto.map(filaEj).join('')}</div></details>` : ''}</section>`;
   if (libres.length) html += `<section class="bloque" style="--mod:${color}"><header><h2>Trabajos libres</h2></header><div class="lista">${libres.map((w) => `<div class="ej ej-t corte"><span class="ej-num">${esc(HERR[w.tipo])}</span><a class="ej-txt ej-tarea" href="#trabajo-${w.id}">${esc(w.titulo)}</a><span></span>
-    <div class="ej-acc"><button type="button" class="boton mini peligro" data-acc="borrar-trabajo" data-v="${w.id}">Borrar</button><a class="boton mini principal" href="#trabajo-${w.id}">Abrir ▸</a></div></div>`).join('')}</div></section>`;
+    <div class="ej-acc"><button type="button" class="boton mini peligro" data-acc="borrar-trabajo" data-v="${w.id}">Borrar</button><a class="boton mini principal" href="#trabajo-${w.id}">Abrir</a></div></div>`).join('')}</div></section>`;
   const lista = catalogo().filter((e) => e.modulo === modulo);
   for (const t of [...new Set(lista.map((e) => e.tema))]) {
     const del = lista.filter((e) => e.tema === t), n = del.filter(hecho).length;
     let grupo = null;
-    html += `<section class="bloque tema" style="--mod:${color}">
-      <header><h2>${esc(t)}</h2><span class="suave num">${n}/${del.length}</span></header>
-      <div class="barra"><i style="width:${n / del.length * 100}%"></i></div>
+    html += `<details class="bloque tema corte" style="--mod:${color}">
+      <summary><span class="tema-nombre">${esc(t)}</span><span class="suave num">${n} de ${del.length} hechos</span><div class="barra"><i style="width:${n / del.length * 100}%"></i></div></summary>
       <div class="lista">${del.map((e) => {
         const g = e.grupo && e.grupo !== grupo ? `<p class="grupo">${esc((grupo = e.grupo))}</p>` : '';
         return g + `<div class="ej corte ${hecho(e) ? 'hecho' : ''}" data-id="${esc(e.id)}">
@@ -774,7 +840,7 @@ function listaEjercicios(modulo) {
           <div class="ej-acc">${e.propio ? '<button type="button" class="boton mini peligro" data-acc="borrar-ej">Borrar</button>' : ''}
             <button type="button" class="boton mini principal" data-acc="abrir-lab">${e.lenguaje === 'csharp' ? 'Programar ▸' : 'Notas ▸'}</button></div>
         </div>`;
-      }).join('')}</div></section>`;
+      }).join('')}</div></details>`;
   }
   return html || vacio('Aún no hay nada en este módulo. Crea un trabajo libre arriba.');
 }
