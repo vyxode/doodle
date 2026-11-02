@@ -16,7 +16,8 @@ export function nombreModulo(n) {
 
 
 // Los textos de Aules llegan en HTML; la web los muestra como texto plano.
-const texto = (html) => (html || '').replace(/<br\s*\/?>|<\/(p|div|li|h\d)>/gi, '\n').replace(/<[^>]+>/g, '')
+// los saltos de línea del código HTML no cuentan (Aules los mete al partir líneas largas); solo <br> y los párrafos
+const texto = (html) => (html || '').replace(/\s*\n\s*/g, ' ').replace(/<br\s*\/?>|<\/(p|div|li|h\d)>/gi, '\n').replace(/<[^>]+>/g, '')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
   .replace(/\n{3,}/g, '\n\n').trim();
 
@@ -63,12 +64,14 @@ export async function descargarAules(urlAules, token) {
     const tareas = await Promise.all((tareasPorCurso[c.id] || []).map(async (a) => {
       const st = await opcional('mod_assign_get_submission_status', { assignid: a.id }, {});
       const sub = (st.lastattempt || {}).submission || (st.lastattempt || {}).teamsubmission || {};
+      const editable = st.lastattempt ? st.lastattempt.canedit !== false : null; // false: Aules ya no deja entregar
       const fb = st.feedback || {};
       const item = items.find((i) => i.itemmodule === 'assign' && i.iteminstance === a.id);
       return {
         id: a.id, cmid: a.cmid, nombre: a.name, enunciado: texto(a.intro),
         apertura: a.allowsubmissionsfromdate || 0, entrega: a.duedate || 0, cierre: a.cutoffdate || 0,
         estado: sub.status || 'new', // new | draft | submitted | reopened
+        editable,
         enviada: sub.timemodified || 0,
         nota: item && item.graderaw != null ? item.graderaw : null,
         notaMax: item ? item.grademax : null,
@@ -100,7 +103,7 @@ export async function descargarAules(urlAules, token) {
     };
   }));
 
-  const ev = await opcional('core_calendar_get_action_events_by_timesort', { timesortfrom: Math.floor(Date.now() / 1000) - 14 * 86400, limitnum: 100 }, { events: [] });
+  const ev = await opcional('core_calendar_get_action_events_by_timesort', { timesortfrom: Math.floor(Date.now() / 1000) - 14 * 86400, limitnum: 50 }, { events: [] });
   const eventos = (ev.events || []).map((e) => ({
     nombre: e.name, fecha: e.timesort, curso: e.course ? e.course.id : null, tipo: e.modulename || e.eventtype, url: e.url || '',
   }));
