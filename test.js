@@ -137,6 +137,10 @@ await writeFile(dir + '/src/ViejoTest.java', 'import org.junit.*; public class V
 const { stdout: fuentes } = await promisify(execFile)('find', [dir + '/src', '-name', '*.java']);
 await promisify(execFile)('javac', ['--release', '8', '-nowarn', '-encoding', 'UTF-8', '-d', dir + '/out', ...fuentes.trim().split('\n')]);
 await mkdir('/str', { recursive: true }); await writeFile('/str/doodle-entrada.txt', 'Fran\n21\n');
+// el mini JUnit y el lanzador van precompilados en un jar que carga la web
+await rm(dir + '/lib', { recursive: true, force: true });
+await promisify(execFile)('javac', ['--release', '8', '-nowarn', '-encoding', 'UTF-8', '-d', dir + '/lib', ...fuentes.trim().split('\n').filter((f) => /\/src\/(org|doodle)\//.test(f))]);
+await promisify(execFile)('jar', ['cf', 'js/vendor/doodle-lib.jar', '-C', dir + '/lib', '.']);
 const java = (...a) => promisify(execFile)('java', ['-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-cp', dir + '/out', 'doodle.Lanzador', ...a]).then((r) => r.stdout);
 assert.match(await java('Calc'), /^Hola Fran\n42\n\u0000FIN/);
 const salTests = await java('--tests', 'CalcTest', 'ViejoTest');
