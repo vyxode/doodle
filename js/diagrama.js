@@ -21,7 +21,7 @@ const FORMAS = {
 const TEXTO_INICIAL = { entidad: 'ENTIDAD', debil: 'DÉBIL', relacion: 'relación', 'relacion-debil': 'relación', atributo: 'atributo', isa: 'ES', agregacion: '', tabla: 'TABLA', clase: 'Clase', interfaz: 'Interfaz', actor: 'Actor', caso: 'Caso de uso', sistema: 'Sistema', nota: 'Nota' };
 export const ESTILOS = { linea: 'Línea', doble: 'Doble (participación total)', flecha: 'Flecha', fk: 'Clave ajena →', herencia: 'Herencia (UML)', discontinua: 'Discontinua «include/extend»', composicion: 'Composición (UML)', agregacionUml: 'Agregación (UML)' };
 const ESTILO_DEFECTO = { er: 'linea', relacional: 'fk', uml: 'linea', casos: 'linea' };
-const FUENTE = "14px Barlow, 'Segoe UI', Arial, sans-serif"; // comillas simples: va dentro de style="…"
+const FUENTE = "14px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"; // comillas simples: va dentro de style="…"
 const COLORES_APP = { trazo: 'var(--texto)', relleno: 'var(--panel-2)', texto: 'var(--texto)', suave: 'var(--suave)', acento: 'var(--rojo)', fondoEt: 'var(--panel)' };
 const COLORES_PAPEL = { trazo: '#111111', relleno: '#FFFFFF', texto: '#111111', suave: '#555555', acento: '#D90F1C', fondoEt: '#FFFFFF' };
 
@@ -115,10 +115,10 @@ function dibujarNodo(n, c, sel) {
     case 'isa': {
       s = `<polygon points="${cx},${y} ${x + w},${y + h} ${x},${y + h}" style="${st}"/>` + textoCentrado(n.texto, cx, y + h * 0.66, c, '600 ');
       const etq = `(${n.total ? 't' : 'p'}, ${n.solapada ? 's' : 'e'})`;
-      s += `<text x="${x + w + 6}" y="${cy}" dominant-baseline="central" style="fill:${c.suave};font:12px Barlow, Arial, sans-serif">${etq}</text>`;
+      s += `<text x="${x + w + 6}" y="${cy}" dominant-baseline="central" style="fill:${c.suave};font:12px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">${etq}</text>`;
       break;
     }
-    case 'agregacion': s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:none;stroke:${c.trazo};stroke-width:1.4;stroke-dasharray:8 5"/>` + (n.texto ? `<text x="${x + 8}" y="${y + 16}" style="fill:${c.suave};font:12px Barlow, Arial, sans-serif">${esc(n.texto)}</text>` : ''); break;
+    case 'agregacion': s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:none;stroke:${c.trazo};stroke-width:1.4;stroke-dasharray:8 5"/>` + (n.texto ? `<text x="${x + 8}" y="${y + 16}" style="fill:${c.suave};font:12px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">${esc(n.texto)}</text>` : ''); break;
     case 'sistema': s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:none;stroke:${c.trazo};stroke-width:1.6"/><text x="${cx}" y="${y + 20}" text-anchor="middle" style="fill:${c.texto};font:600 ${FUENTE}">${esc(n.texto)}</text>`; break;
     case 'caso': s = `<ellipse cx="${cx}" cy="${cy}" rx="${w / 2}" ry="${h / 2}" style="${st}"/>` + textoCentrado(n.texto, cx, cy, c); break;
     case 'actor': {
@@ -143,7 +143,7 @@ function dibujarNodo(n, c, sel) {
       const at = lineas(n.atributos || '').filter((l) => l.trim()), me = lineas(n.metodos || '').filter((l) => l.trim());
       const cab = n.tipo === 'interfaz' ? 50 : 34, y1 = y + cab, y2 = y1 + Math.max(1, at.length) * 20 + 10;
       s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="${st}"/><line x1="${x}" x2="${x + w}" y1="${y1}" y2="${y1}" style="stroke:${c.trazo};stroke-width:1.4"/><line x1="${x}" x2="${x + w}" y1="${y2}" y2="${y2}" style="stroke:${c.trazo};stroke-width:1.4"/>`;
-      if (n.tipo === 'interfaz') s += `<text x="${cx}" y="${y + 16}" text-anchor="middle" style="fill:${c.suave};font:12px Barlow, Arial, sans-serif">«interface»</text>`;
+      if (n.tipo === 'interfaz') s += `<text x="${cx}" y="${y + 16}" text-anchor="middle" style="fill:${c.suave};font:12px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">«interface»</text>`;
       s += `<text x="${cx}" y="${y1 - 17}" text-anchor="middle" dominant-baseline="central" style="fill:${c.texto};font:600 ${n.abstracta ? 'italic ' : ''}${FUENTE}">${esc(n.texto)}</text>`;
       at.forEach((l, i) => { s += `<text x="${x + 10}" y="${y1 + 15 + i * 20}" dominant-baseline="central" style="fill:${c.texto};font:${FUENTE}">${esc(l)}</text>`; });
       me.forEach((l, i) => { s += `<text x="${x + 10}" y="${y2 + 15 + i * 20}" dominant-baseline="central" style="fill:${c.texto};font:${FUENTE}">${esc(l)}</text>`; });
@@ -152,7 +152,7 @@ function dibujarNodo(n, c, sel) {
     case 'nota': s = `<path d="M${x} ${y}h${w - 12}l12 12v${h - 12}h${-w}z" style="fill:${c.relleno};stroke:${c.suave};stroke-width:1.2;stroke-dasharray:3 3"/>` + textoCentrado(n.texto, cx, cy, c); break;
     default: break;
   }
-  if (n.tipo === 'relacion' && n.card) s += `<text x="${cx}" y="${y - 8}" text-anchor="middle" style="fill:${c.texto};font:600 13px Barlow, Arial, sans-serif">${esc(n.card)}</text>`;
+  if (n.tipo === 'relacion' && n.card) s += `<text x="${cx}" y="${y - 8}" text-anchor="middle" style="fill:${c.texto};font:600 13px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">${esc(n.card)}</text>`;
   const marco = sel ? `<rect class="dg-sel" x="${x - 5}" y="${y - 5}" width="${w + 10}" height="${h + 10}"/>` : '';
   return `<g class="dg-nodo" data-id="${n.id}">${s}${marco}</g>`;
 }
@@ -163,7 +163,7 @@ function puntoEnSegmento(p, q, f, desplaz) {
 function etiqueta(t, pt, c, peso = '') {
   if (!t) return '';
   const w = anchoTexto(t, !!peso) + 8;
-  return `<rect x="${pt.x - w / 2}" y="${pt.y - 10}" width="${w}" height="20" style="fill:${c.fondoEt};stroke:none" rx="2"/><text x="${pt.x}" y="${pt.y}" text-anchor="middle" dominant-baseline="central" style="fill:${c.texto};font:${peso}13px Barlow, Arial, sans-serif">${esc(t)}</text>`;
+  return `<rect x="${pt.x - w / 2}" y="${pt.y - 10}" width="${w}" height="20" style="fill:${c.fondoEt};stroke:none" rx="2"/><text x="${pt.x}" y="${pt.y}" text-anchor="middle" dominant-baseline="central" style="fill:${c.texto};font:${peso}13px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">${esc(t)}</text>`;
 }
 function dibujarArista(d, e, c, sel) {
   const ex = extremos(d, e); if (!ex) return '';
