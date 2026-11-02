@@ -1,21 +1,25 @@
 # Doodle
 
-Mi curso de DAM en una web: tareas, entregas y notas de Aules, calendario, estadísticas y ejercicios con editor y simulador de C#.
+Mi curso de DAM en una web: tareas, entregas y notas de Aules, calendario, estadísticas y herramientas para hacer los ejercicios sin salir de la web.
 
-- **Web**: GitHub Pages (`index.html`, `css/`, `js/`). Pide la contraseña y descifra los datos en el navegador.
-- **Robot**: `.github/workflows/sincronizar.yml` ejecuta `sync/aules.mjs` 4 veces al día (y con el botón *Sincronizar ahora*), descarga Aules con la API de Moodle y publica `data/curso.enc` cifrado (AES-256-GCM, clave derivada de `CLAVE_MAESTRA`).
-- **Progreso**: se guarda cifrado en el navegador y, si configuras una clave de GitHub en *Ajustes*, en `data/progreso.enc` para tenerlo igual en todos tus dispositivos.
+- **Aules**: la web descarga tus datos desde tu navegador con el token de la app de Moodle (Ajustes → Conexión con Aules). Aules no acepta conexiones desde los servidores de GitHub.
+- **Cifrado**: todo se guarda cifrado (AES-256-GCM, clave derivada de tu contraseña) en el navegador y, si pones una clave de GitHub en Ajustes, en `data/curso.enc` y `data/progreso.enc` para tenerlo igual en todos tus dispositivos.
+- **Publicación**: `.github/workflows/sincronizar.yml` publica la web en GitHub Pages en cada push.
 
-## Puesta en marcha
+## Herramientas (Ejercicios → una tarea → Empezar)
 
-1. **Settings → Pages → Source: GitHub Actions.**
-2. **Settings → Secrets and variables → Actions**, tres secretos: `AULES_URL` (`https://aules.edu.gva.es/fp`), `AULES_TOKEN`, `CLAVE_MAESTRA`.
-3. **Actions → Sincronizar con Aules y publicar → Run workflow.**
-
-## Añadir ejercicios
-
-En la web (*Ejercicios → Añadir un ejercicio*) o en `js/ejercicios.js` para que formen parte del catálogo.
+| Herramienta | Para | Notas |
+|---|---|---|
+| Diagrama | E/R (Chen extendido), modelo relacional, UML de clases, casos de uso | Exporta a `.drawio`, PNG y SVG |
+| SQL | Bases de Datos | SQLite en el navegador (`js/vendor/sql-wasm.*`); adapta lo típico de MySQL |
+| Java | Entornos | Java 8 real con CheerpJ + `javac` de OpenJDK (`js/vendor/tools.jar`); mini JUnit 4/5 incluido |
+| C# | Programación | Simulador de los temas 1–4 |
+| HTML/CSS | Lenguajes de Marcas | Vista previa en directo y avisos básicos |
+| Tablero | Requisitos e historias de usuario | Kanban, exporta a Markdown |
+| Notas | Todo lo demás | Texto libre, exporta a `.md` |
 
 ## Pruebas
 
-`node test.js` prueba el robot contra un Aules simulado y el cifrado, y regenera los datos de ejemplo (`js/demo.js`).
+- `node test.js`: cifrado, descarga de Aules contra un Aules simulado, nombres de módulos, SQL real, revisor HTML, exportación a draw.io/SVG y el mini JUnit con un `javac` real. Regenera los datos de ejemplo (`js/demo.js`).
+
+Licencias de terceros: sql.js (MIT, `js/vendor/sql.js-LICENSE`), `tools.jar` de OpenJDK 8 (GPLv2 + Classpath Exception, tomado de JavaFiddle de Leaning Technologies), CheerpJ (se carga desde su CDN; uso personal gratuito).

@@ -5,6 +5,16 @@
 // Admite que se pegue la URL de cualquier página de Aules: nos quedamos con la raíz del sitio.
 export const raizAules = (url) => (url || '').trim().replace(/\/(course|my|login|user|mod|webservice)\/.*$/, '').replace(/\/+$/, '');
 
+// Aules nombra los módulos en valenciano y con códigos de grupo ("Programació'-'1CFSG,1CFSF"): se muestran en castellano y limpios.
+const ALIAS = [[/programaci/, 'Programación'], [/bases? de da(des|tos)/, 'Bases de Datos'], [/entorn/, 'Entornos de Desarrollo'], [/sistem(es|as) inform/, 'Sistemas Informáticos'],
+  [/(llenguatges|lenguajes) de marc/, 'Lenguajes de Marcas'], [/ocupabilitat|empleabilidad/, 'Itinerario para la Empleabilidad I'], [/english|angl[eé]s|ingl[eé]s/, 'Inglés Profesional'],
+  [/projecte|proyecto/, 'Proyecto Intermodular'], [/tutor/, 'Tutoría']];
+export function nombreModulo(n) {
+  const k = (n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), a = ALIAS.find(([re]) => re.test(k));
+  return a ? a[1] : (n || '').replace(/'-'.*$/, '').replace(/^\s*[\dA-Z]{3,6}\s*[-–·:]\s*/, '').replace(/\s*-?\s*\b\d?\s*(DAM|DAW|1CFS\w*)\b.*$/i, '').trim();
+}
+
+
 // Los textos de Aules llegan en HTML; la web los muestra como texto plano.
 const texto = (html) => (html || '').replace(/<br\s*\/?>|<\/(p|div|li|h\d)>/gi, '\n').replace(/<[^>]+>/g, '')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
@@ -64,6 +74,7 @@ export async function descargarAules(urlAules, token) {
         notaMax: item ? item.grademax : null,
         notaTexto: (item && item.gradeformatted) || (fb.gradefordisplay ? texto(fb.gradefordisplay) : ''),
         comentario: texto((item && item.feedback) || (fb.plugins || []).flatMap((p) => p.editorfields || []).map((f) => f.text).join('\n')),
+        adjuntos: (a.introattachments || []).map((f) => f.filename),
         url: `${URL_AULES}/mod/assign/view.php?id=${a.cmid}`,
       };
     }));

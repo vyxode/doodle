@@ -3,7 +3,9 @@
 // - Todo se guarda cifrado con tu contraseña: en este navegador y, si configuras GitHub, en el repo
 //   (data/curso.enc y data/progreso.enc) para tenerlo igual en todos tus dispositivos.
 import { cifrar, descifrar } from './cripto.js';
-import { descargarAules, raizAules } from './aules.js';
+import { descargarAules, raizAules, nombreModulo } from './aules.js';
+import { crearEditor, montarSql, montarWeb, montarKanban, montarJava } from './herramientas.js';
+import { montarDiagrama } from './diagrama.js';
 
 const D = 86400;
 const URGENTE = 3 * D; // a menos de 3 días: en rojo
@@ -23,7 +25,7 @@ const S = {
   remoto: { sha: null, salt: null, shaCurso: null, estado: ['', ''] }, sync: '', sincronizando: false,
   filtro: { modulo: '' }, tabModulo: 'todo', mes: null, diaSel: null, recordar: false,
 };
-function progVacio() { return { ej: {}, tareas: {}, ejPropios: {} }; }
+function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {} }; }
 const guardarCfg = () => LS.set('doodle-cfg', S.cfg);
 const aplicarTema = () => { document.documentElement.dataset.theme = S.cfg.tema === 'claro' ? 'light' : 'dark'; };
 aplicarTema();
@@ -48,12 +50,10 @@ function cuenta(ts) {
 }
 const claveDia = (ts) => { const d = new Date(ts * 1000); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); };
 const sinAcentos = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-const nombreModulo = (n) => (n || '').replace(/^\s*[\dA-Z]{3,6}\s*[-–·:]\s*/, '');
-
 // ---------- colores por módulo (automáticos; el rojo queda reservado para lo urgente) ----------
 const PALETA = ['#3D8BFF', '#2ED47A', '#FFB020', '#B26BFF', '#FF5FA2', '#22D3C5', '#FF7A1A', '#D9D24A'];
 function colorDe(modulo) {
-  const i = cursos().findIndex((c) => nombreModulo(c.nombre) === modulo || sinAcentos(c.nombre).includes(sinAcentos(modulo)));
+  const i = cursos().findIndex((c) => nombreModulo(c.nombre) === modulo);
   if (i >= 0) return PALETA[i % PALETA.length];
   let h = 0; for (const ch of modulo || '') h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return PALETA[h % PALETA.length];
@@ -73,7 +73,11 @@ function tareas() {
   }
   return out;
 }
-const urgente = (t) => !t.hecha && t.entrega && t.entrega - ahora() <= URGENTE;
+// Urgente: vence en 3 días o venció hace menos de 2 semanas. Lo más antiguo (fechas que el profesor
+// no actualizó de otros cursos) va aparte como «atrasada» para no llenar la portada.
+const ATRASADA = 14 * D;
+const urgente = (t) => !t.hecha && !!t.entrega && t.entrega - ahora() <= URGENTE && ahora() - t.entrega < ATRASADA;
+const atrasada = (t) => !t.hecha && !!t.entrega && ahora() - t.entrega >= ATRASADA;
 function mediaCurso(c) {
   if (c.notaCurso && c.notaCurso.nota != null && c.notaCurso.max) return c.notaCurso.nota / c.notaCurso.max * 10;
   const ns = c.notas.filter((n) => n.nota != null && n.max).map((n) => n.nota / n.max * 10);
@@ -86,11 +90,11 @@ function catalogo() {
   return out;
 }
 const modulosCatalogo = () => [...new Set(catalogo().map((e) => e.modulo))];
-const cursoDeModulo = (m) => cursos().find((c) => sinAcentos(c.nombre).includes(sinAcentos(m)));
+const cursoDeModulo = (m) => cursos().find((c) => nombreModulo(c.nombre) === m);
 const hecho = (e) => !!(S.prog.ej[e.id] || {}).hecho;
 function estadoTarea(t) {
   if (t.hecha) return t.nota10 != null ? ['ok', fNota(t.nota10) + ' / 10'] : ['ok', 'Entregada'];
-  if (t.entrega && t.entrega < ahora()) return ['mal', 'Sin entregar'];
+  if (t.entrega && t.entrega < ahora()) return atrasada(t) ? ['ojo', 'Atrasada'] : ['mal', 'Sin entregar'];
   if (t.estado === 'draft') return ['ojo', 'Borrador'];
   return [urgente(t) ? 'mal' : 'info', t.tipo === 'examen' ? 'Examen' : 'Pendiente'];
 }
@@ -281,9 +285,12 @@ const icono = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${I
 const NAV = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['notas', 'Notas'], ['ajustes', 'Ajustes']];
 const NAV_MOVIL = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['mas', 'Más']];
 
-function render() {
+function render(forzar) {
   const v = location.hash.slice(1) || 'inicio';
-  const base = v.startsWith('modulo-') ? 'modulos' : v;
+  // shortcut: con un trabajo abierto, los repintados (sincronizar, etc.) no lo vuelven a montar para no perder deshacer y selección
+  if (v === 'trabajo-' + S.montado && document.getElementById('taller') && !forzar) return pintarEstado();
+  S.montado = null;
+  const base = v.startsWith('modulo-') || v.startsWith('tarea-') ? 'modulos' : v.startsWith('trabajo-') ? 'ejercicios' : v;
   const baseMovil = ['notas', 'ajustes'].includes(base) ? 'mas' : base;
   app.innerHTML = `
   <div class="marco">
@@ -301,8 +308,10 @@ function render() {
   </div>`;
   pintarEstado();
   const vista = document.getElementById('vista');
-  vista.innerHTML = v.startsWith('modulo-') ? vistaModulo(+v.slice(7))
+  document.body.classList.toggle('en-taller', v.startsWith('trabajo-'));
+  vista.innerHTML = v.startsWith('modulo-') ? vistaModulo(+v.slice(7)) : v.startsWith('tarea-') ? vistaTarea(v.slice(6)) : v.startsWith('trabajo-') ? vistaTrabajo(v.slice(8))
     : ({ inicio: vistaInicio, modulos: vistaModulos, calendario: vistaCalendario, notas: vistaNotas, ejercicios: vistaEjercicios, ajustes: vistaAjustes, mas: vistaMas }[v] || vistaInicio)();
+  if (v.startsWith('trabajo-')) montarTrabajo(v.slice(8));
   const sd = document.getElementById('salir-demo');
   if (sd) sd.addEventListener('click', (ev) => { ev.preventDefault(); S.demo = false; S.curso = null; location.hash = ''; pintarBloqueo(); });
 }
@@ -315,7 +324,7 @@ function pintarEstado() {
     ${S.aules ? `<button class="boton mini" data-acc="sync" ${S.sincronizando ? 'disabled' : ''} title="Sincronizar con Aules">${icono('sync')}<span>Sincronizar</span></button>` : ''}`;
   for (const id of ['estado-pc', 'estado-movil']) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
 }
-window.addEventListener('hashchange', () => { if (S.curso) { render(); window.scrollTo(0, 0); } });
+window.addEventListener('hashchange', () => { if (S.curso) { render(true); window.scrollTo(0, 0); } });
 
 // ---------- piezas ----------
 const cabecera = (titulo, extra = '', ante = '') => `<header class="cab-vista">${ante ? `<span class="antetitulo">${ante}</span>` : ''}<h1>${titulo}</h1>${extra ? `<div class="cab-extra">${extra}</div>` : ''}</header>`;
@@ -323,7 +332,7 @@ const cifra = (valor, texto, clase = '') => `<div class="cifra corte ${clase}"><
 const vacio = (t) => `<p class="vacio">${t}</p>`;
 function fila(i, conFecha = true) {
   const t = i.tarea, urg = t ? urgente(t) : false, pasada = t && !t.hecha && i.fecha < ahora();
-  const titulo = i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.nombre)}</a>` : `<strong>${esc(i.nombre)}</strong>`;
+  const titulo = t ? `<a href="#tarea-${esc(t.clave)}">${esc(i.nombre)}</a>` : i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.nombre)} ↗</a>` : `<strong>${esc(i.nombre)}</strong>`;
   const propia = t && t.origen === 'propia' ? `
     <div class="fila-propia">
       <label class="casilla"><input type="checkbox" data-acc="hecha" data-id="${esc(t.clave)}" ${t.hecha ? 'checked' : ''}> Hecha</label>
@@ -380,6 +389,7 @@ function vistaInicio() {
         ${notas.length ? `<div class="lista">${notas.map((t) => `<div class="nota-fila" style="--mod:${colorDe(t.modulo)}"><i class="punto-mod"></i><span class="nf-nombre">${esc(t.nombre)}<small>${esc(t.modulo)}</small></span><b class="${t.nota10 < 5 ? 'susp' : ''}">${fNota(t.nota10)}</b></div>`).join('')}</div>` : vacio('Aún no hay notas.')}</section>
     </div>
   </div>
+  ${(() => { const at = ag.filter((i) => i.tarea && atrasada(i.tarea)); return at.length ? `<details class="bloque panel corte"><summary>${at.length} tarea${at.length === 1 ? '' : 's'} atrasada${at.length === 1 ? '' : 's'} (hace más de 2 semanas)</summary><div class="lista">${at.map((i) => fila(i)).join('')}</div></details>` : ''; })()}
   ${(S.curso.avisos || []).length ? `<section class="bloque"><header><h2>Avisos de Aules</h2></header><div class="panel corte"><p class="suave">Aules no dejó leer estas partes; el resto está al día.</p><ul class="mono">${S.curso.avisos.map((a) => `<li>${esc(a)}</li>`).join('')}</ul></div></section>` : ''}`;
 }
 
@@ -405,7 +415,6 @@ function vistaModulo(id) {
   if (!c) return cabecera('Módulo') + vacio('Ese módulo no está en los datos de Aules. <a href="#modulos">Volver</a>');
   const nombre = nombreModulo(c.nombre), color = colorDe(nombre), tab = S.tabModulo;
   const ts = tareas().filter((t) => t.cursoId === id).sort((a, b) => (a.entrega || 9e9) - (b.entrega || 9e9));
-  const mod = modulosCatalogo().find((m) => cursoDeModulo(m) === c);
   const secTareas = `<section class="bloque"><header><h2>Tareas</h2><span class="suave">${ts.filter((t) => t.hecha).length}/${ts.length} entregadas</span></header>
     ${ts.length ? `<div class="lista">${ts.map((t) => fila({ fecha: t.entrega, nombre: t.nombre, modulo: nombre, url: t.url, tarea: t, chip: estadoTarea(t) })).join('')}</div>` : vacio('Este módulo no tiene tareas en Aules.')}</section>`;
   const conNota = c.notas.filter((n) => n.nota != null && n.max);
@@ -417,10 +426,9 @@ function vistaModulo(id) {
       ${s.resumen ? `<p class="suave pre">${esc(s.resumen)}</p>` : ''}
       <ul>${s.elementos.map((e) => `<li>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.nombre)}</a>` : esc(e.nombre)} <small>· ${esc(TIPOS[e.tipo] || e.tipo)}${e.archivos.length ? ' · ' + esc(e.archivos.join(', ')) : ''}</small></li>`).join('')}</ul>
     </details>`).join('') || vacio('Sin contenido.')}</section>`;
-  const secEj = `<section class="bloque"><header><h2>Ejercicios</h2>${mod ? `<a href="#ejercicios" data-acc="ir-ejercicios" data-modulo="${esc(mod)}">Abrir en Ejercicios</a>` : ''}</header>
-    ${mod ? listaEjercicios(mod) : vacio('Aún no hay ejercicios de este módulo. Añádelos desde <a href="#ejercicios">Ejercicios</a>.')}</section>`;
+  const secEj = `<section class="bloque"><header><h2>Ejercicios y trabajos</h2><a href="#ejercicios" data-acc="ir-ejercicios" data-modulo="${esc(nombre)}">Abrir en Ejercicios</a></header>${listaEjercicios(nombre)}</section>`;
   const cuerpo = { tareas: secTareas, notas: secNotas, contenido: secContenido, ejercicios: secEj }[tab]
-    || `<div class="cifras">${cifra(fNota(mediaCurso(c)), 'Media / 10')}${cifra(`${ts.filter((t) => t.hecha).length}<span>/${ts.length}</span>`, 'Entregadas')}${cifra(ts.filter(urgente).length, 'Urgentes', ts.some(urgente) ? 'alerta' : '')}${c.progreso != null ? cifra(Math.round(c.progreso) + '%', 'Progreso en Aules') : ''}</div>` + secTareas + secNotas + secContenido + (mod ? secEj : '');
+    || `<div class="cifras">${cifra(fNota(mediaCurso(c)), 'Media / 10')}${cifra(`${ts.filter((t) => t.hecha).length}<span>/${ts.length}</span>`, 'Entregadas')}${cifra(ts.filter(urgente).length, 'Urgentes', ts.some(urgente) ? 'alerta' : '')}${c.progreso != null ? cifra(Math.round(c.progreso) + '%', 'Progreso en Aules') : ''}</div>` + secTareas + secNotas + secContenido;
   return `<div class="cab-modulo corte trama-esquina" style="--mod:${color}">
       <a href="#modulos" class="antetitulo">← Módulos · ${esc(c.corto)}</a><h1>${esc(nombre)}</h1>
       <a class="boton mini" href="${esc(c.url)}" target="_blank" rel="noopener">Aules ↗</a></div>
@@ -538,48 +546,43 @@ function vistaAjustes() {
       <div class="fila-botones"><button class="boton peligro" data-acc="bloquear">Cerrar sesión${LS.get('doodle-recordar') ? ' y olvidar la contraseña' : ''}</button></div></div></section>`;
 }
 
-// ---------- ejercicios ----------
-function vistaEjercicios() {
-  const mods = modulosCatalogo();
-  if (!mods.includes(S.filtro.modulo)) S.filtro.modulo = mods[0] || '';
-  const lista = catalogo().filter((e) => e.modulo === S.filtro.modulo);
-  return cabecera('Ejercicios', `<span class="suave">${lista.filter(hecho).length} de ${lista.length} hechos</span>`) + `
-  <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((m) => `<button type="button" data-acc="filtro-mod" data-v="${esc(m)}" aria-pressed="${m === S.filtro.modulo}" style="--mod:${colorDe(m)}"><i class="punto-mod"></i>${esc(m)}</button>`).join('')}</div>
-  <details class="panel corte"><summary>+ Añadir un ejercicio</summary>
-    <form id="f-ej" class="rejilla-form">
-      <label class="campo"><span>Módulo</span><input type="text" id="e-modulo" list="lista-mods-ej" value="${esc(S.filtro.modulo)}" required></label>
-      <label class="campo"><span>Tema</span><input type="text" id="e-tema" required placeholder="Tema 5 · Funciones"></label>
-      <label class="campo"><span>Número</span><input type="text" id="e-n" placeholder="5.1.1"></label>
-      <label class="campo"><span>Tipo</span><select id="e-leng"><option value="csharp">C# (editor y ejecución)</option><option value="">Otro (notas)</option></select></label>
-      <label class="campo campo-ancho"><span>Enunciado</span><textarea id="e-texto" required></textarea></label>
-      <div class="campo campo-boton"><button class="boton principal">Añadir ejercicio</button></div>
-      <datalist id="lista-mods-ej">${[...new Set([...mods, ...cursos().map((c) => nombreModulo(c.nombre))])].map((m) => `<option value="${esc(m)}">`).join('')}</datalist>
-    </form></details>
-  ${listaEjercicios(S.filtro.modulo)}`;
+// ---------- herramientas de trabajo ----------
+const HERR = { diagrama: 'Diagrama', sql: 'SQL', java: 'Java', csharp: 'C#', web: 'HTML/CSS', kanban: 'Tablero', notas: 'Notas' };
+// Herramienta (y notación de diagrama) más probable según el módulo y el nombre de la tarea.
+function herramientaPara(modulo, nombre = '') {
+  const n = sinAcentos(nombre), m = sinAcentos(modulo);
+  if (m.includes('bases de datos')) {
+    if (/\bsql\b|consult|select|insert|ddl|dml/.test(n)) return { tipo: 'sql' };
+    if (/relacional|\bmr\b|model relacional|pas a model|paso a modelo|normaliz/.test(n)) return { tipo: 'diagrama', notacion: 'relacional' };
+    return { tipo: 'diagrama', notacion: 'er' };
+  }
+  if (m.includes('entornos')) {
+    if (/java|junit|test|prueba|codigo|code/.test(n)) return { tipo: 'java' };
+    if (/requisit|requirement|trello|jira|kanban|scrum|backlog|histori|stor/.test(n)) return { tipo: 'kanban' };
+    if (/uml|clase|class|diagram/.test(n)) return { tipo: 'diagrama', notacion: 'uml' };
+    return { tipo: 'notas' };
+  }
+  if (m.includes('programacion')) return { tipo: 'csharp' };
+  if (m.includes('marcas')) return /xml|dtd|xsd|json/.test(n) ? { tipo: 'notas' } : { tipo: 'web' };
+  if (m.includes('proyecto')) return /caso|histori|uso/.test(n) ? { tipo: 'diagrama', notacion: 'casos' } : { tipo: 'kanban' };
+  return { tipo: 'notas' };
 }
-function listaEjercicios(modulo) {
-  const lista = catalogo().filter((e) => e.modulo === modulo);
-  const temas = [...new Set(lista.map((e) => e.tema))], color = colorDe(modulo);
-  return temas.map((t) => {
-    const del = lista.filter((e) => e.tema === t), n = del.filter(hecho).length;
-    let grupo = null;
-    return `<section class="bloque tema" style="--mod:${color}">
-      <header><h2>${esc(t)}</h2><span class="suave num">${n}/${del.length}</span></header>
-      <div class="barra"><i style="width:${n / del.length * 100}%"></i></div>
-      <div class="lista">${del.map((e) => {
-        const g = e.grupo && e.grupo !== grupo ? `<p class="grupo">${esc((grupo = e.grupo))}</p>` : '';
-        return g + `<div class="ej corte ${hecho(e) ? 'hecho' : ''}" data-id="${esc(e.id)}">
-          <label class="ej-check" title="Marcar como hecho"><input type="checkbox" data-acc="ej-hecho" ${hecho(e) ? 'checked' : ''}><span class="sr">Hecho</span></label>
-          <span class="ej-num">${esc(e.n || '·')}</span>
-          <p class="ej-txt">${esc(e.texto)}</p>
-          <div class="ej-acc">${e.propio ? '<button type="button" class="boton mini peligro" data-acc="borrar-ej">Borrar</button>' : ''}
-            <button type="button" class="boton mini principal" data-acc="abrir-lab">${e.lenguaje === 'csharp' ? 'Programar ▸' : 'Notas ▸'}</button></div>
-        </div>`;
-      }).join('')}</div></section>`;
-  }).join('') || vacio('No hay ejercicios en este módulo. Añade el primero arriba.');
+const trabajos = () => Object.entries(S.prog.trabajos).filter(([, t]) => !t.borrado).map(([id, t]) => ({ ...t, id }));
+const trabajoDeTarea = (clave) => trabajos().find((t) => t.tarea === clave);
+function crearTrabajo(datos) {
+  const id = 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  cambiar('trabajos', id, { datos: {}, ...datos });
+  return id;
+}
+function trabajarEnTarea(clave) {
+  const t = tareas().find((x) => x.clave === clave); if (!t) return;
+  const ya = trabajoDeTarea(clave);
+  if (ya) { location.hash = 'trabajo-' + ya.id; return; }
+  const h = herramientaPara(t.modulo, t.nombre);
+  location.hash = 'trabajo-' + crearTrabajo({ titulo: t.nombre, modulo: t.modulo, tarea: clave, tipo: h.tipo, notacion: h.notacion });
 }
 
-// Simulador en un Worker para que un bucle infinito no congele la página (igual que en el tema 4).
+// C#: el simulador del tema 4 en un Worker, para que un bucle infinito no congele la página.
 let worker = null, workerRoto = false, cola = Promise.resolve();
 function crearWorker() {
   if (workerRoto || typeof Worker === 'undefined' || typeof window.CSharpFactory !== 'function') return null;
@@ -601,73 +604,19 @@ function simular(req) {
   }));
   return cola;
 }
-function crearEditor(caja, valor, alCambiar, alEjecutar, etiqueta, csharp) {
-  if (window.CodeMirror) {
-    const cm = window.CodeMirror(caja, {
-      value: valor, mode: csharp ? 'text/x-csharp' : 'text/plain', lineNumbers: csharp, indentUnit: 4, tabSize: 4, indentWithTabs: true, lineWrapping: !csharp,
-      matchBrackets: true, autoCloseBrackets: csharp, screenReaderLabel: etiqueta,
-      extraKeys: { 'Ctrl-Enter': alEjecutar, 'Cmd-Enter': alEjecutar },
-    });
-    let marcada = null;
-    cm.on('change', () => alCambiar(cm.getValue()));
-    return {
-      get: () => cm.getValue(),
-      marcar(n) { this.limpiar(); if (n > 0 && n <= cm.lineCount()) marcada = cm.addLineClass(n - 1, 'background', 'linea-error'); },
-      limpiar() { if (marcada) { cm.removeLineClass(marcada, 'background', 'linea-error'); marcada = null; } },
-      ir(n) { cm.focus(); cm.setCursor({ line: Math.max(0, n - 1), ch: 0 }); cm.scrollIntoView(null, 80); },
-      foco() { cm.refresh(); cm.focus(); },
-    };
-  }
-  const ta = document.createElement('textarea'); ta.value = valor; ta.spellcheck = false; ta.setAttribute('aria-label', etiqueta); ta.className = 'editor-plano';
-  caja.append(ta);
-  ta.addEventListener('input', () => alCambiar(ta.value));
-  ta.addEventListener('keydown', (ev) => {
-    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); alEjecutar(); }
-    else if (ev.key === 'Tab' && !ev.shiftKey) { ev.preventDefault(); document.execCommand('insertText', false, '\t'); }
-  });
-  return { get: () => ta.value, marcar() {}, limpiar() {}, ir() { ta.focus(); }, foco() { ta.focus(); } };
-}
-
-// Espacio de trabajo a pantalla completa: enunciado a la izquierda, editor y consola a la derecha (apilado en el móvil).
 const PLANTILLA = 'using System;\n\nclass Program {\n\tpublic static void Main() {\n\t\t\n\t}\n}\n';
-function abrirLab(id) {
-  const lista = catalogo().filter((x) => x.modulo === (catalogo().find((e) => e.id === id) || {}).modulo);
-  const pos = lista.findIndex((x) => x.id === id), e = lista[pos];
-  if (!e) return;
-  const csharp = e.lenguaje === 'csharp', g = S.prog.ej[id] || {};
-  let capa = document.getElementById('lab');
-  if (!capa) { capa = document.createElement('div'); capa.id = 'lab'; document.body.append(capa); }
-  capa.className = 'lab-capa'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-modal', 'true'); capa.setAttribute('aria-label', 'Ejercicio ' + (e.n || ''));
-  capa.style.setProperty('--mod', colorDe(e.modulo));
-  capa.innerHTML = `
-    <header class="lab-cab">
-      <button type="button" class="boton mini" data-acc="cerrar-lab">← Volver</button>
-      <span class="lab-titulo"><b>${esc(e.n || '')}</b> <span class="suave">${esc(e.tema)}</span></span>
-      <div class="fila-botones">
-        <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos - 1] || {}).id || '')}" ${pos > 0 ? '' : 'disabled'} aria-label="Ejercicio anterior">‹</button>
-        <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos + 1] || {}).id || '')}" ${pos < lista.length - 1 ? '' : 'disabled'} aria-label="Ejercicio siguiente">›</button>
-        <label class="casilla"><input type="checkbox" data-acc="lab-hecho" data-id="${esc(id)}" ${g.hecho ? 'checked' : ''}> Hecho</label>
-      </div>
-    </header>
-    <div class="lab-cuerpo">
-      <section class="lab-enun"><span class="antetitulo">${esc(e.grupo || e.modulo)}</span><p class="pre">${esc(e.texto)}</p>${e.ejemplo ? `<pre class="consola">${esc(e.ejemplo)}</pre>` : ''}
-        ${csharp ? '<p class="suave atajo">Ctrl + Intro ejecuta. El simulador admite lo visto hasta el tema 4.</p>' : ''}</section>
-      <section class="lab-trabajo">
-        <div class="barra-lab">${csharp ? '<button type="button" class="boton principal" id="lab-ejecutar">▶ Ejecutar</button>' : ''}<span class="estado-guardado" aria-live="polite"></span></div>
-        <div class="editor" id="lab-editor"></div>
-        ${csharp ? '<div class="consola" id="lab-consola" tabindex="-1" aria-label="Consola del programa"><span class="vacia">Pulsa Ejecutar para lanzar el programa.</span></div><div id="lab-aviso" aria-live="polite"></div>' : ''}
-      </section>
-    </div>`;
-  document.body.classList.add('con-lab');
-  capa.hidden = false;
-  const estado = capa.querySelector('.estado-guardado');
+function montarCsharp(cont, datos, alCambiar) {
+  cont.innerHTML = `<div class="hz hz-cs">
+    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button><span class="suave atajo">Ctrl + Intro · admite lo visto hasta el tema 4</span><span class="estado-guardado" aria-live="polite"></span></div>
+    <div class="editor"></div>
+    <div class="consola" tabindex="-1" aria-label="Consola del programa"><span class="vacia">Pulsa Ejecutar para lanzar el programa.</span></div>
+    <div class="cs-aviso" aria-live="polite"></div></div>`;
+  const estado = cont.querySelector('.estado-guardado'), btn = cont.querySelector('[data-cs]'), consola = cont.querySelector('.consola'), lugar = cont.querySelector('.cs-aviso');
   let entradas = [], semilla = 1, ocupado = false;
-  const ed = crearEditor(capa.querySelector('#lab-editor'), g.codigo || (csharp ? PLANTILLA : ''),
-    (v) => { cambiar('ej', id, { codigo: v }); estado.textContent = S.demo ? 'Guardado en este navegador' : S.pat ? 'Guardado · se sincroniza en unos segundos' : 'Guardado en este dispositivo'; },
-    () => csharp && lanzar([]), 'Código del ejercicio ' + (e.n || ''), csharp);
-  ed.foco();
-  if (!csharp) return;
-  const btn = capa.querySelector('#lab-ejecutar'), consola = capa.querySelector('#lab-consola'), lugar = capa.querySelector('#lab-aviso');
+  const ed = crearEditor(cont.querySelector('.editor'), (datos && datos.codigo) || PLANTILLA, {
+    modo: 'text/x-csharp', etiqueta: 'Código C#', alEjecutar: () => lanzar([]),
+    alCambiar: (v) => { alCambiar({ codigo: v }); estado.textContent = S.demo ? 'Guardado en este navegador' : S.pat ? 'Guardado · se sincroniza en unos segundos' : 'Guardado en este dispositivo'; },
+  });
   async function lanzar(ent, misma) {
     if (ocupado) return; ocupado = true; btn.disabled = true;
     if (!misma) semilla = Math.floor(Math.random() * 1e9);
@@ -699,6 +648,164 @@ function abrirLab(id) {
     lugar.append(aviso);
   }
   btn.addEventListener('click', () => lanzar([]));
+  return { foco: () => ed.foco() };
+}
+function montarNotas(cont, datos, alCambiar, titulo) {
+  cont.innerHTML = `<div class="hz hz-notas"><div class="barra-lab"><button type="button" class="boton mini" data-notas="bajar">Descargar .md</button><span class="suave">Respuestas, apuntes o borradores. Se guarda solo.</span><span class="estado-guardado"></span></div><div class="editor"></div></div>`;
+  const ed = crearEditor(cont.querySelector('.editor'), (datos && datos.texto) || '', { modo: 'text/plain', numeros: false, etiqueta: 'Notas', alCambiar: (v) => { alCambiar({ texto: v }); cont.querySelector('.estado-guardado').textContent = 'Guardado'; } });
+  cont.querySelector('[data-notas]').addEventListener('click', () => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ed.get()], { type: 'text/markdown' })); a.download = (titulo || 'notas').replace(/[^\wáéíóúñ -]+/gi, '').trim() + '.md';
+    document.body.append(a); a.click(); a.remove();
+  });
+  return { foco: () => ed.foco() };
+}
+
+// ---------- ficha de una tarea ----------
+function vistaTarea(clave) {
+  const t = tareas().find((x) => x.clave === clave);
+  if (!t) return cabecera('Tarea') + vacio('Esa tarea ya no está en Aules. <a href="#inicio">Volver</a>');
+  const c = t.cursoId && cursos().find((x) => x.id === t.cursoId), est = estadoTarea(t), tr = trabajoDeTarea(clave), h = herramientaPara(t.modulo, t.nombre);
+  const fecha = (et, ts) => (ts ? `<div><dt>${et}</dt><dd>${fCorta(ts)} · ${fHora(ts)}</dd></div>` : '');
+  return `<div class="cab-modulo corte trama-esquina" style="--mod:${colorDe(t.modulo)}">
+      <a href="${c ? '#modulo-' + c.id : '#calendario'}" class="antetitulo">← ${esc(t.modulo)}</a><h1>${esc(t.nombre)}</h1>
+      <span class="chip ${est[0]}">${esc(est[1])}</span></div>
+    <div class="dos-col">
+      <section class="bloque"><header><h2>Enunciado</h2>${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">Abrir en Aules ↗</a>` : ''}</header>
+        <div class="panel corte"><p class="pre">${t.enunciado ? esc(t.enunciado) : '<span class="suave">Esta tarea no tiene enunciado escrito en Aules.</span>'}</p>
+        ${(t.adjuntos || []).length ? `<p class="suave">Adjuntos en Aules: ${t.adjuntos.map(esc).join(', ')}</p>` : ''}</div></section>
+      <div class="columna">
+        <section class="bloque trabajar corte">
+          <div class="lineas-velocidad" aria-hidden="true"></div>
+          <header><h2>Trabajar en Doodle</h2></header>
+          ${tr ? `<p>Tienes un trabajo empezado con <b>${esc(HERR[tr.tipo])}</b>.</p><div class="fila-botones"><a class="boton principal" href="#trabajo-${tr.id}">Continuar ▸</a></div>`
+            : `<p>Se abrirá con <b>${esc(HERR[h.tipo])}</b>${h.notacion ? ' (' + esc({ er: 'E/R Chen', relacional: 'modelo relacional', uml: 'UML', casos: 'casos de uso' }[h.notacion]) + ')' : ''}. Podrás cambiar de herramienta dentro.</p><div class="fila-botones"><button type="button" class="boton principal" data-acc="trabajar" data-v="${esc(clave)}">Empezar ▸</button></div>`}
+        </section>
+        <section class="bloque"><header><h2>Datos</h2></header>
+          <dl class="datos-tarea panel corte">${fecha('Entrega', t.entrega)}${fecha('Se abre', t.apertura)}${fecha('Cierre', t.cierre)}${fecha('Enviada', t.enviada)}
+            <div><dt>Nota</dt><dd>${t.nota10 != null ? `<b>${fNota(t.nota10)}</b> / 10` : '—'}</dd></div></dl></section>
+        ${t.comentario ? `<section class="bloque"><header><h2>Comentario del profesor</h2></header><div class="panel corte"><p class="pre">${esc(t.comentario)}</p></div></section>` : ''}
+      </div>
+    </div>`;
+}
+
+// ---------- espacio de trabajo ----------
+function vistaTrabajo(id) {
+  const w = S.prog.trabajos[id];
+  if (!w || w.borrado) return cabecera('Trabajo') + vacio('Este trabajo no existe. <a href="#ejercicios">Volver</a>');
+  const t = w.tarea && tareas().find((x) => x.clave === w.tarea);
+  return `<div class="taller" id="taller" style="--mod:${colorDe(w.modulo)}">
+    <header class="taller-cab corte">
+      <a class="boton mini" href="${t ? '#tarea-' + esc(w.tarea) : '#ejercicios'}">←</a>
+      <div class="taller-titulo"><span class="antetitulo">${esc(w.modulo || 'Sin módulo')}${t && t.entrega ? ' · entrega ' + fCorta(t.entrega) : ''}</span><input type="text" id="w-titulo" value="${esc(w.titulo)}" aria-label="Nombre del trabajo"></div>
+      <select id="w-tipo" aria-label="Herramienta">${Object.entries(HERR).map(([k, v]) => `<option value="${k}" ${k === w.tipo ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      ${t && t.enunciado ? '<button type="button" class="boton mini" data-acc="enunciado" aria-expanded="false">Enunciado</button>' : ''}
+    </header>
+    ${t && t.enunciado ? `<aside class="taller-enun panel corte" hidden><p class="pre">${esc(t.enunciado)}</p></aside>` : ''}
+    <div class="taller-herr" id="taller-herr"></div>
+  </div>`;
+}
+function montarTrabajo(id) {
+  const w = S.prog.trabajos[id], caja = document.getElementById('taller-herr');
+  if (!w || !caja) return;
+  S.montado = id;
+  const guardar = (datos) => { const act = S.prog.trabajos[id]; cambiar('trabajos', id, { datos: { ...act.datos, [act.tipo]: datos } }); };
+  const datos = (w.datos || {})[w.tipo];
+  const h = { diagrama: () => montarDiagrama(caja, datos, guardar, { notacion: w.notacion, titulo: w.titulo }), sql: () => montarSql(caja, datos, guardar), java: () => montarJava(caja, datos, guardar),
+    csharp: () => montarCsharp(caja, datos, guardar), web: () => montarWeb(caja, datos, guardar), kanban: () => montarKanban(caja, datos, guardar), notas: () => montarNotas(caja, datos, guardar, w.titulo) }[w.tipo] || (() => montarNotas(caja, datos, guardar, w.titulo));
+  h();
+}
+
+// ---------- ejercicios y trabajos por módulo ----------
+function modulosTaller() {
+  const ms = [...modulosCatalogo(), ...cursos().map((c) => nombreModulo(c.nombre)), ...trabajos().map((t) => t.modulo).filter(Boolean)];
+  return [...new Set(ms)].filter((m) => m !== 'Tutoría');
+}
+function vistaEjercicios() {
+  const mods = modulosTaller();
+  if (!mods.includes(S.filtro.modulo)) S.filtro.modulo = mods[0] || '';
+  const m = S.filtro.modulo;
+  return cabecera('Ejercicios') + `
+  <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="filtro-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
+  <details class="panel corte"><summary>+ Nuevo trabajo libre</summary>
+    <form id="f-trabajo" class="rejilla-form">
+      <label class="campo"><span>Nombre</span><input type="text" id="w-nombre" required placeholder="Práctica de normalización"></label>
+      <label class="campo"><span>Módulo</span><input type="text" id="w-modulo" list="lista-mods-ej" value="${esc(m)}" required></label>
+      <label class="campo"><span>Herramienta</span><select id="w-herr">${Object.entries(HERR).map(([k, v]) => `<option value="${k}" ${k === herramientaPara(m).tipo ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <div class="campo campo-boton"><button class="boton principal">Crear</button></div>
+      <datalist id="lista-mods-ej">${mods.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>
+    </form></details>
+  ${(window.EJERCICIOS || []).some((x) => x.modulo === m) || Object.values(S.prog.ejPropios).some((e) => e.modulo === m) ? `<details class="panel corte"><summary>+ Añadir un ejercicio de C# al catálogo</summary>
+    <form id="f-ej" class="rejilla-form">
+      <label class="campo"><span>Tema</span><input type="text" id="e-tema" required placeholder="Tema 5 · Funciones"></label>
+      <label class="campo"><span>Número</span><input type="text" id="e-n" placeholder="5.1.1"></label>
+      <label class="campo campo-ancho"><span>Enunciado</span><textarea id="e-texto" required></textarea></label>
+      <div class="campo campo-boton"><button class="boton principal">Añadir ejercicio</button></div>
+    </form></details>` : ''}
+  ${listaEjercicios(m)}`;
+}
+function listaEjercicios(modulo) {
+  const color = colorDe(modulo);
+  const conTrabajo = (t) => trabajoDeTarea(t.clave);
+  const ts = tareas().filter((t) => t.modulo === modulo && t.origen === 'aules').sort((a, b) => (b.entrega || 0) - (a.entrega || 0));
+  const libres = trabajos().filter((w) => w.modulo === modulo && !w.tarea).sort((a, b) => (b.t || 0) - (a.t || 0));
+  let html = '';
+  if (ts.length) html += `<section class="bloque" style="--mod:${color}"><header><h2>Tareas de Aules</h2><span class="suave num">${ts.filter((t) => conTrabajo(t)).length} empezadas · ${ts.filter((t) => t.hecha).length} entregadas</span></header>
+    <div class="lista">${ts.map((t) => { const est = estadoTarea(t), w = conTrabajo(t);
+      return `<div class="ej ej-t corte ${t.hecha ? 'hecho' : ''}"><span class="ej-num">${t.entrega ? fCorta(t.entrega).replace(/^\w+,?\s*/, '') : '—'}</span>
+        <a class="ej-txt ej-tarea" href="#tarea-${esc(t.clave)}">${esc(t.nombre)}</a>
+        <span class="chip ${est[0]}">${esc(est[1])}</span>
+        <div class="ej-acc">${w ? `<a class="boton mini principal" href="#trabajo-${w.id}">${esc(HERR[w.tipo])} ▸</a>` : `<button type="button" class="boton mini" data-acc="trabajar" data-v="${esc(t.clave)}">Empezar ▸</button>`}</div></div>`; }).join('')}</div></section>`;
+  if (libres.length) html += `<section class="bloque" style="--mod:${color}"><header><h2>Trabajos libres</h2></header><div class="lista">${libres.map((w) => `<div class="ej ej-t corte"><span class="ej-num">${esc(HERR[w.tipo])}</span><a class="ej-txt ej-tarea" href="#trabajo-${w.id}">${esc(w.titulo)}</a><span></span>
+    <div class="ej-acc"><button type="button" class="boton mini peligro" data-acc="borrar-trabajo" data-v="${w.id}">Borrar</button><a class="boton mini principal" href="#trabajo-${w.id}">Abrir ▸</a></div></div>`).join('')}</div></section>`;
+  const lista = catalogo().filter((e) => e.modulo === modulo);
+  for (const t of [...new Set(lista.map((e) => e.tema))]) {
+    const del = lista.filter((e) => e.tema === t), n = del.filter(hecho).length;
+    let grupo = null;
+    html += `<section class="bloque tema" style="--mod:${color}">
+      <header><h2>${esc(t)}</h2><span class="suave num">${n}/${del.length}</span></header>
+      <div class="barra"><i style="width:${n / del.length * 100}%"></i></div>
+      <div class="lista">${del.map((e) => {
+        const g = e.grupo && e.grupo !== grupo ? `<p class="grupo">${esc((grupo = e.grupo))}</p>` : '';
+        return g + `<div class="ej corte ${hecho(e) ? 'hecho' : ''}" data-id="${esc(e.id)}">
+          <label class="ej-check" title="Marcar como hecho"><input type="checkbox" data-acc="ej-hecho" ${hecho(e) ? 'checked' : ''}><span class="sr">Hecho</span></label>
+          <span class="ej-num">${esc(e.n || '·')}</span>
+          <p class="ej-txt">${esc(e.texto)}</p>
+          <div class="ej-acc">${e.propio ? '<button type="button" class="boton mini peligro" data-acc="borrar-ej">Borrar</button>' : ''}
+            <button type="button" class="boton mini principal" data-acc="abrir-lab">${e.lenguaje === 'csharp' ? 'Programar ▸' : 'Notas ▸'}</button></div>
+        </div>`;
+      }).join('')}</div></section>`;
+  }
+  return html || vacio('Aún no hay nada en este módulo. Crea un trabajo libre arriba.');
+}
+
+// Ejercicio del catálogo a pantalla completa: enunciado a la izquierda, código y consola a la derecha.
+function abrirLab(id) {
+  const todos = catalogo(), e0 = todos.find((e) => e.id === id); if (!e0) return;
+  const lista = todos.filter((x) => x.modulo === e0.modulo), pos = lista.findIndex((x) => x.id === id), e = lista[pos];
+  const g = S.prog.ej[id] || {};
+  let capa = document.getElementById('lab');
+  if (!capa) { capa = document.createElement('div'); capa.id = 'lab'; document.body.append(capa); }
+  capa.className = 'lab-capa'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-modal', 'true'); capa.setAttribute('aria-label', 'Ejercicio ' + (e.n || ''));
+  capa.style.setProperty('--mod', colorDe(e.modulo));
+  capa.innerHTML = `
+    <header class="lab-cab">
+      <button type="button" class="boton mini" data-acc="cerrar-lab">← Volver</button>
+      <span class="lab-titulo"><b>${esc(e.n || '')}</b> <span class="suave">${esc(e.tema)}</span></span>
+      <div class="fila-botones">
+        <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos - 1] || {}).id || '')}" ${pos > 0 ? '' : 'disabled'} aria-label="Ejercicio anterior">‹</button>
+        <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos + 1] || {}).id || '')}" ${pos < lista.length - 1 ? '' : 'disabled'} aria-label="Ejercicio siguiente">›</button>
+        <label class="casilla"><input type="checkbox" data-acc="lab-hecho" data-id="${esc(id)}" ${g.hecho ? 'checked' : ''}> Hecho</label>
+      </div>
+    </header>
+    <div class="lab-cuerpo">
+      <section class="lab-enun"><span class="antetitulo">${esc(e.grupo || e.modulo)}</span><p class="pre">${esc(e.texto)}</p>${e.ejemplo ? `<pre class="consola">${esc(e.ejemplo)}</pre>` : ''}</section>
+      <section class="lab-trabajo" id="lab-trabajo"></section>
+    </div>`;
+  document.body.classList.add('con-lab');
+  capa.hidden = false;
+  const caja = capa.querySelector('#lab-trabajo');
+  const h = e.lenguaje === 'csharp' ? montarCsharp(caja, g, (d) => cambiar('ej', id, { codigo: d.codigo })) : montarNotas(caja, { texto: g.codigo }, (d) => cambiar('ej', id, { codigo: d.texto }), e.n);
+  h.foco();
 }
 function cerrarLab() {
   const capa = document.getElementById('lab'); if (!capa || capa.hidden) return;
@@ -715,6 +822,9 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'cerrar-lab') cerrarLab();
   else if (acc === 'lab-ir' && el.dataset.v) abrirLab(el.dataset.v);
   else if (acc === 'sync') sincronizarAules();
+  else if (acc === 'trabajar') trabajarEnTarea(el.dataset.v);
+  else if (acc === 'enunciado') { const a = document.querySelector('.taller-enun'), abierto = el.getAttribute('aria-expanded') === 'true'; a.hidden = abierto; el.setAttribute('aria-expanded', String(!abierto)); }
+  else if (acc === 'borrar-trabajo') { if (el.dataset.confirmar !== 'si') { el.dataset.confirmar = 'si'; el.textContent = '¿Seguro?'; return; } cambiar('trabajos', el.dataset.v, { borrado: true }); render(); }
   else if (acc === 'filtro-mod') { S.filtro.modulo = el.dataset.v; render(); }
   else if (acc === 'ir-ejercicios') { S.filtro.modulo = el.dataset.modulo; }
   else if (acc === 'tab-mod') { S.tabModulo = el.dataset.v; render(); }
@@ -737,6 +847,8 @@ document.addEventListener('change', async (ev) => {
   const el = ev.target, acc = el.dataset.acc;
   if (acc === 'ej-hecho') { const ej = el.closest('.ej'); cambiar('ej', ej.dataset.id, { hecho: el.checked }); render(); }
   else if (acc === 'lab-hecho') cambiar('ej', el.dataset.id, { hecho: el.checked });
+  else if (el.id === 'w-tipo') { cambiar('trabajos', S.montado, { tipo: el.value }); render(true); }
+  else if (el.id === 'w-titulo') cambiar('trabajos', S.montado, { titulo: el.value.trim() || 'Sin nombre' });
   else if (acc === 'hecha') { cambiar('tareas', el.dataset.id, { hecha: el.checked }); render(); }
   else if (acc === 'nota') cambiar('tareas', el.dataset.id, { nota: el.value === '' ? null : Math.max(0, +el.value) });
   else if (el.id === 'importar' && el.files[0]) {
@@ -752,9 +864,11 @@ document.addEventListener('submit', async (ev) => {
     cambiar('tareas', 'p' + Date.now().toString(36), { nombre: val('t-nombre'), modulo: val('t-modulo'), tipo: val('t-tipo'), entrega: Math.floor(new Date(y, m - 1, d, hh, mm).getTime() / 1000), hecha: false, nota: null, max: 10 });
     render();
   } else if (f.id === 'f-ej') {
-    S.filtro.modulo = val('e-modulo');
-    cambiar('ejPropios', 'e' + Date.now().toString(36), { modulo: S.filtro.modulo, tema: val('e-tema'), n: val('e-n'), texto: val('e-texto'), lenguaje: val('e-leng') });
+    cambiar('ejPropios', 'e' + Date.now().toString(36), { modulo: S.filtro.modulo, tema: val('e-tema'), n: val('e-n'), texto: val('e-texto'), lenguaje: 'csharp' });
     render();
+  } else if (f.id === 'f-trabajo') {
+    const tipo = val('w-herr'), modulo = val('w-modulo');
+    location.hash = 'trabajo-' + crearTrabajo({ titulo: val('w-nombre'), modulo, tipo, notacion: tipo === 'diagrama' ? herramientaPara(modulo).notacion : undefined });
   } else if (f.id === 'f-aules') {
     const msg = document.getElementById('aules-estado'), token = val('a-token') || (S.aules && S.aules.token);
     const nuevo = { url: raizAules(val('a-url')), token };
