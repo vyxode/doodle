@@ -4,7 +4,7 @@
 //   (data/curso.enc y data/progreso.enc) para tenerlo igual en todos tus dispositivos.
 import { cifrar, descifrar } from './cripto.js';
 import { descargarAules, raizAules, nombreModulo } from './aules.js';
-import { crearEditor, montarSql, montarWeb, montarKanban, montarJava, cargarScript, comprobarCaso, montarPracticaSql, EJ_SQL } from './herramientas.js';
+import { crearEditor, montarSql, montarWeb, montarKanban, montarJava, cargarScript, comprobarCaso, conMainDePrueba, montarPracticaSql, EJ_SQL } from './herramientas.js';
 const EJ_SQL_N = EJ_SQL.length;
 import { montarDiagrama, svgExportable } from './diagrama.js';
 import { leerTemas } from './temas.js';
@@ -260,7 +260,7 @@ function pdfsDeTemas() {
 }
 async function actualizarTemas(forzar) {
   if (S.demo || !S.aules || S.leyendoTemas) return;
-  const pdfs = pdfsDeTemas(), firma = pdfs.map((x) => x.f.url).join('|');
+  const pdfs = pdfsDeTemas(), firma = 'v2|' + pdfs.map((x) => x.f.url).join('|'); // v2: cambia al mejorar el lector y obliga a releer
   if (!pdfs.length || (!forzar && S.temas && S.temas.firma === firma && Date.now() - S.temas.fecha < 7 * 864e5)) return;
   S.leyendoTemas = true; const antes = S.sync; S.sync = 'Leyendo los temas de Programación…'; pintarEstado();
   try {
@@ -955,11 +955,14 @@ function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar) {
   if (bc) bc.addEventListener('click', async () => {
     bc.disabled = true; lugar.textContent = '';
     const res = [];
-    for (const caso of pruebas) res.push({ caso, ...comprobarCaso(await simular({ src: ed.get(), inputs: caso.e, seed: 1 }), caso) });
+    for (const p of pruebas) {
+      const caso = { e: [], ...p };
+      res.push({ caso, ...comprobarCaso(await simular({ src: caso.codigo ? conMainDePrueba(ed.get(), caso.codigo) : ed.get(), inputs: caso.e, seed: 1, args: caso.args || [] }), caso) });
+    }
     bc.disabled = false;
     const bien = res.filter((x) => x.ok).length, todo = bien === res.length;
     lugar.innerHTML = `<div class="aviso ${todo ? 'ok' : 'error'}"><b>${todo ? 'Todas las pruebas pasan' : `${bien} de ${res.length} pruebas pasan`}</b>
-      <ul class="pruebas">${res.map((x) => `<li class="${x.ok ? 'ok' : 'mal'}">${x.ok ? '✓' : '✗'} Entrada: <code>${esc(x.caso.e.join(' ⏎ '))}</code>${x.ok ? '' : `<br><span>${esc(x.motivo)}</span>`}</li>`).join('')}</ul></div>`;
+      <ul class="pruebas">${res.map((x) => `<li class="${x.ok ? 'ok' : 'mal'}">${x.ok ? '✓' : '✗'} ${x.caso.codigo ? 'Prueba: <code>' + esc(x.caso.codigo) + '</code>' : x.caso.args ? 'Argumentos: <code>' + esc(x.caso.args.join(' ') || '(ninguno)') + '</code>' : x.caso.e.length ? 'Entrada: <code>' + esc(x.caso.e.join(' ⏎ ')) + '</code>' : 'Sin datos de entrada'}${x.ok ? '' : `<br><span>${esc(x.motivo)}</span>`}</li>`).join('')}</ul></div>`;
     if (todo && alAprobar) alAprobar();
   });
   return { foco: () => ed.foco(), get: () => ed.get(), poner: (v) => { ed.set(v); verArgs(v); alCambiar({ codigo: v }); } };

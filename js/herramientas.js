@@ -480,27 +480,46 @@ export function montarJava(cont, datos, alCambiar) {
 // ======================= corrección automática de C# =======================
 // r es el resultado del simulador (window.CSharp.run). Se mira solo lo que el programa escribe tras el último dato.
 export function comprobarCaso(r, caso) {
+  const leidas = r.segs ? r.segs.filter((x) => x.t === 'in').length : 0;
   if (r.status === 'input') return { ok: false, motivo: 'El programa pidió más datos de los previstos (' + caso.e.length + ').' };
   if (r.status !== 'done') return { ok: false, motivo: r.error || 'El programa no terminó.' };
-  let ult = -1; r.segs.forEach((s, i) => { if (s.t !== 'out') ult = i; });
-  const salida = r.segs.slice(ult + 1).filter((s) => s.t === 'out').map((s) => s.s).join('');
+  if (leidas < caso.e.length) return { ok: false, motivo: `El programa terminó tras leer ${leidas} de ${caso.e.length} datos (debería haber seguido pidiendo).` };
+  // qué parte de la salida se mira: tras el dato número «tras», todo, o (por defecto) lo escrito después del último dato
+  const ins = []; r.segs.forEach((x, i) => { if (x.t === 'in') ins.push(i); });
+  const desdeSeg = caso.todo ? 0 : caso.tras ? ins[caso.tras - 1] + 1 : (ins.length ? ins[ins.length - 1] + 1 : 0);
+  const hastaSeg = caso.tras && ins[caso.tras] !== undefined ? ins[caso.tras] : r.segs.length;
+  const salida = r.segs.slice(desdeSeg, hastaSeg).filter((x) => x.t === 'out').map((x) => x.s).join('');
+  const mal = (motivo) => ({ ok: false, motivo, salida });
+  if (caso.exit !== undefined && (r.exit ?? 0) !== caso.exit) return mal(`Main debería terminar con el código ${caso.exit} y termina con ${r.exit ?? 0}.`);
   const nums = (salida.match(/-?\d+(?:[.,]\d+)?/g) || []).map((x) => parseFloat(x.replace(',', '.')));
   const igual = (a, b) => Math.abs(a - b) < 0.01 + Math.abs(b) * 1e-9;
   let desde = 0;
   for (const esperado of caso.n || []) {
     const vale = [].concat(esperado), pos = nums.findIndex((x, i) => i >= (caso.orden ? desde : 0) && vale.some((v) => igual(x, v)));
-    if (pos < 0) return { ok: false, motivo: `Esperaba ver ${vale.map(String).join(' o ').replace(/\./g, ',')}${caso.orden ? ' en ese orden' : ''}.`, salida };
+    if (pos < 0) return mal(`Esperaba ver ${vale.map(String).join(' o ').replace(/\./g, ',')}${caso.orden ? ' en ese orden' : ''}.`);
     desde = pos + 1;
   }
-  const norm = (s) => { s = s.toLowerCase().replace(/\r/g, '').split('\n').map((l) => l.trimEnd()).join('\n'); return caso.sinEspacios ? s.replace(/[ \t]+/g, '') : s; };
+  if (caso.exacto && nums.length !== (caso.n || []).length) return mal(`Esperaba ver solo ${(caso.n || []).length} números y salen ${nums.length}.`);
+  const norm = (s) => { if (!caso.mayus) s = s.toLowerCase(); s = s.replace(/\r/g, '').split('\n').map((l) => l.trimEnd()).join('\n'); return caso.sinEspacios ? s.replace(/[ \t]+/g, '') : s; };
   const sal = norm(salida); desde = 0;
-  for (const t of caso.t || []) {
-    const pos = sal.indexOf(norm(t), caso.orden ? desde : 0);
-    if (pos < 0) return { ok: false, motivo: `Esperaba ver «${t.replace(/\n/g, '⏎')}»${caso.orden ? ' en ese orden' : ''}.`, salida };
-    desde = pos + norm(t).length;
+  for (const t of caso.t || []) { // un array dentro = vale cualquiera de esos textos
+    const ops = [].concat(t), hit = ops.map((x) => [x, sal.indexOf(norm(x), caso.orden ? desde : 0)]).find((x) => x[1] >= 0);
+    if (!hit) return mal(`Esperaba ver «${ops.map((x) => x.replace(/\n/g, '⏎')).join('» o «')}»${caso.orden ? ' en ese orden' : ''}.`);
+    desde = hit[1] + norm(hit[0]).length;
   }
-  if (caso.veces) { const [t, k] = caso.veces, n = sal.split(norm(t)).length - 1; if (n < k) return { ok: false, motivo: `«${t}» debería salir al menos ${k} veces y sale ${n}.`, salida }; }
+  const palabra = (p) => new RegExp('(^|[^\\p{L}])' + p + '($|[^\\p{L}])', 'iu').test(salida);
+  for (const p of caso.pal || []) if (!palabra(p)) return mal(`Esperaba que la respuesta dijera «${p}».`);
+  for (const p of caso.nopal || []) if (palabra(p)) return mal(`La respuesta no debería decir «${p}».`);
+  for (const re of caso.re || []) if (!new RegExp(re, 'i').test(salida)) return mal(`El formato del resultado no es el esperado.`);
+  if (caso.veces) { const [t, k] = caso.veces, n = sal.split(norm(t)).length - 1; if (n < k) return mal(`«${t}» debería salir al menos ${k} veces y sale ${n}.`); }
   return { ok: true, salida };
+}
+// Para probar una función del enunciado: el Main del alumno pasa a llamarse MainOriginal y se añade un Main que la llama.
+export function conMainDePrueba(src, codigo) {
+  const m = src.match(/((?:public|private|internal)\s+)?static\s+(?:void|int)\s+Main\s*\(/);
+  if (!m) return src;
+  const main = 'static void Main() {\n' + codigo + '\n}\n';
+  return src.slice(0, m.index) + main + m[0].replace(/Main(\s*\()$/, 'MainOriginal$1') + src.slice(m.index + m[0].length);
 }
 
 // ======================= práctica de SQL con corrección =======================
