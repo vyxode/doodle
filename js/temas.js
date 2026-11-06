@@ -165,10 +165,13 @@ export function montarCatalogo(diapos, temas) {
   const ids = new Set(ejercicios.map((e) => e.id));
   for (const e of ejercicios) e.refs = e.refs.map((r) => {
     if (ids.has(r)) return r;
-    const nombres = [...e.texto.matchAll(/["“]([A-Z]\w+)["”]/g)].map((m) => m[1]), mismoTema = ejercicios.filter((x) => x.tema === e.tema && x !== e);
-    const pref = mismoTema.filter((x) => x.id.startsWith(r + '.'));
-    const conNombre = (xs) => xs.find((x) => nombres.some((n) => x.texto.includes(n)));
-    return (conNombre(pref) || pref[0] || conNombre(mismoTema.filter((x) => x.n < e.n)) || {}).id || r;
+    const nombres = [...e.texto.matchAll(/["“]([A-Z]\w+)["”]/g)].map((m) => m[1]).filter((n) => n !== 'Main'), mismoTema = ejercicios.filter((x) => x.tema === e.tema && x !== e);
+    const conNombre = (xs) => xs.find((x) => nombres.some((n) => x.texto.includes('"' + n + '"') || x.texto.includes('“' + n + '”')));
+    for (let pre = r; pre.includes('.'); pre = pre.slice(0, pre.lastIndexOf('.'))) {
+      const c = mismoTema.filter((x) => x.id.startsWith(pre + '.')), hit = conNombre(c) || (pre === r && c[0]);
+      if (hit) return hit.id;
+    }
+    return r;
   });
   // avisa de lo que se cita y no se encuentra, para revisarlo
   const sinResolver = ejercicios.flatMap((e) => [...(e.citados || []).filter((x) => !ejemplos[x]), ...e.refs.filter((x) => !ids.has(x))].map((x) => `${e.n} → ${x}`));

@@ -7,6 +7,7 @@ import { descargarAules, raizAules, nombreModulo } from './aules.js';
 import { crearEditor, montarSql, montarWeb, montarKanban, montarJava, cargarScript, comprobarCaso, montarPracticaSql, EJ_SQL } from './herramientas.js';
 const EJ_SQL_N = EJ_SQL.length;
 import { montarDiagrama, svgExportable } from './diagrama.js';
+import { leerTemas } from './temas.js';
 
 const D = 86400;
 const URGENTE = 3 * D; // a menos de 3 días: en rojo
@@ -122,8 +123,9 @@ function mediaCurso(c) {
   return ns.length ? ns.reduce((a, b) => a + b) / ns.length : null;
 }
 function catalogo() {
-  const out = [];
-  for (const m of window.EJERCICIOS || []) for (const e of m.ejercicios) out.push({ ...e, modulo: m.modulo, lenguaje: e.lenguaje || m.lenguaje });
+  const out = [], leidos = !S.demo && S.temas && S.temas.ejercicios.length ? S.temas : null;
+  for (const m of window.EJERCICIOS || []) if (!(leidos && m.modulo === 'Programación')) for (const e of m.ejercicios) out.push({ ...e, modulo: m.modulo, lenguaje: e.lenguaje || m.lenguaje });
+  if (leidos) for (const e of leidos.ejercicios) out.push({ ...e, modulo: 'Programación', lenguaje: 'csharp' });
   for (const [id, e] of Object.entries(S.prog.ejPropios)) if (!e.borrado) out.push({ ...e, id, propio: true });
   return out;
 }
@@ -244,6 +246,30 @@ async function sincronizarAules() {
     if (S.pat) { S.sync = 'Subiendo a GitHub…'; pintarEstado(); await subirCurso(sobre); S.sync = ''; }
   } catch (e) { S.sync = e.message; }
   finally { S.sincronizando = false; pintarEstado(); }
+  actualizarTemas();
+}
+
+// Los temas de Programación (PDF de Aules + diapositivas) se leen aquí, en tu dispositivo: ejercicios y ejemplos de cada apartado.
+function pdfsDeTemas() {
+  const c = cursoDeModulo('Programación'), out = new Map();
+  for (const sec of (c && c.secciones) || []) for (const el of sec.elementos) for (const f of archivosDe(el)) {
+    const m = (f.nombre || '').match(/tema\s*0*(\d+)\.pdf$/i);
+    if (m && f.url && !out.has(+m[1])) out.set(+m[1], f);
+  }
+  return [...out].sort((a, b) => a[0] - b[0]).map(([num, f]) => ({ num, f }));
+}
+async function actualizarTemas(forzar) {
+  if (S.demo || !S.aules || S.leyendoTemas) return;
+  const pdfs = pdfsDeTemas(), firma = pdfs.map((x) => x.f.url).join('|');
+  if (!pdfs.length || (!forzar && S.temas && S.temas.firma === firma && Date.now() - S.temas.fecha < 7 * 864e5)) return;
+  S.leyendoTemas = true; const antes = S.sync; S.sync = 'Leyendo los temas de Programación…'; pintarEstado();
+  try {
+    const t = await leerTemas(pdfs.map(({ num, f }) => ({ num, traer: () => traerArchivo(f).then((b) => b.arrayBuffer()) })));
+    if (t.ejercicios.length) { S.temas = { ...t, firma }; LS.set('doodle-temas', S.temas); }
+    S.sync = t.errores.length ? 'No se pudo leer: ' + t.errores.join('; ') : antes;
+    render();
+  } catch (e) { S.sync = 'Temas: ' + e.message; }
+  finally { S.leyendoTemas = false; pintarEstado(); }
 }
 
 // ---------- entrada ----------
@@ -281,7 +307,9 @@ async function entrar(pass) {
       copiaSemanal().catch(() => {});
     } catch (e) { errSync(e); }
   }
+  S.temas = LS.get('doodle-temas');
   if (S.aules && (!S.curso.generado || Date.now() - Date.parse(S.curso.generado) > VIEJO)) sincronizarAules();
+  else actualizarTemas();
 }
 function entrarDemo() {
   const curso = JSON.parse(JSON.stringify(window.DEMO));
@@ -852,24 +880,24 @@ function trabajarEnTarea(clave) {
   location.hash = 'trabajo-' + crearTrabajo({ titulo: t.nombre, modulo: t.modulo, tarea: clave, tipo: h.tipo, notacion: h.notacion });
 }
 
-// C#: el simulador del tema 4 en un Worker, para que un bucle infinito no congele la página.
+// C#: el simulador (temas 1 a 5) en un Worker, para que un bucle infinito no congele la página.
 let worker = null, workerRoto = false, cola = Promise.resolve();
 function crearWorker() {
   if (workerRoto || typeof Worker === 'undefined' || typeof window.CSharpFactory !== 'function') return null;
   try {
-    const codigo = '(' + window.CSharpFactory.toString() + ')(self);\nself.onmessage = function (e) { self.postMessage(self.CSharp.run(e.data.src, e.data.inputs, e.data.seed)); };';
+    const codigo = '(' + window.CSharpFactory.toString() + ')(self);\nself.onmessage = function (e) { self.postMessage(self.CSharp.run(e.data.src, e.data.inputs, e.data.seed, e.data.args)); };';
     return new Worker(URL.createObjectURL(new Blob([codigo], { type: 'text/javascript' })));
   } catch (e) { workerRoto = true; return null; }
 }
 function simular(req) {
   cola = cola.then(() => new Promise((resolve) => {
     if (!worker) worker = crearWorker();
-    if (!worker) { resolve(window.CSharp.run(req.src, req.inputs, req.seed)); return; }
+    if (!worker) { resolve(window.CSharp.run(req.src, req.inputs, req.seed, req.args)); return; }
     let fin = false;
     const terminar = (r) => { if (fin) return; fin = true; clearTimeout(reloj); resolve(r); };
     const reloj = setTimeout(() => { worker.terminate(); worker = null; terminar({ status: 'halt', segs: [], error: 'El programa ha tardado demasiado y se ha detenido.' }); }, 15000);
     worker.onmessage = (e) => terminar(e.data);
-    worker.onerror = (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); worker = null; workerRoto = true; terminar(window.CSharp.run(req.src, req.inputs, req.seed)); };
+    worker.onerror = (ev) => { if (ev && ev.preventDefault) ev.preventDefault(); worker = null; workerRoto = true; terminar(window.CSharp.run(req.src, req.inputs, req.seed, req.args)); };
     worker.postMessage(req);
   }));
   return cola;
@@ -877,23 +905,28 @@ function simular(req) {
 const PLANTILLA = 'using System;\n\nclass Program {\n\tpublic static void Main() {\n\t\t\n\t}\n}\n';
 function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar) {
   cont.innerHTML = `<div class="hz hz-cs">
-    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button>${pruebas ? `<button type="button" class="boton" data-cs="comprobar">Comprobar (${pruebas.length} prueba${pruebas.length === 1 ? '' : 's'})</button>` : ''}<span class="suave atajo">Ctrl + Intro ejecuta. Admite lo visto hasta el tema 4.</span><span class="estado-guardado" aria-live="polite"></span></div>
+    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button>${pruebas ? `<button type="button" class="boton" data-cs="comprobar">Comprobar (${pruebas.length} prueba${pruebas.length === 1 ? '' : 's'})</button>` : ''}<label class="cs-args" hidden><span class="suave">Argumentos</span><input type="text" placeholder="p. ej. 3 4" autocomplete="off" spellcheck="false" aria-label="Argumentos de la línea de comandos (args)"></label><span class="suave atajo">Ctrl + Intro ejecuta. Admite lo visto hasta el tema 5.</span><span class="estado-guardado" aria-live="polite"></span></div>
     <div class="editor"></div>
     <div class="consola" tabindex="-1" aria-label="Consola del programa"><span class="vacia">Pulsa Ejecutar para lanzar el programa.</span></div>
     <div class="cs-aviso" aria-live="polite"></div></div>`;
   const estado = cont.querySelector('.estado-guardado'), btn = cont.querySelector('[data-cs]'), consola = cont.querySelector('.consola'), lugar = cont.querySelector('.cs-aviso');
   let entradas = [], semilla = 1, ocupado = false;
+  // si Main recibe string[] args, aparece una casilla para escribir los argumentos de la línea de comandos
+  const cajaArgs = cont.querySelector('.cs-args'), inArgs = cajaArgs.querySelector('input');
+  const verArgs = (v) => { cajaArgs.hidden = !/Main\s*\(\s*string\s*\[\s*\]/.test(v); };
+  const args = () => (cajaArgs.hidden ? [] : (inArgs.value.match(/"[^"]*"|\S+/g) || []).map((x) => x.replace(/^"|"$/g, '')));
   const ed = crearEditor(cont.querySelector('.editor'), (datos && datos.codigo) || PLANTILLA, {
     modo: 'text/x-csharp', etiqueta: 'Código C#', alEjecutar: () => lanzar([]),
-    alCambiar: (v) => { alCambiar({ codigo: v }); estado.textContent = S.demo ? 'Guardado en este navegador' : S.pat ? 'Guardado. Se sincroniza en unos segundos' : 'Guardado en este dispositivo'; },
+    alCambiar: (v) => { verArgs(v); alCambiar({ codigo: v }); estado.textContent = S.demo ? 'Guardado en este navegador' : S.pat ? 'Guardado. Se sincroniza en unos segundos' : 'Guardado en este dispositivo'; },
   });
   async function lanzar(ent, misma) {
     if (ocupado) return; ocupado = true; btn.disabled = true;
     if (!misma) semilla = Math.floor(Math.random() * 1e9);
     entradas = ent.slice();
-    const r = await simular({ src: ed.get(), inputs: entradas, seed: semilla });
+    const r = await simular({ src: ed.get(), inputs: entradas, seed: semilla, args: args() });
     ocupado = false; btn.disabled = false; pintar(r);
   }
+  verArgs(ed.get());
   function pintar(r) {
     consola.textContent = ''; ed.limpiar(); lugar.textContent = '';
     for (const s of r.segs) { const p = document.createElement('pre'); if (s.t !== 'out') p.className = 'tecleado'; p.textContent = s.s; consola.append(p); }
@@ -908,7 +941,7 @@ function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar) {
     }
     if (!r.segs.length) { const v = document.createElement('span'); v.className = 'vacia'; v.textContent = r.status === 'compile' ? 'No se ha ejecutado porque el programa tiene un error.' : '(el programa no ha escrito nada)'; consola.append(v); }
     consola.scrollTop = consola.scrollHeight;
-    if (r.status === 'done') { aviso.className = 'aviso ok'; aviso.textContent = 'Programa terminado.'; lugar.append(aviso); return; }
+    if (r.status === 'done') { aviso.className = 'aviso ok'; aviso.textContent = 'Programa terminado' + (r.exit !== undefined && r.exit !== null ? ' con el código ' + r.exit + (r.exit === 0 ? ' (sin errores)' : '') : '') + '.'; lugar.append(aviso); return; }
     aviso.className = 'aviso error';
     const b = document.createElement('b');
     b.textContent = (r.status === 'compile' ? 'Error de compilación en la línea ' + r.line : r.status === 'exception' ? 'El programa se ha parado en la línea ' + r.line : 'Programa detenido' + (r.line ? ' (línea ' + r.line + ')' : '')) + (r.code && r.code !== 'SIM' ? ' (' + r.code + ')' : '');
@@ -929,7 +962,7 @@ function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar) {
       <ul class="pruebas">${res.map((x) => `<li class="${x.ok ? 'ok' : 'mal'}">${x.ok ? '✓' : '✗'} Entrada: <code>${esc(x.caso.e.join(' ⏎ '))}</code>${x.ok ? '' : `<br><span>${esc(x.motivo)}</span>`}</li>`).join('')}</ul></div>`;
     if (todo && alAprobar) alAprobar();
   });
-  return { foco: () => ed.foco() };
+  return { foco: () => ed.foco(), get: () => ed.get(), poner: (v) => { ed.set(v); verArgs(v); alCambiar({ codigo: v }); } };
 }
 function montarNotas(cont, datos, alCambiar, titulo) {
   cont.innerHTML = `<div class="hz hz-notas"><div class="barra-lab"><button type="button" class="boton mini" data-notas="bajar">Descargar .md</button><span class="suave">Respuestas, apuntes o borradores. Se guarda solo.</span><span class="estado-guardado"></span></div><div class="editor"></div></div>`;
@@ -1045,6 +1078,7 @@ function vistaEjercicios() {
       <div class="campo campo-boton"><button class="boton principal">Añadir ejercicio</button></div>
     </form></details>` : ''}
   ${m === 'Programación' && window.CHULETA ? `<section class="bloque"><div class="panel practica-cta"><div><b>Chuleta de C#</b><p class="suave">Todo lo de los temas 1 a 5 con ejemplos y buscador. También está en cada ejercicio de C#.</p></div><button type="button" class="boton" data-acc="chuleta">Abrir</button></div></section>` : ''}
+  ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejercicios y ejemplos leídos de tus temas de Aules (${S.temas.ejercicios.length} ejercicios, ${Object.keys(S.temas.ejemplos).length} ejemplos) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
   ${(window.REPASO || {})[m] ? `<section class="bloque"><div class="panel practica-cta"><div><b>Repaso para el examen</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}`;
@@ -1163,16 +1197,39 @@ function abrirLab(id) {
       </div>
     </header>
     <div class="lab-cuerpo">
-      <section class="lab-enun"><span class="antetitulo">${esc(e.grupo || e.modulo)}</span><p class="pre">${esc(e.texto)}</p>${e.ejemplo ? `<pre class="consola">${esc(e.ejemplo)}</pre>` : ''}</section>
+      <section class="lab-enun"><span class="antetitulo">${esc(e.grupo || e.modulo)}</span><p class="pre">${esc(e.texto)}</p>${e.ejemplo ? `<pre class="consola">${esc(e.ejemplo)}</pre>` : ''}${ayudaLab(e, todos)}</section>
       <section class="lab-trabajo" id="lab-trabajo"></section>
     </div>`;
   document.body.classList.add('con-lab');
   capa.hidden = false;
   const caja = capa.querySelector('#lab-trabajo');
+  S.labEd = null;
   const h = e.lenguaje === 'csharp' ? montarCsharp(caja, g, (d) => cambiar('ej', id, { codigo: d.codigo }), (window.PRUEBAS_CS || {})[id], () => {
     cambiar('ej', id, { hecho: true }); const c = capa.querySelector('[data-acc=lab-hecho]'); if (c) c.checked = true;
   }) : montarNotas(caja, { texto: g.codigo }, (d) => cambiar('ej', id, { codigo: d.texto }), e.n);
+  S.labEd = h;
   h.foco();
+}
+// Lo que el enunciado cita (ejemplos y ejercicios anteriores) y los ejemplos de su apartado, sacados de tus temas.
+function ayudaLab(e, todos) {
+  const E = (S.temas && S.temas.ejemplos) || {}, citados = (e.citados || []).filter((id) => E[id]);
+  const otros = (e.ejemplos || []).filter((id) => E[id] && !citados.includes(id));
+  const refs = (e.refs || []).map((id) => todos.find((x) => x.id === id)).filter(Boolean);
+  if (!citados.length && !otros.length && !refs.length) return '';
+  const nombre = (id) => id.startsWith('Ejemplo_') ? 'Ejemplo ' + id.slice(8) : 'Ejemplo de las diapositivas';
+  const caja = (id, abierto) => `<details class="lab-ejemplo" ${abierto ? 'open' : ''}><summary><b>${esc(nombre(id))}</b> <span class="suave">${esc(E[id].titulo || '')}</span></summary>
+    <pre>${esc(E[id].codigo)}</pre><button type="button" class="boton mini" data-acc="ej-base" data-v="${esc(id)}">Usar como base</button></details>`;
+  return `<div class="lab-ayuda">
+    ${refs.map((x) => `<p class="lab-ref">Parte del ejercicio <button type="button" class="enlace" data-acc="lab-ir" data-v="${esc(x.id)}">${esc(x.n)}</button>: ${esc(x.texto.length > 140 ? x.texto.slice(0, 140) + '…' : x.texto)}</p>`).join('')}
+    ${citados.map((id) => caja(id, true)).join('')}
+    ${otros.length ? `<p class="antetitulo">${citados.length ? 'Más ejemplos' : 'Ejemplos'} de este apartado</p>${otros.map((id) => caja(id, false)).join('')}` : ''}
+  </div>`;
+}
+function usarComoBase(btn) {
+  const cod = ((S.temas && S.temas.ejemplos) || {})[btn.dataset.v], ed = S.labEd;
+  if (!cod || !ed || !ed.poner) return;
+  if (!btn.dataset.seguro && ed.get().trim() && ed.get() !== PLANTILLA) { btn.dataset.seguro = '1'; btn.textContent = 'Pulsa otra vez: sustituye tu código'; return; }
+  ed.poner(cod.codigo); delete btn.dataset.seguro; btn.textContent = 'Copiado al editor';
 }
 function cerrarLab() {
   const capa = document.getElementById('lab'); if (!capa || capa.hidden) return;
@@ -1415,6 +1472,8 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'buscar') abrirBuscador();
   else if (acc === 'practicar-sql') { const w = trabajos().find((x) => x.tipo === 'practica'); location.hash = 'trabajo-' + (w ? w.id : crearTrabajo({ titulo: 'Práctica de SQL', modulo: 'Bases de Datos', tipo: 'practica' })); }
   else if (acc === 'chuleta') abrirChuleta();
+  else if (acc === 'ej-base') usarComoBase(el);
+  else if (acc === 'releer-temas') actualizarTemas(true);
   else if (acc === 'cerrar-chuleta') cerrarChuleta();
   else if (acc === 'repasar') empezarRepaso(el.dataset.v);
   else if (acc === 'rep-resp') responderRepaso(+el.dataset.v);
