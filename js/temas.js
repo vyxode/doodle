@@ -56,7 +56,7 @@ export function parsearTema(lineas) {
   const t = { num: null, titulo: '', apartados: [], ejemplos: [], ejercicios: [] };
   let ap = null, partes = [], ej = null, emp = null, modoEj = false, ant = null, nota = '';
   const grupo = () => { const n2 = t.apartados.find((a) => a.n === partes.slice(0, 2).join('.')); return [n2, partes.length > 2 ? ap : null].filter(Boolean).map((a) => a.n + ' ' + a.titulo).join(' · '); };
-  const cerrarEj = () => { if (ej) { ej.texto = ej.texto.replace(/[ \t]+\n/g, '\n').replace(/^\n+|\s+$/g, ''); delete ej.mono; t.ejercicios.push(ej); ej = null; } };
+  const cerrarEj = () => { if (ej) { ej.texto = ej.texto.replace(/[ \t]+\n/g, '\n').replace(/^\n+|\s+$/g, ''); delete ej.mono; delete ej.x0; t.ejercicios.push(ej); ej = null; } };
   const cerrarEmp = () => { if (emp) { if (emp.lineas.length) t.ejemplos.push({ id: emp.id, apartado: emp.apartado, titulo: emp.titulo, codigo: emp.lineas.join('\n') }); emp = null; } };
   for (const l of L) {
     const s = l.s.trim();
@@ -75,7 +75,7 @@ export function parsearTema(lineas) {
         ant = l; continue;
       } else { ant = l; continue; }
     }
-    if (l.mono && ej && !/^\/\/\s*Ejemplo_/.test(s) && (ant.p !== l.p || ant.y - l.y < 60)) { ej.texto += '\n' + l.s; ej.mono = true; ant = l; continue; }
+    if (l.mono && ej && !/^\/\/\s*Ejemplo_/.test(s) && (ant.p !== l.p || ant.y - l.y < 60)) { ej.texto += '\n' + ' '.repeat(Math.max(0, Math.round((l.x - ej.x0) / l.cw))) + l.s; ej.mono = true; ant = l; continue; }
     if (l.mono) {
       const m = s.match(/^\/\/\s*(Ejemplo_\w+?)\.cs/);
       if (m) { cerrarEj(); modoEj = false; emp = { id: m[1], apartado: ap ? ap.n : '', titulo: '', lineas: [], prof: 0, abierto: false, cab: 0, x0: l.x, cw: l.cw }; }
@@ -92,7 +92,7 @@ export function parsearTema(lineas) {
     if (/^Ejercicios? propuestos?:?$/i.test(s)) { cerrarEj(); modoEj = true; ant = l; continue; }
     const it = modoEj && s.match(/^\(((?:\d+\.)+\d+)\)\s*(.*)$/);
     if (it && +it[1].split('.')[0] === t.num) {
-      cerrarEj(); ej = { n: it[1], apartado: ap ? ap.n : '', grupo: grupo() + (nota ? ' · ' + nota : ''), texto: it[2] }; ant = l; continue;
+      cerrarEj(); ej = { n: it[1], apartado: ap ? ap.n : '', grupo: grupo() + (nota ? ' · ' + nota : ''), texto: it[2], x0: l.x }; ant = l; continue;
     }
     if (!ej && modoEj && /:$/.test(s) && s.length < 80) { nota = s.replace(/:$/, ''); ant = l; continue; }
     if (ej) {
@@ -100,7 +100,7 @@ export function parsearTema(lineas) {
       const salto = ant.p !== l.p ? (/[.?!)"»]$/.test(ant.s.trim()) && !/^[a-záéíóúñ]/.test(s)) : ant.y - l.y > 26;
       if (salto) { cerrarEj(); if (/:$/.test(s)) nota = s.replace(/:$/, ''); }
       else {
-        const lista = VIÑETA.test(s), simbolos = !/[A-Za-zÁÉÍÓÚáéíóúñÑ0-9]/.test(s) || /^[*#@\-=+ ]+$/.test(s);
+        const lista = VIÑETA.test(s), simbolos = /^[*#@=_-]+$/.test(s.replace(/\s/g, ''));
         ej.texto += (lista || simbolos || /[:]$/.test(ant.s.trim()) || /^[*#@\-=+ ]+$/.test(ant.s.trim()) ? '\n' : ' ') + (lista ? '• ' + s.replace(VIÑETA, '') : s);
       }
     }

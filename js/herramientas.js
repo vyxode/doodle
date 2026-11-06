@@ -502,10 +502,10 @@ export function comprobarCaso(r, caso) {
   if (caso.exacto && nums.length !== (caso.n || []).length) return mal(`Esperaba ver solo ${(caso.n || []).length} números y salen ${nums.length}.`);
   const norm = (s) => { if (!caso.mayus) s = s.toLowerCase(); s = s.replace(/\r/g, '').split('\n').map((l) => l.trimEnd()).join('\n'); return caso.sinEspacios ? s.replace(/[ \t]+/g, '') : s; };
   const sal = norm(salida); desde = 0;
-  for (const t of caso.t || []) {
-    const pos = sal.indexOf(norm(t), caso.orden ? desde : 0);
-    if (pos < 0) return mal(`Esperaba ver «${t.replace(/\n/g, '⏎')}»${caso.orden ? ' en ese orden' : ''}.`);
-    desde = pos + norm(t).length;
+  for (const t of caso.t || []) { // un array dentro = vale cualquiera de esos textos
+    const ops = [].concat(t), hit = ops.map((x) => [x, sal.indexOf(norm(x), caso.orden ? desde : 0)]).find((x) => x[1] >= 0);
+    if (!hit) return mal(`Esperaba ver «${ops.map((x) => x.replace(/\n/g, '⏎')).join('» o «')}»${caso.orden ? ' en ese orden' : ''}.`);
+    desde = hit[1] + norm(hit[0]).length;
   }
   const palabra = (p) => new RegExp('(^|[^\\p{L}])' + p + '($|[^\\p{L}])', 'iu').test(salida);
   for (const p of caso.pal || []) if (!palabra(p)) return mal(`Esperaba que la respuesta dijera «${p}».`);
