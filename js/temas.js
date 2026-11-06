@@ -52,7 +52,7 @@ export function llaves(s) {
 export function parsearTema(lineas) {
   const L = lineas.filter((l) => !RUIDO.test(l.s.trim()));
   const t = { num: null, titulo: '', apartados: [], ejemplos: [], ejercicios: [] };
-  let ap = null, partes = [], ej = null, emp = null, modoEj = false, ant = null;
+  let ap = null, partes = [], ej = null, emp = null, modoEj = false, ant = null, nota = '';
   const grupo = () => { const n2 = t.apartados.find((a) => a.n === partes.slice(0, 2).join('.')); return [n2, partes.length > 2 ? ap : null].filter(Boolean).map((a) => a.n + ' ' + a.titulo).join(' · '); };
   const cerrarEj = () => { if (ej) { ej.texto = ej.texto.replace(/[ \t]+\n/g, '\n').trim(); t.ejercicios.push(ej); ej = null; } };
   const cerrarEmp = () => { if (emp) { if (emp.lineas.length) t.ejemplos.push({ id: emp.id, apartado: emp.apartado, titulo: emp.titulo, codigo: emp.lineas.join('\n') }); emp = null; } };
@@ -78,22 +78,23 @@ export function parsearTema(lineas) {
       if (m) { cerrarEj(); modoEj = false; emp = { id: m[1], apartado: ap ? ap.n : '', titulo: '', lineas: [], prof: 0, abierto: false, cab: 0, x0: l.x, cw: l.cw }; }
       ant = l; continue;
     }
-    const h = s.match(/^((?:\d+\.)*\d+)\.?\s+([A-ZÁÉÍÓÚÑ¿¡"].*)$/);
+    const h = s.match(/^((?:\d+\.)*\d+)\.?\s+([A-Za-zÁÉÍÓÚÑáéíóúñ¿¡"].*)$/);
     const hp = h && h[1].split('.').map(Number);
     if (h && t.num == null && hp.length === 1) { t.num = hp[0]; t.titulo = h[2].trim(); ant = l; continue; }
     if (h && hp[0] === t.num && hp.length >= 2 && mayor(hp, partes)) {
-      cerrarEj(); modoEj = false; partes = hp; ap = { n: hp.join('.'), titulo: h[2].trim() }; t.apartados.push(ap); ant = l; continue;
+      cerrarEj(); modoEj = false; nota = ''; partes = hp; ap = { n: hp.join('.'), titulo: h[2].trim() }; t.apartados.push(ap); ant = l; continue;
     }
     // título de apartado partido en dos líneas: «4.1.4. Operaciones … máximo,» + «añadir, insertar, borrar»
     if (ap && ant && t.apartados.at(-1) === ap && ant.s.trim().startsWith(ap.n) && /^[a-záéíóúñ]/.test(s) && !ej) { ap.titulo += ' ' + s; ant = l; continue; }
     if (/^Ejercicios? propuestos?:?$/i.test(s)) { cerrarEj(); modoEj = true; ant = l; continue; }
     const it = modoEj && s.match(/^\(((?:\d+\.)+\d+)\)\s*(.*)$/);
     if (it && +it[1].split('.')[0] === t.num) {
-      cerrarEj(); ej = { n: it[1], apartado: ap ? ap.n : '', grupo: grupo(), texto: it[2] }; ant = l; continue;
+      cerrarEj(); ej = { n: it[1], apartado: ap ? ap.n : '', grupo: grupo() + (nota ? ' · ' + nota : ''), texto: it[2] }; ant = l; continue;
     }
+    if (!ej && modoEj && /:$/.test(s) && s.length < 80) { nota = s.replace(/:$/, ''); ant = l; continue; }
     if (ej) {
       const salto = ant.p !== l.p ? (/[.?!)"»]$/.test(ant.s.trim()) && !/^[a-záéíóúñ]/.test(s)) : ant.y - l.y > 26;
-      if (salto) cerrarEj();
+      if (salto) { cerrarEj(); if (/:$/.test(s)) nota = s.replace(/:$/, ''); }
       else {
         const lista = VIÑETA.test(s), simbolos = !/[A-Za-zÁÉÍÓÚáéíóúñÑ0-9]/.test(s) || /^[*#@\-=+ ]+$/.test(s);
         ej.texto += (lista || simbolos || /[:]$/.test(ant.s.trim()) || /^[*#@\-=+ ]+$/.test(ant.s.trim()) ? '\n' : ' ') + (lista ? '• ' + s.replace(VIÑETA, '') : s);
@@ -122,7 +123,6 @@ export function parsearDiapo(html, clave) {
       k++;
       out.ejercicios.push({ n: fich ? fich[1] : `${clave}.${k}`, apartado: clave, grupo: `${sub} · ${apartado}`,
         texto: cuerpo.replace(/\*\*/g, '').replace(/^\s*[-*]\s+/gm, '• ').replace(/\n{3,}/g, '\n\n').trim(), ejemplos: pendientes.slice(-3) });
-      pendientes = [];
       continue;
     }
     if (titulo) apartado = titulo;
@@ -145,7 +145,8 @@ export function montarCatalogo(diapos, temas) {
   const ejemplos = {}, ejercicios = [];
   for (const d of diapos) {
     for (const e of d.ejemplos) ejemplos[e.id] = e;
-    for (const e of d.ejercicios) ejercicios.push({ id: 'prog-' + e.n, tema: `Tema ${d.num} · ${d.titulo}`, grupo: e.grupo, n: e.n, texto: e.texto, ejemplos: e.ejemplos, refs: [] });
+    for (const e of d.ejercicios) ejercicios.push({ id: 'prog-' + e.n, tema: `Tema ${d.num} · ${d.titulo}`, grupo: e.grupo, n: e.n, texto: e.texto, ejemplos: e.ejemplos,
+      refs: [...new Set([...e.texto.matchAll(/Ejercicio_(\w+?)\.cs/g)].map((m) => 'prog-' + m[1]).filter((id) => id !== 'prog-' + e.n))] });
   }
   for (const t of temas) {
     for (const e of t.ejemplos) ejemplos[e.id] = e;
@@ -160,8 +161,16 @@ export function montarCatalogo(diapos, temas) {
   }
   const orden = (e) => parseInt(e.tema.slice(5), 10);
   ejercicios.sort((a, b) => orden(a) - orden(b));
-  // avisa de lo que se cita y no se encuentra, para revisarlo
+  // el libro a veces cita un número que no existe (5.7.1 por 5.7.2.1): se busca el que empieza igual o el que trata la misma función entre comillas
   const ids = new Set(ejercicios.map((e) => e.id));
+  for (const e of ejercicios) e.refs = e.refs.map((r) => {
+    if (ids.has(r)) return r;
+    const nombres = [...e.texto.matchAll(/["“]([A-Z]\w+)["”]/g)].map((m) => m[1]), mismoTema = ejercicios.filter((x) => x.tema === e.tema && x !== e);
+    const pref = mismoTema.filter((x) => x.id.startsWith(r + '.'));
+    const conNombre = (xs) => xs.find((x) => nombres.some((n) => x.texto.includes(n)));
+    return (conNombre(pref) || pref[0] || conNombre(mismoTema.filter((x) => x.n < e.n)) || {}).id || r;
+  });
+  // avisa de lo que se cita y no se encuentra, para revisarlo
   const sinResolver = ejercicios.flatMap((e) => [...(e.citados || []).filter((x) => !ejemplos[x]), ...e.refs.filter((x) => !ids.has(x))].map((x) => `${e.n} → ${x}`));
   return { ejercicios, ejemplos, sinResolver };
 }
