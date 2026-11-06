@@ -6,6 +6,7 @@ export const DIAPOS = 'https://nachoiborraies.github.io/csharp/docs/es/slides/';
 export const DIAPOS_TEMAS = ['01a', '01b', '01c', '02a', '02b', '02c', '02d'];
 
 // ---------- PDF → líneas con posición, tipo de letra y espacios del código ----------
+const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹', n: 'ⁿ' };
 export async function lineasPdf(buf) {
   const lib = await import(PDFJS);
   lib.GlobalWorkerOptions.workerSrc = PDFJS.replace('pdf.min', 'pdf.worker.min');
@@ -15,6 +16,7 @@ export async function lineasPdf(buf) {
     let cur = null;
     for (const it of c.items) {
       const y = it.transform[5];
+      if (cur && y - cur.y > 2 && y - cur.y < 8 && /^\s*[0-9n]\s*$/.test(it.str)) { cur.items.push({ x: it.transform[4], s: SUP[it.str.trim()], w: it.width, mono: false }); continue; }
       if (!cur || Math.abs(y - cur.y) > 2) { cur = { p, y, items: [] }; L.push(cur); }
       if (it.str) cur.items.push({ x: it.transform[4], s: it.str, w: it.width, mono: (c.styles[it.fontName] || {}).fontFamily === 'monospace' });
     }
@@ -34,7 +36,7 @@ export function linea({ p, y, items }) {
 
 // ---------- líneas del PDF → tema ----------
 const RUIDO = /^(Introducción a la programación con C#, por Nacho Cabanes|Revisión \d{4}.*Página \d+)$/;
-const VIÑETA = /^[-•·▪◦-]\s*/;
+const VIÑETA = /^[\uf000-\uf0ff•▪◦]\s*/;
 const mayor = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const x = a[i] ?? -1, y = b[i] ?? -1; if (x !== y) return x > y; } return false; };
 
 // Cuenta llaves fuera de cadenas, caracteres y comentarios ("{0}" no cuenta).
@@ -54,7 +56,7 @@ export function parsearTema(lineas) {
   const t = { num: null, titulo: '', apartados: [], ejemplos: [], ejercicios: [] };
   let ap = null, partes = [], ej = null, emp = null, modoEj = false, ant = null, nota = '';
   const grupo = () => { const n2 = t.apartados.find((a) => a.n === partes.slice(0, 2).join('.')); return [n2, partes.length > 2 ? ap : null].filter(Boolean).map((a) => a.n + ' ' + a.titulo).join(' · '); };
-  const cerrarEj = () => { if (ej) { ej.texto = ej.texto.replace(/[ \t]+\n/g, '\n').trim(); t.ejercicios.push(ej); ej = null; } };
+  const cerrarEj = () => { if (ej) { ej.texto = ej.texto.replace(/[ \t]+\n/g, '\n').replace(/^\n+|\s+$/g, ''); delete ej.mono; delete ej.x0; t.ejercicios.push(ej); ej = null; } };
   const cerrarEmp = () => { if (emp) { if (emp.lineas.length) t.ejemplos.push({ id: emp.id, apartado: emp.apartado, titulo: emp.titulo, codigo: emp.lineas.join('\n') }); emp = null; } };
   for (const l of L) {
     const s = l.s.trim();
@@ -73,6 +75,7 @@ export function parsearTema(lineas) {
         ant = l; continue;
       } else { ant = l; continue; }
     }
+    if (l.mono && ej && !/^\/\/\s*Ejemplo_/.test(s) && (ant.p !== l.p || ant.y - l.y < 60)) { ej.texto += '\n' + ' '.repeat(Math.max(0, Math.round((l.x - ej.x0) / l.cw))) + l.s; ej.mono = true; ant = l; continue; }
     if (l.mono) {
       const m = s.match(/^\/\/\s*(Ejemplo_\w+?)\.cs/);
       if (m) { cerrarEj(); modoEj = false; emp = { id: m[1], apartado: ap ? ap.n : '', titulo: '', lineas: [], prof: 0, abierto: false, cab: 0, x0: l.x, cw: l.cw }; }
@@ -89,15 +92,16 @@ export function parsearTema(lineas) {
     if (/^Ejercicios? propuestos?:?$/i.test(s)) { cerrarEj(); modoEj = true; ant = l; continue; }
     const it = modoEj && s.match(/^\(((?:\d+\.)+\d+)\)\s*(.*)$/);
     if (it && +it[1].split('.')[0] === t.num) {
-      cerrarEj(); ej = { n: it[1], apartado: ap ? ap.n : '', grupo: grupo() + (nota ? ' · ' + nota : ''), texto: it[2] }; ant = l; continue;
+      cerrarEj(); ej = { n: it[1], apartado: ap ? ap.n : '', grupo: grupo() + (nota ? ' · ' + nota : ''), texto: it[2], x0: l.x }; ant = l; continue;
     }
     if (!ej && modoEj && /:$/.test(s) && s.length < 80) { nota = s.replace(/:$/, ''); ant = l; continue; }
     if (ej) {
+      if (ej.mono && /^[A-ZÁÉÍÓÚ¿(]/.test(s)) { cerrarEj(); ant = l; continue; } // tras el dibujo vuelve la teoría
       const salto = ant.p !== l.p ? (/[.?!)"»]$/.test(ant.s.trim()) && !/^[a-záéíóúñ]/.test(s)) : ant.y - l.y > 26;
       if (salto) { cerrarEj(); if (/:$/.test(s)) nota = s.replace(/:$/, ''); }
       else {
-        const lista = VIÑETA.test(s), simbolos = !/[A-Za-zÁÉÍÓÚáéíóúñÑ0-9]/.test(s) || /^[*#@\-=+ ]+$/.test(s);
-        ej.texto += (lista || simbolos || /[:]$/.test(ant.s.trim()) || /^[*#@\-=+ ]+$/.test(ant.s.trim()) ? '\n' : ' ') + (lista ? '• ' + s.replace(VIÑETA, '') : s);
+        const lista = VIÑETA.test(s), simbolos = /^[*#@=_-]+$/.test(s.replace(/\s/g, ''));
+        ej.texto += (lista || simbolos || /[:]$/.test(ant.s.trim()) || /^[*#@=_-]+$/.test(ant.s.trim().replace(/\s/g, '')) ? '\n' : ' ') + (lista ? '• ' + s.replace(VIÑETA, '') : s);
       }
     }
     ant = l;
@@ -122,7 +126,7 @@ export function parsearDiapo(html, clave) {
       const fich = cuerpo.match(/Ejercicio_(\w+?)\.cs/);
       k++;
       out.ejercicios.push({ n: fich ? fich[1] : `${clave}.${k}`, apartado: clave, grupo: `${sub} · ${apartado}`,
-        texto: cuerpo.replace(/\*\*/g, '').replace(/^\s*[-*]\s+/gm, '• ').replace(/\n{3,}/g, '\n\n').trim(), ejemplos: pendientes.slice(-3) });
+        texto: cuerpo.split(/(```[\s\S]*?```)/).map((x, i) => (i % 2 ? x : x.replace(/\*\*/g, '').replace(/^\s*[-*]\s+/gm, '• '))).join('').replace(/\n{3,}/g, '\n\n').trim(), ejemplos: pendientes.slice(-3) });
       continue;
     }
     if (titulo) apartado = titulo;

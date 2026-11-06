@@ -1647,6 +1647,17 @@ class DefAssign {
       case 'cast': case 'un': case 'paren': return this.ex(e.e, S);
     }
   }
+  // Estado tras una condición, si sale verdadera (t) o falsa (f): if (!int.TryParse(x, out a) || !int.TryParse(y, out b)) return; deja a y b asignadas.
+  cnd(e, S) {
+    let x = e; while (x.k === 'paren') x = x.e;
+    if (x.k === 'un' && x.op === '!') { const r = this.cnd(x.e, S); return { t: r.f, f: r.t }; }
+    if (x.k === 'bin' && (x.op === '&&' || x.op === '||')) {
+      const a = this.cnd(x.l, S);
+      if (x.op === '&&') { const b = this.cnd(x.r, this.copy(a.t)); return { t: b.t, f: this.join(a.f, b.f) }; }
+      const b = this.cnd(x.r, this.copy(a.f)); return { t: this.join(a.t, b.t), f: b.f };
+    }
+    const T = this.copy(S); this.ex(e, T); return { t: T, f: this.copy(T) };
+  }
   lv(t, S) { // destino de una asignación que no es una variable simple: se leen sus partes
     if (t.k === 'index') { this.ex(t.obj, S); for (const i of t.idx) this.ex(i, S); }
     else if (t.k === 'member' && t.obj) { let o = t.obj; while (o.k === 'paren') o = o.e; if (o.k !== 'name') this.lv(o, S); }
@@ -1666,16 +1677,16 @@ class DefAssign {
         return S;
       case 'expr': this.ex(s.e, S); return S;
       case 'if': {
-        this.ex(s.cond, S);
-        if (constTrue(s.cond)) return this.st(s.then, this.copy(S));
-        const a = this.st(s.then, this.copy(S));
-        const b = s.els ? this.st(s.els, this.copy(S)) : S;
+        const c = this.cnd(s.cond, S);
+        if (constTrue(s.cond)) return this.st(s.then, c.t);
+        const a = this.st(s.then, c.t);
+        const b = s.els ? this.st(s.els, c.f) : c.f;
         return this.join(a, b);
       }
       case 'while': {
-        this.ex(s.cond, S);
-        const f = this.loop(true); this.st(s.body, this.copy(S)); this.jumps.pop();
-        let after = constTrue(s.cond) ? null : this.copy(S);
+        const c = this.cnd(s.cond, S);
+        const f = this.loop(true); this.st(s.body, c.t); this.jumps.pop();
+        let after = constTrue(s.cond) ? null : c.f;
         for (const b of f.breaks) after = this.join(after, b);
         return after;
       }
@@ -1683,8 +1694,8 @@ class DefAssign {
         const f = this.loop(true);
         let sc = this.st(s.body, this.copy(S)); this.jumps.pop();
         for (const c of f.conts) sc = this.join(sc, c);
-        if (sc !== null) this.ex(s.cond, sc);
-        let after = constTrue(s.cond) ? null : sc;
+        const c = sc !== null ? this.cnd(s.cond, sc) : null;
+        let after = constTrue(s.cond) || !c ? null : c.f;
         for (const b of f.breaks) after = this.join(after, b);
         return after;
       }
