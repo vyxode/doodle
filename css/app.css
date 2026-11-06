@@ -428,7 +428,7 @@ body.en-taller .demo-banda { display: none; }
 .taller-herr { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; }
 .hz { min-height: 0; min-width: 0; display: grid; gap: 10px; grid-template-rows: auto minmax(0, 1fr); }
 .hz .editor .CodeMirror { height: 100%; }
-.hz-cs { grid-template-rows: auto minmax(200px, 1.4fr) minmax(90px, 1fr) auto; }
+.hz-cs { grid-template-rows: auto minmax(260px, 2fr) minmax(90px, 1fr) auto; }
 .hz-cs .consola { max-height: none; }
 .hz-notas .editor .CodeMirror, .hz-notas .editor-plano { font-family: var(--f-texto) !important; font-size: 15.5px !important; line-height: 1.65 !important; }
 
@@ -750,3 +750,12 @@ kbd { font: 500 11.5px var(--f-texto); padding: 2px 6px; border: 1px solid var(-
 .cs-args { display: inline-flex; align-items: center; gap: 6px; }
 .cs-args[hidden] { display: none; }
 .cs-args input { width: 130px; font: inherit; font-family: var(--f-code); font-size: 13px; padding: 5px 8px; border: 1px solid var(--linea-fuerte); border-radius: var(--radio); background: var(--panel); color: var(--texto); }
+
+/* ampliar código: el enunciado se oculta y el editor ocupa casi toda la pantalla */
+.lab-amplio .lab-enun { display: none; }
+.lab-amplio .lab-cuerpo { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.lab-amplio .hz-cs { grid-template-rows: auto minmax(300px, 3fr) minmax(90px, 1fr) auto; }
+@media (max-width: 899px) {
+  .hz-cs { grid-template-rows: auto minmax(55vh, auto) minmax(140px, auto) auto; }
+  .lab-amplio .hz-cs { grid-template-rows: auto minmax(70vh, auto) minmax(140px, auto) auto; }
+}

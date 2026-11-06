@@ -1194,6 +1194,7 @@ function abrirLab(id) {
       <div class="fila-botones">
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos - 1] || {}).id || '')}" ${pos > 0 ? '' : 'disabled'} aria-label="Ejercicio anterior">‹</button>
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos + 1] || {}).id || '')}" ${pos < lista.length - 1 ? '' : 'disabled'} aria-label="Ejercicio siguiente">›</button>
+        <button type="button" class="boton mini" data-acc="lab-amplio" aria-pressed="false">Ampliar código</button>
         ${e.lenguaje === 'csharp' ? '<button type="button" class="boton mini" data-acc="chuleta">Chuleta</button>' : ''}
         <button type="button" class="boton mini" data-acc="pomodoro" data-v="${esc(e.modulo)}">Concentrarme</button>
         <label class="casilla"><input type="checkbox" data-acc="lab-hecho" data-id="${esc(id)}" ${g.hecho ? 'checked' : ''}> Hecho</label>
@@ -1205,6 +1206,7 @@ function abrirLab(id) {
     </div>`;
   document.body.classList.add('con-lab');
   capa.hidden = false;
+  ampliarLab(LS.get('doodle-lab-amplio') === true);
   const caja = capa.querySelector('#lab-trabajo');
   S.labEd = null;
   const h = e.lenguaje === 'csharp' ? montarCsharp(caja, g, (d) => cambiar('ej', id, { codigo: d.codigo }), (window.PRUEBAS_CS || {})[id], () => {
@@ -1233,6 +1235,13 @@ function usarComoBase(btn) {
   if (!cod || !ed || !ed.poner) return;
   if (!btn.dataset.seguro && ed.get().trim() && ed.get() !== PLANTILLA) { btn.dataset.seguro = '1'; btn.textContent = 'Pulsa otra vez: sustituye tu código'; return; }
   ed.poner(cod.codigo); delete btn.dataset.seguro; btn.textContent = 'Copiado al editor';
+}
+// Ampliar: oculta el enunciado y deja casi toda la pantalla para el código (se recuerda en este dispositivo)
+function ampliarLab(si) {
+  const capa = document.getElementById('lab'); if (!capa) return;
+  capa.classList.toggle('lab-amplio', si); LS.set('doodle-lab-amplio', si);
+  const b = capa.querySelector('[data-acc=lab-amplio]'); if (b) { b.setAttribute('aria-pressed', String(si)); b.textContent = si ? 'Ver enunciado' : 'Ampliar código'; }
+  window.dispatchEvent(new Event('resize')); // CodeMirror recalcula su tamaño
 }
 function cerrarLab() {
   const capa = document.getElementById('lab'); if (!capa || capa.hidden) return;
@@ -1474,6 +1483,7 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'sync') sincronizarAules();
   else if (acc === 'buscar') abrirBuscador();
   else if (acc === 'practicar-sql') { const w = trabajos().find((x) => x.tipo === 'practica'); location.hash = 'trabajo-' + (w ? w.id : crearTrabajo({ titulo: 'Práctica de SQL', modulo: 'Bases de Datos', tipo: 'practica' })); }
+  else if (acc === 'lab-amplio') ampliarLab(!document.getElementById('lab').classList.contains('lab-amplio'));
   else if (acc === 'chuleta') abrirChuleta();
   else if (acc === 'ej-base') usarComoBase(el);
   else if (acc === 'releer-temas') actualizarTemas(true);
