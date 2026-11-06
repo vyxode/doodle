@@ -1044,6 +1044,7 @@ function vistaEjercicios() {
       <label class="campo campo-ancho"><span>Enunciado</span><textarea id="e-texto" required></textarea></label>
       <div class="campo campo-boton"><button class="boton principal">Añadir ejercicio</button></div>
     </form></details>` : ''}
+  ${m === 'Programación' && window.CHULETA ? `<section class="bloque"><div class="panel practica-cta"><div><b>Chuleta de C#</b><p class="suave">Todo lo de los temas 1 a 5 con ejemplos y buscador. También está en cada ejercicio de C#.</p></div><button type="button" class="boton" data-acc="chuleta">Abrir</button></div></section>` : ''}
   ${(window.REPASO || {})[m] ? `<section class="bloque"><div class="panel practica-cta"><div><b>Repaso para el examen</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}`;
@@ -1156,6 +1157,7 @@ function abrirLab(id) {
       <div class="fila-botones">
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos - 1] || {}).id || '')}" ${pos > 0 ? '' : 'disabled'} aria-label="Ejercicio anterior">‹</button>
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos + 1] || {}).id || '')}" ${pos < lista.length - 1 ? '' : 'disabled'} aria-label="Ejercicio siguiente">›</button>
+        ${e.lenguaje === 'csharp' ? '<button type="button" class="boton mini" data-acc="chuleta">Chuleta</button>' : ''}
         <button type="button" class="boton mini" data-acc="pomodoro" data-v="${esc(e.modulo)}">Concentrarme</button>
         <label class="casilla"><input type="checkbox" data-acc="lab-hecho" data-id="${esc(id)}" ${g.hecho ? 'checked' : ''}> Hecho</label>
       </div>
@@ -1307,6 +1309,34 @@ async function verCopias(caja) {
   } catch (e) { caja.innerHTML = `<p class="error-txt">${esc(e.message)}</p>`; }
 }
 
+// ---------- chuleta de Programación (js/chuleta.js), en un panel que se abre encima de todo ----------
+const conCodigo = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+function fichasChuleta(q) {
+  const k = sinAcentos(q || '').split(/\s+/).filter(Boolean);
+  return (window.CHULETA || []).map((tm) => ({ tema: tm.tema, fichas: tm.fichas.filter((f) => { const t = sinAcentos([tm.tema, f.t, f.d, f.c].join(' ')); return k.every((p) => t.includes(p)); }) })).filter((tm) => tm.fichas.length);
+}
+function abrirChuleta(q = '') {
+  let capa = document.getElementById('chuleta');
+  if (!capa) {
+    capa = document.createElement('div'); capa.id = 'chuleta'; capa.className = 'chuleta'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-label', 'Chuleta de Programación');
+    capa.innerHTML = `<div class="chuleta-caja"><header class="chuleta-cab"><b>Chuleta de C#</b><button type="button" class="boton mini" data-acc="cerrar-chuleta">Cerrar</button></header>
+      <input type="search" id="chuleta-q" placeholder="Busca: substring, switch, ref, burbuja…" autocomplete="off" aria-label="Buscar en la chuleta">
+      <div class="chuleta-lista" id="chuleta-lista"></div></div>`;
+    document.body.append(capa);
+    capa.querySelector('#chuleta-q').addEventListener('input', (ev) => pintarChuleta(ev.target.value));
+    capa.addEventListener('click', (ev) => { if (ev.target === capa) cerrarChuleta(); });
+  }
+  capa.hidden = false;
+  const inp = capa.querySelector('#chuleta-q'); inp.value = q; pintarChuleta(q); inp.focus();
+}
+function pintarChuleta(q) {
+  const temas = fichasChuleta(q), abierta = !!q.trim();
+  document.getElementById('chuleta-lista').innerHTML = temas.length ? temas.map((tm) => `<section><h3>${esc(tm.tema)}</h3>
+    ${tm.fichas.map((f) => `<details class="ficha" ${abierta ? 'open' : ''}><summary>${esc(f.t)}</summary><p>${conCodigo(f.d)}</p>${f.c ? `<pre>${esc(f.c)}</pre>` : ''}</details>`).join('')}</section>`).join('')
+    : '<p class="suave">Nada coincide. Prueba con otra palabra.</p>';
+}
+function cerrarChuleta() { const c = document.getElementById('chuleta'); if (!c || c.hidden) return false; c.hidden = true; return true; }
+
 // ---------- búsqueda (Ctrl+K) ----------
 function resultados(q) {
   const k = sinAcentos(q).split(/\s+/).filter(Boolean), out = [];
@@ -1316,6 +1346,7 @@ function resultados(q) {
   for (const t of tareas()) if (vale(t.nombre, t.modulo, t.privada)) out.push({ tipo: 'Tarea', nombre: t.nombre, extra: t.modulo + (t.entrega ? ', ' + cuando(t.entrega).toLowerCase() : ''), ir: '#tarea-' + t.clave });
   for (const w of trabajos()) if (vale(w.titulo, w.modulo, HERR[w.tipo])) out.push({ tipo: 'Trabajo', nombre: w.titulo, extra: HERR[w.tipo] + ', ' + (w.modulo || ''), ir: '#trabajo-' + w.id });
   for (const e of catalogo()) if (vale(e.n, e.texto, e.tema)) out.push({ tipo: 'Ejercicio', nombre: (e.n ? e.n + ' ' : '') + e.texto.slice(0, 90), extra: e.tema, lab: e.id });
+  out.push(...fichasChuleta(q).flatMap((tm) => tm.fichas.map((f) => ({ tipo: 'Chuleta', nombre: f.t, extra: tm.tema, chuleta: true }))).slice(0, 5));
   for (const c of cursos()) for (const sec of c.secciones) for (const el of sec.elementos) if (el.url && vale(el.nombre, sec.nombre, archivosDe(el).map((f) => f.nombre).join(' '))) out.push({ tipo: 'Apuntes', nombre: el.nombre, extra: nombreModulo(c.nombre) + ', ' + (sec.nombre || ''), url: el.url });
   return out.slice(0, 40);
 }
@@ -1332,7 +1363,7 @@ function abrirBuscador() {
     ul.innerHTML = items.length ? items.map((it, i) => `<li role="option" aria-selected="${i === sel}" data-i="${i}"><span class="b-tipo">${esc(it.tipo)}</span><span class="b-texto">${esc(it.nombre)}${it.extra ? `<small>${esc(it.extra)}</small>` : ''}</span></li>`).join('') : '<li class="suave b-nada">Nada coincide.</li>';
     const act = ul.querySelector('[aria-selected="true"]'); if (act) act.scrollIntoView({ block: 'nearest' });
   };
-  const abrir = (it) => { cerrarBuscador(); if (!it) return; if (it.url) window.open(it.url, '_blank', 'noopener'); else if (it.lab) abrirLab(it.lab); else location.hash = it.ir; };
+  const abrir = (it) => { cerrarBuscador(); if (!it) return; if (it.url) window.open(it.url, '_blank', 'noopener'); else if (it.chuleta) abrirChuleta(it.nombre); else if (it.lab) abrirLab(it.lab); else location.hash = it.ir; };
   q.addEventListener('input', () => { sel = 0; pintar(); });
   q.addEventListener('keydown', (ev) => {
     if (ev.key === 'ArrowDown') { ev.preventDefault(); sel = Math.min(items.length - 1, sel + 1); pintar(); }
@@ -1373,7 +1404,7 @@ document.addEventListener('keydown', (ev) => {
 });
 
 // ---------- acciones (delegadas) ----------
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !cerrarVisor()) cerrarLab(); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !cerrarChuleta() && !cerrarVisor()) cerrarLab(); });
 document.addEventListener('click', async (ev) => {
   const el = ev.target.closest('[data-acc]'); if (!el || el.tagName === 'INPUT') return;
   const acc = el.dataset.acc, ej = el.closest('.ej');
@@ -1383,6 +1414,8 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'sync') sincronizarAules();
   else if (acc === 'buscar') abrirBuscador();
   else if (acc === 'practicar-sql') { const w = trabajos().find((x) => x.tipo === 'practica'); location.hash = 'trabajo-' + (w ? w.id : crearTrabajo({ titulo: 'Práctica de SQL', modulo: 'Bases de Datos', tipo: 'practica' })); }
+  else if (acc === 'chuleta') abrirChuleta();
+  else if (acc === 'cerrar-chuleta') cerrarChuleta();
   else if (acc === 'repasar') empezarRepaso(el.dataset.v);
   else if (acc === 'rep-resp') responderRepaso(+el.dataset.v);
   else if (acc === 'rep-sig') siguienteRepaso();
