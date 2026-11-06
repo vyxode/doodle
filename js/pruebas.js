@@ -144,7 +144,8 @@ window.PRUEBAS_CS = {
   'prog-4.1.3.6': [{ e: [...T10, 'eva', 'fin'], tras: 11, nopal: ['no'] }, { e: [...T10, 'paco', 'fin'], tras: 11, pal: ['no'] }],
   'prog-4.1.3.7': [{ e: ['ana', 'luis', 'eva', ''], t: ['ana', 'luis', 'eva'], orden: true }],
   'prog-4.1.4.1': [{ e: ['15'], n: [1], nopal: ['no'] }, { e: ['99'], pal: ['no'] }, { e: ['0'], pal: ['no'] }],
-  'prog-4.1.4.2': [{ e: ['7'], t: ['10 15 12 7'] }],
+  // vale añadirlo tras los datos originales o al final del ejemplo completo: una línea del array que acabe en 7
+  'prog-4.1.4.2': [{ e: ['7'], re: ['(^|\\n)[^\\n]*\\d \\b7 *($|\\n)'] }],
   // la posición puede contarse desde 1 o desde 0: valen las dos
   'prog-4.1.4.3': [{ e: ['30', '2'], t: [['10 30 15 12', '10 15 30 12']] }],
   'prog-4.1.4.4': [{ e: ['2'], re: ['(^|\\n)\\s*10 1[25]\\s*($|\\n)'] }],
