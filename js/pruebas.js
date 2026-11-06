@@ -147,8 +147,9 @@ window.PRUEBAS_CS = {
   // vale añadirlo tras los datos originales o al final del ejemplo completo: una línea del array que acabe en 7
   'prog-4.1.4.2': [{ e: ['7'], re: ['(^|\\n)[^\\n]*\\d \\b7 *($|\\n)'] }],
   // la posición puede contarse desde 1 o desde 0: valen las dos
-  'prog-4.1.4.3': [{ e: ['30', '2'], t: [['10 30 15 12', '10 15 30 12']] }],
-  'prog-4.1.4.4': [{ e: ['2'], re: ['(^|\\n)\\s*10 1[25]\\s*($|\\n)'] }],
+  // sobre los datos originales (10 15 12) o sobre el array como queda tras el resto del ejemplo (10 12 6)
+  'prog-4.1.4.3': [{ e: ['30', '2'], t: [['10 30 15 12', '10 15 30 12', '10 30 12 6', '10 12 30 6']] }],
+  'prog-4.1.4.4': [{ e: ['2'], re: ['(^|\\n)\\s*(10 1[25]|10 30 6|10 12 6)\\s*($|\\n)'] }],
   'prog-4.2.2': [{ e: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b4'], nopal: ['no'] }, { e: ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'c1'], pal: ['no'] }],
   'prog-4.2.3': [{ e: ['2', '3', '5', '9', '1', '7', '4'], n: [9, 7], orden: true }],
   'prog-4.3.1.1': [{ e: ['Queen', 'Bohemian Rhapsody', '354', '5400'], t: ['Queen', 'Bohemian Rhapsody'], n: [354, 5400] }],
