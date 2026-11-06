@@ -80,14 +80,17 @@ function lex(src) {
     }
     if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] || ''))) {
       let s = '', isReal = false, ty;
-      if (c === '0' && (src[i + 1] === 'x' || src[i + 1] === 'X')) {
-        i += 2; while (/[0-9a-fA-F]/.test(src[i] || '')) s += src[i++];
-        let v = parseInt(s, 16); ty = v > 2147483647 ? 'long' : 'int';
+      if (c === '0' && /[xXbB]/.test(src[i + 1] || '')) { // 0x1F, 0b1010 (C# 7) y separadores 1_000
+        const hex = /[xX]/.test(src[i + 1]); i += 2; while ((hex ? /[0-9a-fA-F_]/ : /[01_]/).test(src[i] || '')) s += src[i++];
+        s = s.replace(/_/g, ''); if (!s) err('Número mal escrito');
+        let v = parseInt(s, hex ? 16 : 2); ty = v > 2147483647 ? 'long' : 'int';
         if (/[lL]/.test(src[i] || '')) { i++; ty = 'long'; }
         toks.push({ t: 'num', v, ty, line }); continue;
       }
-      while (/[0-9]/.test(src[i] || '')) s += src[i++];
-      if (src[i] === '.' && /[0-9]/.test(src[i + 1] || '')) { isReal = true; s += src[i++]; while (/[0-9]/.test(src[i] || '')) s += src[i++]; }
+      while (/[0-9_]/.test(src[i] || '')) s += src[i++];
+      if (src[i] === '.' && /[0-9]/.test(src[i + 1] || '')) { isReal = true; s += src[i++]; while (/[0-9_]/.test(src[i] || '')) s += src[i++]; }
+      if (s.endsWith('_')) err('Número mal escrito: el separador _ no puede ir al final');
+      s = s.replace(/_/g, '');
       if ((src[i] === 'e' || src[i] === 'E') && /[0-9+\-]/.test(src[i + 1] || '')) {
         isReal = true; s += src[i++]; if (src[i] === '+' || src[i] === '-') s += src[i++];
         while (/[0-9]/.test(src[i] || '')) s += src[i++];
@@ -128,7 +131,11 @@ const SIMPLIFY = { decimal: 'double', sbyte: 'short', ushort: 'int', uint: 'long
 const GENERIC_NAMES = new Set(['List', 'Dictionary', 'Queue', 'Stack', 'HashSet', 'ArrayList', 'SortedList']);
 
 class Parser {
-  constructor(toks) { this.toks = toks; this.p = 0; }
+  constructor(toks) {
+    this.toks = toks; this.p = 0;
+    // nombres de enum, para reconocer (diasSemana) 3 como conversión
+    this.enumNames = new Set(toks.filter((t, i) => t.t === 'id' && toks[i - 1] && toks[i - 1].t === 'kw' && toks[i - 1].v === 'enum').map((t) => t.v));
+  }
   get tok() { return this.toks[this.p]; }
   peek(k = 1) { return this.toks[Math.min(this.p + k, this.toks.length - 1)]; }
   is(v, k = 0) { const t = this.peek(k); return (t.t === 'op' || t.t === 'kw') && t.v === v; }
@@ -185,7 +192,7 @@ class Parser {
 
   // --- unidad ---
   parseUnit() {
-    const unit = { classes: [], structs: [] };
+    const unit = { classes: [], structs: [], enums: [] };
     while (this.tok.t !== 'eof') {
       if (this.accept('using')) { while (!this.is(';') && this.tok.t !== 'eof') this.p++; this.expect(';'); continue; }
       if (this.accept('namespace')) {
@@ -217,7 +224,8 @@ class Parser {
     const t = this.tok;
     if (this.accept('class')) return this.parseClass(unit, outer, mods, t.line);
     if (this.accept('struct')) return this.parseStruct(unit, outer, t.line);
-    if (this.is('enum') || this.is('interface')) throw new CompileError("'" + t.v + "' se ve más adelante; este simulador no lo admite.", t.line, 'SIM');
+    if (this.accept('enum')) return this.parseEnum(unit, outer, t.line);
+    if (this.is('interface')) throw new CompileError("'" + t.v + "' se ve más adelante; este simulador no lo admite.", t.line, 'SIM');
     throw new CompileError("Se esperaba 'class' y aparece '" + t.v + "'", t.line, 'CS1518');
   }
   parseClass(unit, outer, mods, line) {
@@ -257,6 +265,21 @@ class Parser {
     this.accept(';');
     return cls;
   }
+  parseEnum(unit, outer, line) {
+    const name = this.ident();
+    if (this.accept(':')) this.type();
+    const en = { name, line, members: [], outer: outer ? outer.name : null };
+    unit.enums.push(en);
+    this.expect('{');
+    while (!this.is('}')) {
+      const ml = this.tok.line, mn = this.ident();
+      en.members.push({ name: mn, init: this.accept('=') ? this.expr() : null, line: ml });
+      if (!this.accept(',')) break;
+    }
+    this.expect('}');
+    this.accept(';');
+    return en;
+  }
   parseStruct(unit, outer, line) {
     const name = this.ident();
     const st = { name, line, fields: [], outer: outer ? outer.name : null };
@@ -293,8 +316,10 @@ class Parser {
         if (this.is('ref') || this.is('out')) mod = this.next().v;
         if (this.is('params')) throw new CompileError("'params' no está soportado en este simulador", this.tok.line, 'SIM');
         const ty = this.type(); const pn = this.ident();
-        if (this.is('=')) throw new CompileError('Los parámetros opcionales no están soportados en este simulador', this.tok.line, 'SIM');
-        params.push({ name: pn, ty, mod });
+        let def = null;
+        if (this.accept('=')) { if (mod) throw new CompileError('Un parámetro ref u out no puede tener valor por defecto', this.tok.line, 'CS1741'); def = this.expr(); }
+        else if (params.some((q) => q.def)) throw new CompileError("Los parámetros con valor por defecto tienen que ir al final (falta valor en '" + pn + "')", this.tok.line, 'CS1737');
+        params.push({ name: pn, ty, mod, def });
       } while (this.accept(','));
     }
     this.expect(')');
@@ -365,12 +390,20 @@ class Parser {
           for (const v of d.vars) if (!v.init) throw new CompileError('Una constante necesita un valor', line, 'CS0145');
           return d;
         }
-        case 'goto': throw new CompileError("'goto' no está soportado en este simulador", line, 'SIM');
+        case 'goto': {
+          this.p++;
+          let g;
+          if (this.accept('case')) g = { k: 'goto', caso: this.expr(), line };
+          else if (this.accept('default')) g = { k: 'goto', def: true, line };
+          else g = { k: 'goto', label: this.ident(), line };
+          this.expect(';'); return g;
+        }
         case 'else': throw new CompileError("'else' sin un 'if' delante (revisa las llaves y los ';' tras el if)", line, 'CS1525');
         case 'case': case 'default':
           if (!(t.v === 'default' && this.is('(', 1))) throw new CompileError("'" + t.v + "' fuera de un switch", line, 'CS1525');
       }
     }
+    if (t.t === 'id' && this.is(':', 1)) { this.p += 2; return { k: 'label', name: t.v, s: this.is('}') ? { k: 'empty', line } : this.statement(), line }; }
     if (this.looksLikeDecl()) { const d = this.localDecl(); this.expect(';'); return d; }
     const e = this.expr();
     this.expect(';');
@@ -477,7 +510,7 @@ class Parser {
         const nt = this.peek();
         let isCast = false;
         if (nt.t === 'kw' && PRIM_KW.has(nt.v) && nt.v !== 'void') isCast = true;
-        else if (nt.t === 'id' && TYPE_ALIAS[nt.v] && this.is(')', 2)) isCast = true;
+        else if (nt.t === 'id' && (TYPE_ALIAS[nt.v] || this.enumNames.has(nt.v)) && this.is(')', 2)) isCast = true;
         if (isCast) {
           const save = this.p; this.p++;
           const ty = this.tryType();
@@ -507,15 +540,23 @@ class Parser {
     const a = [];
     if (!this.is(close)) {
       do {
-        if (this.is('ref') || this.is('out')) {
-          const mt = this.next();
-          if (this.looksLikeDecl()) throw new CompileError('Declarar la variable dentro de out (out int x) es de C# 7; declárala antes.', mt.line, 'CS8026');
-          a.push({ k: 'refarg', mod: mt.v, e: this.expr(), line: mt.line });
-        } else a.push(this.expr());
+        if (this.tok.t === 'id' && this.is(':', 1)) { const nt = this.next(); this.p++; a.push({ k: 'named', name: nt.v, e: this.argOne(), line: nt.line }); continue; }
+        a.push(this.argOne());
       } while (this.accept(','));
     }
     this.expect(close);
     return a;
+  }
+  argOne() {
+    if (!(this.is('ref') || this.is('out'))) return this.expr();
+    const mt = this.next();
+    const save = this.p, ty = mt.v === 'out' && this.tryType();
+    if (ty && this.tok.t === 'id' && (this.is(',', 1) || this.is(')', 1))) { // out int x (C# 7)
+      const nt = this.next();
+      return { k: 'refarg', mod: mt.v, e: { k: 'name', name: nt.v, line: nt.line }, decl: { ty, name: nt.v }, line: mt.line };
+    }
+    this.p = save;
+    return { k: 'refarg', mod: mt.v, e: this.expr(), line: mt.line };
   }
   primary() {
     const t = this.tok;
@@ -635,7 +676,9 @@ function canImplicit(P, f, t, cv) {
   }
   return false;
 }
-function canExplicit(P, f, t) { return canImplicit(P, f, t) || (isNumC(f) && isNumC(t)); }
+const isEnumT = (t) => !!(CURRENT_P && CURRENT_P.enums && CURRENT_P.enums.has(t));
+const numOEnum = (t) => isNumC(t) || isEnumT(t);
+function canExplicit(P, f, t) { return canImplicit(P, f, t) || (numOEnum(f) && numOEnum(t)); }
 function promote(a, b) {
   const ra = a === 'char' ? 3 : NUMRANK[a], rb = b === 'char' ? 3 : NUMRANK[b];
   return RANKNAME[Math.max(ra, rb, 3)];
@@ -645,6 +688,7 @@ function promote(a, b) {
 class CsExc extends Error { constructor(type, msg, line) { super(msg); this.type = type; this.line = line; } }
 class NeedInput extends Error {}
 class Halt extends Error { constructor(msg, line) { super(msg); this.line = line; } }
+class Salida extends Error { constructor(code) { super('exit'); this.code = code; } }
 const MSG = {
   idx: 'Índice fuera de los límites de la matriz.',
   fmt: 'La cadena de entrada no tiene el formato correcto.',
@@ -805,6 +849,7 @@ function toIntChecked(v, from, ty, line) {
   return v === 0 ? 0 : v;
 }
 function castVal(v, from, to) {
+  if (isEnumT(to)) to = 'int'; if (isEnumT(from)) from = 'int';
   if (from === to) return v;
   switch (to) {
     case 'int': return (from === 'double' || from === 'float') ? (isFinite(v) ? Math.trunc(v) | 0 : -2147483648) : v | 0;
@@ -824,8 +869,13 @@ const coerce = (v, from, to) => (to === 'float' && from !== 'float' && typeof v 
 // ======================================================================
 function compile(src) {
   const unit = parse(src);
-  const P = { structs: new Map(), classes: new Map(), statics: [], nextId: 1, usesLinq: /using\s+System\.Linq\s*;/.test(src), main: null };
+  const P = { structs: new Map(), classes: new Map(), enums: new Map(), statics: [], nextId: 1, usesLinq: /using\s+System\.Linq\s*;/.test(src), main: null };
   const E = (msg, line, code) => new CompileError(msg, line, code);
+  CURRENT_P = P;
+  for (const en of unit.enums) {
+    if (P.enums.has(en.name)) throw E("Ya existe un tipo llamado '" + en.name + "'", en.line, 'CS0101');
+    P.enums.set(en.name, { name: en.name, decl: en, members: new Map(), outer: en.outer });
+  }
 
   for (const st of unit.structs) {
     if (P.structs.has(st.name)) throw E("Ya existe un tipo llamado '" + st.name + "'", st.line, 'CS0101');
@@ -834,12 +884,12 @@ function compile(src) {
   }
   for (const c of unit.classes) {
     if (P.classes.has(c.name)) throw E("Ya existe una clase llamada '" + c.name + "'", c.line, 'CS0101');
-    if (P.structs.has(c.name)) throw E("Ya existe un tipo llamado '" + c.name + "'", c.line, 'CS0101');
+    if (P.structs.has(c.name) || P.enums.has(c.name)) throw E("Ya existe un tipo llamado '" + c.name + "'", c.line, 'CS0101');
     P.classes.set(c.name, { name: c.name, decl: c, fields: new Map(), methods: new Map() });
   }
   const typeExists = (t, line) => {
     const b = baseOf(t);
-    if (['int', 'long', 'short', 'byte', 'float', 'double', 'char', 'bool', 'string', 'StringBuilder', 'Random'].includes(b) || P.structs.has(b)) return;
+    if (['int', 'long', 'short', 'byte', 'float', 'double', 'char', 'bool', 'string', 'StringBuilder', 'Random'].includes(b) || P.structs.has(b) || P.enums.has(b)) return;
     if (b === 'object') throw E("El tipo 'object' no está soportado en este simulador", line, 'SIM');
     if (b === 'var') throw E("'var' solo se puede usar en variables locales con valor inicial", line, 'CS0825');
     if (b === 'void') throw E("'void' solo se puede usar como tipo de retorno de un método", line, 'CS1547');
@@ -890,6 +940,27 @@ function compile(src) {
   if (!P.main) throw E('El programa no tiene un método static void Main()', 1, 'CS5001');
 
   const ck = new Checker(P);
+  // valores de los enum: el primero vale 0 y cada uno uno más que el anterior, salvo que se indique
+  for (const en of P.enums.values()) {
+    let next = 0;
+    for (const m of en.decl.members) {
+      if (en.members.has(m.name)) throw E("El enum '" + en.name + "' ya tiene un valor '" + m.name + "'", m.line, 'CS0102');
+      if (m.init) {
+        ck.begin(null, null);
+        const t = ck.val(m.init);
+        if (m.init.cv === undefined || !isIntegral(t)) throw E("El valor de '" + m.name + "' tiene que ser un número entero fijo", m.line, 'CS0266');
+        next = m.init.cv;
+      }
+      en.members.set(m.name, next++);
+    }
+  }
+  // valores por defecto de los parámetros: tienen que ser constantes
+  for (const c of P.classes.values()) for (const list of c.methods.values()) for (const m of list) for (const p of m.params) if (p.def) {
+    ck.begin(c.name, null);
+    const t = ck.val(p.def);
+    if (p.def.cv === undefined && !(t === 'null' && isRefTy(P, p.ty))) throw E("El valor por defecto de '" + p.name + "' tiene que ser una constante", m.line, 'CS1736');
+    ck.assignable(t, p.ty, p.def, m.line);
+  }
   // constantes y campos static (en orden)
   for (const c of P.classes.values()) {
     for (const d of c.fields.values()) {
@@ -913,9 +984,11 @@ function compile(src) {
 class Checker {
   constructor(P) { this.P = P; }
   E(msg, line, code) { return new CompileError(msg, line, code); }
-  begin(cls, m) { this.cls = cls; this.m = m; this.scopes = [{ vars: new Map(), inner: new Set() }]; this.loops = 0; this.switches = 0; this.catches = 0; }
+  begin(cls, m) { this.cls = cls; this.m = m; this.scopes = [{ vars: new Map(), inner: new Set() }]; this.loops = 0; this.switches = 0; this.catches = 0; this.swTy = []; this.labels = new Set(); }
   method(c, m) {
     this.begin(c.name, m);
+    const etiquetas = (x) => { if (!x || typeof x !== 'object') return; if (x.k === 'label') this.labels.add(x.name); for (const v of Object.values(x)) if (Array.isArray(v)) v.forEach(etiquetas); else if (v && typeof v === 'object' && v.k) etiquetas(v); };
+    etiquetas(m.body); for (const x of m.body.body) if (x.k === 'switch') x.sections.forEach((sec) => sec.body.forEach(etiquetas));
     for (const p of m.params) this.declare({ id: p.id, name: p.name, ty: p.ty, kind: 'param', mod: p.mod }, m.line);
     this.block(m.body, false);
     CURRENT_P = this.P;
@@ -1010,6 +1083,17 @@ class Checker {
         if (!s.e) { if (!this.catches) throw this.E("'throw;' solo puede usarse dentro de un catch", s.line, 'CS0156'); return; }
         if (this.val(s.e) !== 'exc') throw this.E('Solo se pueden lanzar excepciones (throw new Exception("..."))', s.line, 'CS0155');
         return;
+      case 'label': return this.stmt(s.s);
+      case 'goto':
+        if (s.label) { if (!this.labels.has(s.label)) throw this.E("No existe la etiqueta '" + s.label + "' en este método", s.line, 'CS0159'); return; }
+        if (!this.swTy.length) throw this.E("'goto " + (s.def ? 'default' : 'case') + "' solo puede usarse dentro de un switch", s.line, 'CS0153');
+        if (s.caso) {
+          const t = this.val(s.caso), gt = this.swTy[this.swTy.length - 1];
+          if (s.caso.cv === undefined) throw this.E('Después de goto case tiene que ir un valor constante', s.line, 'CS0150');
+          if (!canImplicit(this.P, t, gt, s.caso.cv)) throw this.E("El valor de goto case es de tipo '" + tyName(t) + "' y el switch de tipo '" + tyName(gt) + "'", s.line, 'CS0029');
+          s.v = s.caso.cv;
+        }
+        return;
       case 'try':
         this.block(s.body);
         for (const c of s.catches) {
@@ -1027,7 +1111,7 @@ class Checker {
   sub(s) { if (s.k === 'block') this.block(s); else { this.push(); this.stmt(s); this.pop(); } }
   typeOk(t, line) {
     const b = baseOf(t);
-    if (['int', 'long', 'short', 'byte', 'float', 'double', 'char', 'bool', 'string', 'StringBuilder', 'Random'].includes(b) || this.P.structs.has(b)) return;
+    if (['int', 'long', 'short', 'byte', 'float', 'double', 'char', 'bool', 'string', 'StringBuilder', 'Random'].includes(b) || this.P.structs.has(b) || this.P.enums.has(b)) return;
     if (b === 'object') throw this.E("El tipo 'object' no está soportado en este simulador", line, 'SIM');
     if (this.P.classes.has(b)) throw this.E("Este simulador no admite variables de tipo clase ('" + b + "'); usa un struct", line, 'SIM');
     throw this.E("No se encuentra el tipo '" + b + "' (¿está bien escrito? C# distingue mayúsculas y minúsculas)", line, 'CS0246');
@@ -1076,11 +1160,11 @@ class Checker {
   }
   switchStmt(s) {
     const gt = this.val(s.e);
-    if (!['int', 'long', 'short', 'byte', 'char', 'string', 'bool'].includes(gt))
+    if (!['int', 'long', 'short', 'byte', 'char', 'string', 'bool'].includes(gt) && !isEnumT(gt))
       throw this.E("No se puede usar switch con un valor de tipo '" + tyName(gt) + "'", s.e.line, 'CS0151');
     s.gt = gt;
     const seen = new Set();
-    this.switches++; this.push();
+    this.switches++; this.push(); this.swTy.push(gt);
     for (const sec of s.sections) {
       for (const lb of sec.labels) {
         if (lb.def) { if (seen.has('default')) throw this.E("Hay dos 'default:' en el switch", lb.line, 'CS0152'); seen.add('default'); continue; }
@@ -1098,7 +1182,7 @@ class Checker {
         throw this.E("Falta un 'break' al final de " + (lb.def ? "'default:'" : "'case " + fmtCase(lb.v, gt) + ":'") + ' (en C# cada case tiene que terminar en break)', sec.body.length ? lastLine({ k: 'block', body: sec.body }) : lb.line, 'CS0163');
       }
     }
-    this.pop(); this.switches--;
+    this.pop(); this.switches--; this.swTy.pop();
   }
   // ---- expresiones ----
   val(e) {
@@ -1170,7 +1254,7 @@ class Checker {
           throw this.E("No se puede convertir el tipo '" + tyName(f) + "' en '" + tyName(e.ty) + "'" + hint, e.line, 'CS0030');
         }
         e.from = f;
-        if (e.e.cv !== undefined && isNumC(f)) e.cv = castVal(e.e.cv, f, e.ty);
+        if (e.e.cv !== undefined && numOEnum(f)) e.cv = castVal(e.e.cv, f, e.ty);
         else if (e.e.cv !== undefined && f === e.ty) e.cv = e.e.cv;
         return e.ty;
       }
@@ -1186,7 +1270,7 @@ class Checker {
       case 'inc': {
         const t = this.val(e.e);
         this.lvalue(e.e, e.op);
-        if (!isNumC(t)) throw this.E("El operador '" + e.op + "' solo se aplica a números o char, no a '" + tyName(t) + "'", e.line, 'CS0023');
+        if (!numOEnum(t)) throw this.E("El operador '" + e.op + "' solo se aplica a números o char, no a '" + tyName(t) + "'", e.line, 'CS0023');
         return t;
       }
       case 'bin': return this.bin(e);
@@ -1234,7 +1318,7 @@ class Checker {
     }
     if (e.name === 'System') { e.tname = 'System'; return 'type:System'; }
     const alias = { String: 'string', Int32: 'int', Int64: 'long', Int16: 'short', Double: 'double', Single: 'float', Char: 'char', Boolean: 'bool', Byte: 'byte' }[e.name] || e.name;
-    if (STATIC_TYPES.has(alias) || P.classes.has(alias) || P.structs.has(alias) || alias === 'StringBuilder' || alias === 'Random' || EXC_TYPES.has(alias)) { e.tname = alias; return 'type:' + alias; }
+    if (STATIC_TYPES.has(alias) || P.classes.has(alias) || P.structs.has(alias) || P.enums.has(alias) || alias === 'StringBuilder' || alias === 'Random' || EXC_TYPES.has(alias)) { e.tname = alias; return 'type:' + alias; }
     if (c && c.methods.has(e.name)) throw this.E("'" + e.name + "' es un método: para llamarlo pon paréntesis, " + e.name + '()', e.line, 'CS0428');
     throw this.E("El nombre '" + e.name + "' no existe en el contexto actual (¿no está declarado, o está mal escrito? Mayúsculas y minúsculas cuentan)", e.line, 'CS0103');
   }
@@ -1249,6 +1333,11 @@ class Checker {
         const al = { String: 'string', Int32: 'int', Int64: 'long', Int16: 'short', Double: 'double', Single: 'float', Char: 'char', Boolean: 'bool', Byte: 'byte' }[n] || n;
         if (STATIC_TYPES.has(al) || al === 'StringBuilder' || al === 'Random' || EXC_TYPES.has(al)) return 'type:' + al;
         throw this.E("No existe '" + T + '.' + n + "'", e.line, 'CS0234');
+      }
+      const en = P.enums.get(T);
+      if (en) {
+        if (!en.members.has(n)) throw this.E("El enum '" + T + "' no tiene ningún valor '" + n + "'", e.line, 'CS0117');
+        e.cv = en.members.get(n); return T;
       }
       const K = { 'Math.PI': ['double', Math.PI], 'Math.E': ['double', Math.E], 'int.MaxValue': ['int', 2147483647], 'int.MinValue': ['int', -2147483648],
         'long.MaxValue': ['long', 9223372036854775807], 'long.MinValue': ['long', -9223372036854775808], 'short.MaxValue': ['short', 32767], 'short.MinValue': ['short', -32768],
@@ -1349,6 +1438,11 @@ class Checker {
       e.concat = true; return 'string';
     }
     if (op === '&&' || op === '||') { if (a !== 'bool' || b !== 'bool') throw bad(' (los dos lados tienen que ser condiciones bool)'); return 'bool'; }
+    if (isEnumT(a) || isEnumT(b)) {
+      if (a === b && ['==', '!=', '<', '>', '<=', '>='].includes(op)) { e.opTy = 'int'; e.cmp = 'num'; return 'bool'; }
+      if ((op === '+' || op === '-') && isEnumT(a) && isIntegral(b)) { e.opTy = 'int'; return a; }
+      throw bad(isEnumT(a) !== isEnumT(b) ? ' (para comparar con un número convierte el enum: (int) valor)' : '');
+    }
     if (op === '==' || op === '!=') {
       if (isNumC(a) && isNumC(b)) { e.opTy = promote(a, b); e.cmp = 'num'; return 'bool'; }
       if (a === 'bool' && b === 'bool') { e.cmp = 'eq'; return 'bool'; }
@@ -1392,6 +1486,15 @@ class Checker {
     return t;
   }
   argVal(a) {
+    if (a.k === 'named') throw this.E("Los argumentos con nombre (" + a.name + ": ...) solo se pueden usar con métodos que hayas escrito tú", a.line, 'SIM');
+    if (a.k === 'refarg' && a.decl) { // out int x
+      if (a.ty) return a.ty;
+      if (a.decl.ty === 'var') throw this.E('Escribe el tipo de la variable: out int x', a.line, 'CS8197');
+      this.typeOk(a.decl.ty, a.line);
+      const d = this.declare({ id: 'v' + (this.P.nextId++), name: a.decl.name, ty: a.decl.ty, kind: 'local', da: true }, a.line);
+      a.e.ref = d; a.e.ty = a.decl.ty; a.ty = a.decl.ty;
+      return a.ty;
+    }
     if (a.k === 'refarg') {
       const t = this.val(a.e);
       this.lvalue(a.e, '=');
@@ -1421,7 +1524,7 @@ class Checker {
     let key;
     if (ot.startsWith('type:')) key = ot.slice(5) + '.' + cal.name;
     else {
-      const k = isArr(ot) ? 'array' : (P.structs.has(ot) ? 'struct' : (isNum(ot) ? 'num' : ot));
+      const k = isArr(ot) ? 'array' : (P.structs.has(ot) ? 'struct' : (isNum(ot) ? 'num' : (isEnumT(ot) ? 'enum' : ot)));
       key = k + '#' + cal.name;
     }
     const b = BUILTINS[key];
@@ -1448,11 +1551,27 @@ class Checker {
   }
   userCall(e, c, name) {
     const list = c.methods.get(name);
-    const ats = e.args.map((a) => this.argVal(a));
-    const cands = list.filter((m) => m.params.length === e.args.length);
-    if (!cands.length) throw this.E("El método '" + name + "' no recibe " + e.args.length + ' argumento' + (e.args.length === 1 ? '' : 's') + ' (recibe ' + list.map((m) => m.params.length).join(' o ') + ')', e.line, 'CS1501');
+    const raw = e.args, pos = [], named = [];
+    for (const a of raw) { if (a.k === 'named') named.push(a); else { if (named.length) throw this.E('Los argumentos sin nombre tienen que ir antes de los que llevan nombre', a.line, 'CS1738'); pos.push(a); } }
+    for (const a of [...pos, ...named.map((n) => n.e)]) if (a.k === 'refarg' && a.decl) this.argVal(a);
+    // coloca cada argumento en su parámetro: primero por posición, luego por nombre y el resto con su valor por defecto
+    const colocar = (m) => {
+      if (pos.length > m.params.length) return null;
+      const out = m.params.map((p, i) => (i < pos.length ? pos[i] : null));
+      for (const n of named) { const i = m.params.findIndex((p) => p.name === n.name); if (i < 0 || out[i]) return null; out[i] = n.e; }
+      for (let i = 0; i < out.length; i++) if (!out[i]) { if (!m.params[i].def) return null; out[i] = m.params[i].def; }
+      return out;
+    };
+    const cands = list.map((m) => [m, colocar(m)]).filter((x) => x[1]);
+    if (!cands.length) {
+      const malNombre = named.find((n) => !list.some((m) => m.params.some((p) => p.name === n.name)));
+      if (malNombre) throw this.E("El método '" + name + "' no tiene ningún parámetro llamado '" + malNombre.name + "'", malNombre.line, 'CS1739');
+      throw this.E("El método '" + name + "' no recibe " + raw.length + ' argumento' + (raw.length === 1 ? '' : 's') + ' (recibe ' + list.map((m) => { const min = m.params.filter((p) => !p.def).length; return min === m.params.length ? m.params.length : min + ' a ' + m.params.length; }).join(' o ') + ')', e.line, 'CS1501');
+    }
     let lastErr = null;
-    for (const m of cands) {
+    for (const [m, args] of cands) {
+      e.args = args;
+      const ats = args.map((a) => this.argVal(a));
       try {
         m.params.forEach((p, i) => {
           const a = e.args[i];
@@ -1469,6 +1588,7 @@ class Checker {
         return m.ret;
       } catch (x) { if (!(x instanceof CompileError)) throw x; lastErr = x; }
     }
+    e.args = raw;
     throw lastErr;
   }
 }
@@ -1487,7 +1607,7 @@ class DefAssign {
     if (!e || S === null) return;
     switch (e.k) {
       case 'name':
-        if (e.ref && e.ref.da && !S.has(e.ref.id))
+        if (!this.lax && e.ref && e.ref.da && !S.has(e.ref.id))
           throw new CompileError("Uso de la variable local no asignada '" + e.name + "': puede que llegue aquí sin valor (dale un valor al declararla o en todos los caminos)", e.line, 'CS0165');
         return;
       case 'assign': {
@@ -1596,6 +1716,9 @@ class DefAssign {
         return after;
       }
       case 'break': { const f = this.jumps[this.jumps.length - 1]; if (f) f.breaks.push(this.copy(S)); return null; }
+      case 'goto': return null;
+      // shortcut: a una etiqueta se puede llegar con goto desde cualquier sitio; a partir de ahí no se comprueba la asignación (lo vigila la ejecución)
+      case 'label': if (S === null) { this.lax = true; S = new Set(); } return this.st(s.s, S);
       case 'continue': { for (let i = this.jumps.length - 1; i >= 0; i--) if (this.jumps[i].isLoop) { this.jumps[i].conts.push(this.copy(S)); break; } return null; }
       case 'return': case 'throw': if (s.e) this.ex(s.e, S); return null;
       case 'try': {
@@ -1612,7 +1735,7 @@ class DefAssign {
     return S;
   }
 }
-let CURRENT_P = null;
+var CURRENT_P = null;
 function isStructName(t) { return !!(CURRENT_P && CURRENT_P.structs.has(t)); }
 
 function fmtCase(v, t) { if (t === 'string') return v === null ? 'null' : '"' + v + '"'; if (t === 'char') return "'" + String.fromCharCode(v) + "'"; return String(v); }
@@ -1630,7 +1753,8 @@ function hasBreak(s) {
 function reach(s) {
   switch (s.k) {
     case 'block': for (const x of s.body) if (!reach(x)) return false; return true;
-    case 'return': case 'throw': case 'break': case 'continue': return false;
+    case 'return': case 'throw': case 'break': case 'continue': case 'goto': return false;
+    case 'label': return true;
     case 'if': return !s.els || reach(s.then) || reach(s.els);
     case 'while': return !constTrue(s.cond) || hasBreak(s.body);
     case 'do': return (!constTrue(s.cond)) || hasBreak(s.body);
@@ -1685,6 +1809,7 @@ function str(v, t) {
   if (t === 'string') return v === null ? '' : v;
   if (t === 'char') return String.fromCharCode(v);
   if (t === 'bool') return v ? 'True' : 'False';
+  if (isEnumT(t)) { for (const [n, x] of CURRENT_P.enums.get(t).members) if (x === v) return n; return String(v); }
   if (t === 'double') return fmtG(v, 15);
   if (t === 'float') return fmtG(v, 7);
   if (isIntegral(t)) return String(v);
@@ -1777,7 +1902,29 @@ def('Math.Round', (a) => (a.length === 1 || (a.length === 2 && imp(null, a[1], '
 }, { usage: 'Math.Round(número) o Math.Round(número, decimales)' });
 
 // --- Convert y Parse ---
-const CONV = { ToInt32: 'int', ToInt16: 'short', ToInt64: 'long', ToByte: 'byte', ToDouble: 'double', ToSingle: 'float', ToDecimal: 'double', ToChar: 'char', ToString: 'string', ToBoolean: 'bool' };
+// shortcut: ToUInt16/32/64 y ToSByte devuelven el tipo con signo más próximo (ver SIMPLIFY), así que no avisan de los negativos
+const CONV = { ToInt32: 'int', ToInt16: 'short', ToInt64: 'long', ToByte: 'byte', ToDouble: 'double', ToSingle: 'float', ToDecimal: 'double', ToChar: 'char', ToString: 'string', ToBoolean: 'bool',
+  ToSByte: 'short', ToUInt16: 'int', ToUInt32: 'long', ToUInt64: 'long' };
+const BITS = { byte: 8, short: 16, int: 32, long: 64 };
+// Convert.ToInt32("1a", 16): en base 2, 8 y 16 los números que no caben con signo dan la vuelta (FFFFFFFF = -1)
+function parseBase(sv, b, ty, line) {
+  if (sv === null) return 0;
+  if (![2, 8, 10, 16].includes(b)) throw new CsExc('ArgumentException', 'Base no válida: solo se admiten 2, 8, 10 y 16.', line);
+  if (b === 10) return parseIntStr(sv, ty, line);
+  let x = sv.trim(); if (b === 16) x = x.replace(/^0[xX]/, '');
+  const ok = { 2: /^[01]+$/, 8: /^[0-7]+$/, 16: /^[0-9a-fA-F]+$/ }[b];
+  if (!ok.test(x)) throw new CsExc('FormatException', 'No se encontraron dígitos válidos para la base ' + b + '.', line);
+  let n = BigInt(b === 16 ? '0x' + x : b === 8 ? '0o' + x : '0b' + x);
+  const bits = BigInt(BITS[ty] || 32);
+  if (n >= (1n << bits)) throw new CsExc('OverflowException', 'El valor es demasiado grande o demasiado pequeño para ' + (NET_NAME[ty] || ty) + '.', line);
+  if (ty !== 'byte' && n >= (1n << (bits - 1n))) n -= (1n << bits);
+  return Number(n);
+}
+function toBase(v, ty, b, line) {
+  if (![2, 8, 10, 16].includes(b)) throw new CsExc('ArgumentException', 'Base no válida: solo se admiten 2, 8, 10 y 16.', line);
+  if (b === 10 || v >= 0) return b === 10 ? String(v) : BigInt(v).toString(b);
+  return BigInt.asUintN(BITS[ty] || 32, BigInt(v)).toString(b);
+}
 function convertVal(v, from, to, line) {
   if (from === 'string') {
     if (v === null) return to === 'string' ? '' : (to === 'bool' ? false : 0);
@@ -1796,8 +1943,14 @@ function convertVal(v, from, to, line) {
   return to === 'float' ? Math.fround(v) : v;
 }
 for (const [n, to] of Object.entries(CONV)) {
-  def('Convert.' + n, (a) => a.length === 1 && (a[0] === 'string' || num(a[0]) || a[0] === 'bool' || a[0] === 'null') ? to : null,
-    function (x, t) { return convertVal(x[0], t[0] === 'null' ? 'string' : t[0], to, this.line); }, { usage: 'Convert.' + n + '(valor)' });
+  const conBase = isIntegral(to) && !['ToSByte', 'ToUInt16', 'ToUInt32', 'ToUInt64'].includes(n) || n === 'ToString';
+  def('Convert.' + n, (a) => {
+    if (a.length === 2 && conBase && imp(null, a[1], 'int')) return n === 'ToString' ? (isIntegral(a[0]) || a[0] === 'char' ? to : null) : (a[0] === 'string' || a[0] === 'null' ? to : null);
+    return a.length === 1 && (a[0] === 'string' || num(a[0]) || a[0] === 'bool' || a[0] === 'null' || isEnumT(a[0])) ? to : null;
+  }, function (x, t) {
+    if (x.length === 2) return n === 'ToString' ? toBase(x[0], t[0] === 'char' ? 'int' : t[0], x[1], this.line) : parseBase(x[0], x[1], to, this.line);
+    return convertVal(x[0], t[0] === 'null' ? 'string' : (isEnumT(t[0]) ? 'int' : t[0]), to, this.line);
+  }, { usage: 'Convert.' + n + '(valor)' + (conBase ? ' o Convert.' + n + (n === 'ToString' ? '(número, base)' : '(texto, base)') : '') });
 }
 for (const T of ['int', 'long', 'short', 'byte', 'double', 'float', 'char', 'bool']) {
   def(T + '.Parse', (a) => a.length === 1 && a[0] === 'string' ? T : null, function (x) {
@@ -1822,6 +1975,11 @@ for (const k of ['num', 'char', 'bool']) {
   def(k + '#CompareTo', (a, e, ot) => a.length === 1 && (a[0] === ot || (num(a[0]) && num(ot))) ? 'int' : null, function (x) { const a = this.self, b = x[0]; return a < b ? -1 : a > b ? 1 : 0; });
   def(k + '#Equals', (a) => a.length === 1 ? 'bool' : null, function (x) { return this.self === x[0]; });
 }
+// GetType(): nombre del tipo de .NET (System.Int32, System.String…)
+for (const k of ['num', 'char', 'bool', 'string']) def(k + '#GetType', (a) => a.length ? null : 'string', function () { return 'System.' + (NET_NAME[this.selfTy] || this.selfTy); });
+def('enum#ToString', (a) => a.length ? null : 'string', function () { return str(this.self, this.selfTy); });
+def('enum#GetType', (a) => a.length ? null : 'string', function () { return this.selfTy; });
+def('Environment.Exit', (a) => a.length === 1 && imp(null, a[0], 'int') ? 'void' : null, function (x) { throw new Salida(x[0]); }, { usage: 'Environment.Exit(código)' });
 // char
 const charTest = { IsDigit: /\p{Nd}/u, IsLetter: /\p{L}/u, IsLetterOrDigit: /[\p{L}\p{Nd}]/u, IsUpper: /\p{Lu}/u, IsLower: /\p{Ll}/u,
   IsWhiteSpace: /\s/u, IsPunctuation: /\p{P}/u, IsNumber: /\p{N}/u, IsSymbol: /\p{S}/u, IsControl: /\p{Cc}/u };
@@ -2040,7 +2198,7 @@ class Runtime {
     return s;
   }
   defVal(t) {
-    if (isNumC(t)) return 0;
+    if (isNumC(t) || isEnumT(t)) return 0;
     if (t === 'bool') return false;
     const st = this.P.structs.get(t);
     if (st) { const f = Object.create(null); for (const x of st.fields) f[x.name] = this.defVal(x.ty); const s = new Struct(t, f); s.owner = st.outer; return s; }
@@ -2054,7 +2212,13 @@ class Runtime {
 
   // ---- sentencias ----
   execBlock(list, fr) {
-    for (let i = 0; i < list.length; i++) { const r = this.exec(list[i], fr); if (r) return r; }
+    for (let i = 0; i < list.length; i++) {
+      const r = this.exec(list[i], fr);
+      if (r) {
+        if (r.go !== undefined) { const j = list.findIndex((x) => x.k === 'label' && x.name === r.go); if (j >= 0) { i = j - 1; continue; } }
+        return r;
+      }
+    }
     return undefined;
   }
   exec(s, fr) {
@@ -2062,6 +2226,8 @@ class Runtime {
     switch (s.k) {
       case 'block': return this.execBlock(s.body, fr);
       case 'empty': return;
+      case 'label': return this.exec(s.s, fr);
+      case 'goto': return s.label ? { go: s.label } : s.def ? { gd: true } : { gc: s.v };
       case 'expr': this.ev(s.e, fr); return;
       case 'decl':
         for (const v of s.vars) {
@@ -2076,14 +2242,14 @@ class Runtime {
       case 'while':
         while (this.ev(s.cond, fr)) {
           const r = this.exec(s.body, fr);
-          if (r === BRK) break; if (r === RET) return r;
+          if (r === BRK) break; if (r && r !== CNT) return r;
           this.tick(s.line);
         }
         return;
       case 'do':
         do {
           const r = this.exec(s.body, fr);
-          if (r === BRK) break; if (r === RET) return r;
+          if (r === BRK) break; if (r && r !== CNT) return r;
           this.tick(s.line);
         } while (this.ev(s.cond, fr));
         return;
@@ -2091,7 +2257,7 @@ class Runtime {
         for (const i of s.init) this.exec(i, fr);
         while (!s.cond || this.ev(s.cond, fr)) {
           const r = this.exec(s.body, fr);
-          if (r === BRK) break; if (r === RET) return r;
+          if (r === BRK) break; if (r && r !== CNT) return r;
           for (const it of s.iter) this.ev(it, fr);
           this.tick(s.line);
         }
@@ -2105,7 +2271,7 @@ class Runtime {
           if (s.et !== s.vt) v = castVal(v, s.et, s.vt);
           fr[s.d.id] = { v: this.cloneV(v) };
           const r = this.exec(s.body, fr);
-          if (r === BRK) break; if (r === RET) return r;
+          if (r === BRK) break; if (r && r !== CNT) return r;
           this.tick(s.line);
         }
         return;
@@ -2116,7 +2282,13 @@ class Runtime {
         for (let i = 0; i < s.sections.length && start < 0; i++) for (const lb of s.sections[i].labels) if (!lb.def && lb.v === v) { start = i; break; }
         if (start < 0) start = s.sections.findIndex((sec) => sec.labels.some((l) => l.def));
         if (start < 0) return;
-        const r = this.execBlock(s.sections[start].body, fr);
+        let r = this.execBlock(s.sections[start].body, fr);
+        while (r && (r.gc !== undefined || r.gd)) { // goto case / goto default
+          const want = r;
+          const k = want.gd ? s.sections.findIndex((sec) => sec.labels.some((l) => l.def)) : s.sections.findIndex((sec) => sec.labels.some((l) => !l.def && l.v === want.gc));
+          if (k < 0) return;
+          this.tick(s.line); r = this.execBlock(s.sections[k].body, fr);
+        }
         return r === BRK ? undefined : r;
       }
       case 'break': return BRK;
@@ -2303,6 +2475,7 @@ class Runtime {
     }
     const cells = [];
     const args = e.args.map((a, i) => {
+      if (a.k === 'refarg' && a.decl) fr[a.e.ref.id] = { v: UNSET };
       if (a.k === 'refarg') { const r = this.lref(a.e, fr); cells[i] = { get v() { return r.get(); }, set v(x) { r.set(x); } }; return a.mod === 'out' ? undefined : r.get(); }
       return this.ev(a, fr);
     });
@@ -2315,6 +2488,7 @@ class Runtime {
     m.params.forEach((p, i) => {
       const a = argNodes[i];
       if (p.mod) {
+        if (a.decl) fr[a.e.ref.id] = { v: UNSET };
         const r = this.lref(a.e, fr);
         nf[p.id] = r.cell || { get v() { return r.get(); }, set v(x) { r.set(x); } };
       } else nf[p.id] = { v: coerce(this.cloneV(this.ev(a, fr)), a.ty, p.ty) };
@@ -2322,6 +2496,7 @@ class Runtime {
     nf.$ret = m.ret;
     if (++this.depth > MAX_DEPTH) throw new Halt('Demasiadas llamadas anidadas (¿un método que se llama a sí mismo sin parar?). Desbordamiento de la pila.', line);
     const r = this.execBlock(m.body.body, nf);
+    if (r && r.go !== undefined) throw new Halt("El goto salta a la etiqueta '" + r.go + "', que no está en un bloque que contenga al goto", line);
     this.depth--;
     if (m.ret !== 'void') return nf.$rv;
     return undefined;
@@ -2351,21 +2526,25 @@ function compileCached(src) {
 }
 // Ejecuta el programa desde el principio con las líneas de entrada dadas.
 // status: 'done' | 'input' (espera otra línea) | 'compile' | 'exception' | 'halt'
-function run(src, inputs, seed) {
+function run(src, inputs, seed, args) {
   const c = compileCached(src);
   if (c.err) return { status: 'compile', segs: [], error: c.err.message, line: c.err.line, code: c.err.code };
   const P = c.P, rt = new Runtime(P, inputs || [], seed);
+  CURRENT_P = P;
   try {
     for (const d of P.statics) rt.G[d.id] = { v: d.isConst ? d.cv : rt.defVal(d.ty) };
     for (const d of P.statics) if (d.init && !d.isConst) {
       rt.G[d.id].v = d.init.k === 'arrinit' ? rt.buildInit(d.init, d.ty, {}) : coerce(rt.cloneV(rt.ev(d.init, {})), d.init.ty, d.ty);
     }
     const fr = Object.create(null);
-    if (P.main.params.length === 1) fr[P.main.params[0].id] = { v: new Arr('string[]', [0], []) };
+    const argv = (args || []).map(String);
+    if (P.main.params.length === 1) fr[P.main.params[0].id] = { v: new Arr('string[]', [argv.length], argv) };
     fr.$ret = P.main.ret;
-    rt.execBlock(P.main.body.body, fr);
-    return { status: 'done', segs: rt.segs, steps: rt.steps };
+    const r = rt.execBlock(P.main.body.body, fr);
+    if (r && r.go !== undefined) throw new Halt("El goto salta a la etiqueta '" + r.go + "', que no está en un bloque que contenga al goto", rt.line);
+    return { status: 'done', segs: rt.segs, steps: rt.steps, exit: P.main.ret === 'int' ? fr.$rv : undefined };
   } catch (x) {
+    if (x instanceof Salida) return { status: 'done', segs: rt.segs, steps: rt.steps, exit: x.code };
     if (x instanceof NeedInput) return { status: 'input', segs: rt.segs };
     if (x instanceof CsExc) return { status: 'exception', segs: rt.segs, error: 'Excepción no controlada: System.' + x.type + ': ' + x.message, line: x.line };
     if (x instanceof Halt) return { status: 'halt', segs: rt.segs, error: x.message, line: x.line };

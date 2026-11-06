@@ -735,3 +735,18 @@ kbd { font: 500 11.5px var(--f-texto); padding: 2px 6px; border: 1px solid var(-
 .chuleta .ficha code { font-family: var(--f-code); font-size: .9em; background: var(--panel-2); border-radius: 4px; padding: 1px 4px; }
 .chuleta .ficha pre { margin: 0 0 12px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--linea); border-radius: 6px; overflow: auto; font-size: 13px; line-height: 1.5; tab-size: 4;
   font-family: var(--f-code); }
+
+/* ejemplos y ejercicios citados, bajo el enunciado */
+.enlace { font: inherit; color: var(--acento); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.lab-ayuda { display: grid; gap: 8px; margin-top: 18px; }
+.lab-ayuda .antetitulo { margin-top: 6px; }
+.lab-ref { margin: 0; padding: 8px 10px; border-left: 3px solid var(--acento); background: var(--panel-2); border-radius: 0 6px 6px 0; font-size: 14px; line-height: 1.5; }
+.lab-ejemplo { border: 1px solid var(--linea); border-radius: 8px; background: var(--panel); }
+.lab-ejemplo summary { cursor: pointer; padding: 8px 10px; font-size: 14px; }
+.lab-ejemplo summary b { font-family: var(--f-code); font-weight: 500; font-size: 13px; }
+.lab-ejemplo pre { margin: 0 10px 8px; padding: 10px; background: var(--panel-2); border-radius: 6px; overflow: auto; max-height: 50vh; font-size: 12.5px; line-height: 1.5; }
+.lab-ejemplo .boton { margin: 0 10px 10px; }
+.nota-temas { margin: -4px 0 16px; font-size: 13px; }
+.cs-args { display: inline-flex; align-items: center; gap: 6px; }
+.cs-args[hidden] { display: none; }
+.cs-args input { width: 130px; font: inherit; font-family: var(--f-code); font-size: 13px; padding: 5px 8px; border: 1px solid var(--linea-fuerte); border-radius: var(--radio); background: var(--panel); color: var(--texto); }

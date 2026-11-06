@@ -9,6 +9,7 @@ import { cifrar, descifrar } from './js/cripto.js';
 import { nombreModulo } from './js/aules.js';
 import { sentencias, adaptarMysql, revisarHtml } from './js/herramientas.js';
 import { aDrawio, svgExportable, columna, tam } from './js/diagrama.js';
+import { parsearTema, montarCatalogo, llaves } from './js/temas.js';
 import { mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 
@@ -163,6 +164,14 @@ await promisify(execFile)('python3', ['-c', 'import xml.dom.minidom as m; m.pars
   const mal = comprobarCaso(run(main('int[] a = new int[4]; for (int i = 0; i < 4; i++) a[i] = Convert.ToInt32(Console.ReadLine()); Console.WriteLine("Media: " + (a[0]+a[1]+a[2]+a[3]) / 4);'), P['prog-4.1.1.1'][1].e), P['prog-4.1.1.1'][1]);
   assert.ok(!mal.ok && /1,25/.test(mal.motivo), 'división entera detectada: ' + mal.motivo);
   assert.match(comprobarCaso(run(main('Console.ReadLine();'), []), { e: ['x'] }).motivo, /más datos/);
+  // lo añadido para los temas 3 y 5: goto, enum, bases, out int x, por defecto y con nombre, args y código de salida
+  const sal = (src, e = [], a) => { const r = globalThis.window.CSharp.run(src, e, 1, a); assert.equal(r.status, 'done', r.error); return r.segs.filter((x) => x.t === 'out').map((x) => x.s).join(''); };
+  assert.equal(sal(main('int n = 3; switch (n) { case 1: goto case 3; case 3: Console.Write("i"); break; } for (int i = 0; i < 9; i++) if (i == 2) goto fin;\nfin: Console.Write("f");')), 'if');
+  assert.equal(sal('using System;\nenum Mes { ENERO = 1, FEBRERO }\nclass P { static void Main() { Mes m = Mes.ENERO; m++; Console.Write(m + " " + (int) m); } }'), 'FEBRERO 2');
+  assert.equal(sal(main('Console.Write(Convert.ToString(247, 16) + Convert.ToInt32("1a", 16) + 0b101 + 1_000 + (5).GetType());')), 'f72651000System.Int32');
+  assert.equal(sal('using System;\nclass P { static int F(int a, int b = 10, char c = \'*\') { return a + b; } static void D(out int x) { x = 4; } static void Main() { D(out int y); Console.Write("" + F(1) + F(1, c: \'-\', b: 2) + y); } }'), '1134');
+  const r5 = globalThis.window.CSharp.run('using System;\nclass P { static int Main(string[] args) { Console.Write(args.Length); Environment.Exit(3); return 0; } }', [], 1, ['a', 'b']);
+  assert.equal(r5.exit, 3); assert.equal(r5.segs[0].s, '2');
 }
 
 // --- E/R → relacional ---
@@ -205,6 +214,36 @@ assert.match(salTests, /\u0000MAL CalcTest\.mal\u0001suma ==> esperado <5> pero 
 assert.match(salTests, /\u0000RESUMEN 4 1/);
 await writeFile('/str/doodle-entrada.txt', '');
 assert.match(await java('Calc'), /pidió más datos/);
+
+// --- lector de temas (con líneas inventadas: los PDF de verdad no se guardan aquí) ---
+{
+  let y = 800, p = 1;
+  const L = (s, mono = false, x = 85, gap = 17) => ({ p, y: (y -= gap), x, mono, cw: 5.5, s });
+  const lineas = [
+    L('9. Tema de prueba'), L('9.1. Primer apartado'), L('9.1.1. Un apartado con título'), L('partido en dos'),
+    L('// Ejemplo_09_01_01a.cs', true), L('// Saludo de prueba', true), L('// Introducción a C#, por Nacho Cabanes', true),
+    L('using System;', true), L('class A', true), L('{', true), L('static void Main()', true, 107), L('{', true, 107),
+    L('Console.WriteLine("{0} }", 1);', true, 129), L('}', true, 107), L('}', true),
+    L('Así se ve el resultado.'), L('Ejercicios propuestos:'),
+    L('(9.1.1.1) Crea una variante del ejemplo 09_01_01a que salude'), L('dos veces.'),
+    L('(9.1.1.2) Amplía el ejercicio 9.1.1.1 con un "Saludar".'),
+    L('Texto de teoría que no es del ejercicio.', false, 85, 52),
+    L('9.1.2. structs anidados'), L('Ejercicios propuestos:'), L('Si has estudiado álgebra:'),
+    L('(9.1.2.1) Usa la función "Saludar" del ejercicio 9.1.5.'),
+  ];
+  const t = parsearTema(lineas);
+  assert.equal(t.num, 9); assert.equal(t.apartados[1].titulo, 'Un apartado con título partido en dos');
+  assert.equal(t.ejemplos[0].id, 'Ejemplo_09_01_01a'); assert.equal(t.ejemplos[0].titulo, 'Saludo de prueba');
+  assert.equal(t.ejemplos[0].codigo, 'using System;\nclass A\n{\n    static void Main()\n    {\n        Console.WriteLine("{0} }", 1);\n    }\n}');
+  assert.deepEqual(t.ejercicios.map((e) => e.texto), ['Crea una variante del ejemplo 09_01_01a que salude dos veces.', 'Amplía el ejercicio 9.1.1.1 con un "Saludar".', 'Usa la función "Saludar" del ejercicio 9.1.5.']);
+  assert.equal(t.ejercicios[2].grupo, '9.1 Primer apartado · 9.1.2 structs anidados · Si has estudiado álgebra');
+  const c = montarCatalogo([], [t]);
+  assert.deepEqual(c.ejercicios[0].citados, ['Ejemplo_09_01_01a']);
+  assert.deepEqual(c.ejercicios[1].refs, ['prog-9.1.1.1']);
+  assert.deepEqual(c.ejercicios[2].refs, ['prog-9.1.1.2']); // cita un número que no existe: se resuelve por la función entre comillas
+  assert.deepEqual(c.sinResolver, []);
+  assert.equal(llaves('if (a) { s = "{"; c = \'}\'; } // {'), 0);
+}
 
 await writeFile('js/demo.js', '// Datos de ejemplo (generados por test.js con un Aules simulado). La web desplaza las fechas al día de hoy.\nwindow.DEMO = ' + JSON.stringify(curso) + ';\n');
 console.log('Todas las pruebas OK · js/demo.js regenerado');
