@@ -717,6 +717,31 @@ kbd { font: 500 11.5px var(--f-texto); padding: 2px 6px; border: 1px solid var(-
 .repaso-op.mal { opacity: 1; border-color: var(--rojo); background: var(--rojo-fondo); }
 .repaso-x { margin: 0; line-height: 1.5; }
 .repaso-fin .boton, .repaso .boton { justify-self: start; }
+.repaso-botones { display: flex; flex-wrap: wrap; gap: 8px; }
+.tarjeta-b { margin: 0; padding: 12px 14px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; background: var(--panel-2); border-radius: var(--radio); }
+
+/* examen de prueba */
+.ex-cfg { max-width: 640px; padding: 16px; margin-top: 0; }
+.ex-ayuda { max-width: 640px; line-height: 1.5; }
+.ex-titulo { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); margin: 8px 0 0; }
+.examen { display: grid; gap: 12px; max-width: 760px; }
+.ex-q { display: grid; gap: 8px; padding: 16px; min-width: 0; }
+.ex-p { margin: 0 0 2px; font-weight: 500; line-height: 1.45; }
+.ex-p small { margin-left: 6px; font-weight: 400; color: var(--suave); }
+.ex-op { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; line-height: 1.4; border: 1px solid var(--linea-fuerte); border-radius: var(--radio); cursor: pointer; }
+.ex-op:hover { background: var(--hover); }
+.ex-op input { margin: 3px 0 0; flex: none; }
+.ex-op.bien { border-color: var(--ok); background: var(--ok-fondo); }
+.ex-op.mal { border-color: var(--rojo); background: var(--rojo-fondo); }
+.ex-q textarea { width: 100%; box-sizing: border-box; min-height: 130px; }
+.ex-modelo { margin: 0; padding: 12px 14px; line-height: 1.55; background: var(--panel-2); border-radius: var(--radio); }
+.ex-k { display: grid; gap: 6px; }
+.ex-k label { display: flex; gap: 8px; align-items: flex-start; line-height: 1.4; cursor: pointer; }
+.ex-k input { margin: 3px 0 0; flex: none; }
+.ex-nota { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 16px; max-width: 760px; margin-bottom: 12px; }
+.ex-nota b { font-size: 28px; font-variant-numeric: tabular-nums; }
+.ex-nota p { margin: 0; flex: 1 1 240px; }
+.ex-hist { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; font-variant-numeric: tabular-nums; }
 
 /* chuleta: panel lateral en PC, pantalla completa en el móvil */
 .chuleta { position: fixed; inset: 0; z-index: 58; background: rgba(15, 15, 15, 0.35); display: flex; justify-content: flex-end; }
