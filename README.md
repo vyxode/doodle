@@ -4,6 +4,7 @@ Mi curso de DAM en una web: tareas, entregas y notas de Aules, calendario, estad
 
 - **Aules**: la web descarga tus datos desde tu navegador con el token de la app de Moodle (Ajustes → Conexión con Aules). Aules no acepta conexiones desde los servidores de GitHub.
 - **Cifrado**: todo se guarda cifrado (AES-256-GCM, clave derivada de tu contraseña) en el navegador y, si pones una clave de GitHub en Ajustes, en `data/curso.enc` y `data/progreso.enc` para tenerlo igual en todos tus dispositivos.
+- **Repaso** (Ejercicios → un módulo): preguntas de test y tarjetas con cajas de Leitner, y exámenes de prueba al azar por nivel con test y desarrollo. Todo sale de `js/repaso.js`; añade preguntas siempre al final de cada módulo para no descolocar el progreso.
 - **Publicación**: `.github/workflows/sincronizar.yml` publica la web en GitHub Pages en cada push.
 
 ## Herramientas (Ejercicios → una tarea → Empezar)

@@ -246,4 +246,14 @@ assert.match(await java('Calc'), /pidió más datos/);
 }
 
 await writeFile('js/demo.js', '// Datos de ejemplo (generados por test.js con un Aules simulado). La web desplaza las fechas al día de hoy.\nwindow.DEMO = ' + JSON.stringify(curso) + ';\n');
+// --- repaso, tarjetas y desarrollo: cada pregunta bien formada ---
+globalThis.window = globalThis.window || {};
+await import('./js/repaso.js');
+for (const q of Object.values(window.REPASO).flat()) {
+  assert.ok(Number.isInteger(q.c) && q.o[q.c] !== undefined && new Set(q.o).size === q.o.length && q.x, q.p);
+  assert.ok(q.d === undefined || [1, 2, 3].includes(q.d), q.p);
+}
+for (const t of Object.values(window.TARJETAS).flat()) assert.ok(t.f && t.b, JSON.stringify(t));
+for (const q of Object.values(window.DESARROLLO).flat()) assert.ok(q.p && q.r && q.k.length && [1, 2, 3].includes(q.d), q.p);
+
 console.log('Todas las pruebas OK · js/demo.js regenerado');
