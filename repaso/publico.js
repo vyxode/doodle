@@ -45,13 +45,16 @@ function marca(ctx, w, h) {
   ctx.restore();
 }
 
+let lectura = 0; // cada clic empieza una lectura nueva; la anterior deja de pintar (si no, dos clics duplican las páginas)
 async function leer(r) {
+  const esta = ++lectura;
   $('hojas').innerHTML = ''; $('estado').textContent = 'Abriendo…';
   try {
     const k = await crypto.subtle.importKey('raw', bytes(yo.k), 'AES-GCM', false, ['decrypt']);
     const res = await fetch(r.f + '.enc', { cache: 'no-cache' });
     if (!res.ok) throw new Error('No se encuentra el resumen');
     const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await abrir(k, await res.arrayBuffer())) }).promise;
+    if (esta !== lectura) return doc.destroy();
     registrar(r.t);
     const ancho = Math.min($('hojas').clientWidth || 800, 860) * Math.min(devicePixelRatio || 1, 2);
     for (let i = 1; i <= doc.numPages; i++) {
@@ -62,6 +65,7 @@ async function leer(r) {
       c.setAttribute('aria-label', `${r.t}, página ${i}`); c.setAttribute('role', 'img');
       const ctx = c.getContext('2d');
       await pag.render({ canvasContext: ctx, viewport: vp }).promise;
+      if (esta !== lectura) return doc.destroy();
       marca(ctx, c.width, c.height);
       $('hojas').append(c);
     }
@@ -81,7 +85,7 @@ $('form-entrar').onsubmit = async (e) => {
     registrar('entrada'); mostrar();
   } catch (err) { $('error').textContent = err.message === 'Contraseña incorrecta' ? err.message : 'No se ha podido comprobar la contraseña'; }
 };
-$('salir').onclick = () => { yo = null; try { sessionStorage.removeItem('doodle-lector'); } catch { /* nada */ } $('hojas').innerHTML = ''; $('estado').textContent = ''; mostrar(); };
+$('salir').onclick = () => { yo = null; lectura++; try { sessionStorage.removeItem('doodle-lector'); } catch { /* nada */ } $('hojas').innerHTML = ''; $('estado').textContent = ''; mostrar(); };
 try { yo = JSON.parse(sessionStorage.getItem('doodle-lector')); } catch { yo = null; }
 mostrar();
 
