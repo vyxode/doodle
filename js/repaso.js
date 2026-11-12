@@ -85,17 +85,17 @@ window.REPASO = {
     { d: 3, p: '¿Dónde guarda GPT una copia de su tabla de particiones?', o: ['Al final del disco', 'En la partición EFI', 'En el MBR', 'No guarda copia'], c: 0, x: 'Si se daña la del principio, se puede recuperar.' },
     { d: 3, p: 'Un equipo con BIOS y disco MBR necesita 6 particiones (sistema, swap, datos y tres de pruebas). ¿Cómo se reparten?', o: ['3 primarias + 1 extendida con 3 lógicas', '6 primarias', '4 primarias + 2 lógicas', '2 extendidas con 3 lógicas cada una'], c: 0, x: 'La tabla MBR solo tiene 4 entradas: la cuarta se hace extendida y dentro van las lógicas (sda5, sda6, sda7).' },
     { d: 2, p: '¿Cómo se llama la primera partición de un SSD NVMe en Linux?', o: ['/dev/nvme0n1p1', '/dev/sda1', '/dev/nvme1', '/dev/nvme0p1'], c: 0, x: 'nvme0 = controladora, n1 = namespace, p1 = partición.' },
-    { d: 3, p: 'En /dev/nvme0n1, ¿qué significa «n1»?', o: ['El espacio de nombres (namespace)', 'La partición 1', 'El disco número 1 de la placa', 'La controladora'], c: 0, x: 'La controladora es nvme0 y las particiones son p1, p2…' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: 'Al instalar Ubuntu en una máquina con BIOS y disco GPT, el instalador crea una sda1 de 1 MB sin formato. ¿Qué es?', o: ['La partición BIOS boot que GRUB necesita al arrancar con BIOS desde un disco GPT', 'La partición EFI', 'La partición MSR', 'Un error del instalador'], c: 0, x: 'Guarda la parte de GRUB que en MBR iría detrás del primer sector.' },
     { d: 1, p: 'En un dual boot con Windows y Ubuntu, ¿qué se instala primero?', o: ['Windows', 'Ubuntu', 'Da igual', 'GRUB'], c: 0, x: 'Si Ubuntu va el último, su GRUB queda como gestor principal y detecta Windows.' },
     { d: 2, p: '¿Por qué se instala Ubuntu después de Windows?', o: ['GRUB detecta Windows y lo añade a su menú; el gestor de Windows no detecta Linux', 'Ubuntu necesita la partición C:', 'Windows borra el disco entero', 'Ubuntu no se puede instalar en un disco vacío'], c: 0, x: 'GRUB usa os-prober para encontrar los otros sistemas.' },
     { d: 2, p: 'Al instalar Ubuntu junto a Windows en UEFI, ¿qué se hace con la partición EFI que ya existe?', o: ['Se usa sin formatearla', 'Se formatea en FAT32', 'Se borra y se crea otra', 'Se formatea en ext4'], c: 0, x: 'Si se formatea, se borra el gestor de arranque de Windows.' },
     { d: 3, p: 'Si se instala primero Ubuntu y después Windows (UEFI), ¿qué pasa?', o: ['Windows se pone el primero en el orden de arranque y entra sin menú, pero Ubuntu sigue instalado', 'Ubuntu se borra del disco', 'GRUB detecta Windows automáticamente', 'El equipo deja de arrancar'], c: 0, x: 'Los archivos de GRUB siguen en \\EFI\\ubuntu; basta con volver a llamarlos.' },
-    { d: 3, p: '¿Qué hace bcdedit /set {bootmgr} path \\EFI\\ubuntu\\shimx64.efi?', o: ['Hace que el arranque de Windows lance GRUB', 'Borra GRUB', 'Reinstala Windows Boot Manager', 'Formatea la partición EFI'], c: 0, x: 'Es una de las formas de recuperar el menú de GRUB desde Windows.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 3, p: 'Un portátil con 16 GB de RAM va a tener Ubuntu sin hibernación. ¿Cuánta swap se recomienda (guía SwapFaq de Ubuntu)?', o: ['4 GB', '16 GB', '20 GB', '32 GB'], c: 0, x: 'Según la guía SwapFaq de Ubuntu. Con hibernación harían falta unos 20 GB.' },
     { d: 2, p: 'Portátil con UEFI y SSD de 512 GB en el que se instalarán Windows 11 y Ubuntu. ¿Por qué se elige GPT?', o: ['El equipo tiene UEFI y Windows 11 en UEFI solo se instala sobre GPT', 'Porque el disco pasa de 2 TB', 'Porque MBR no admite NTFS', 'Porque Ubuntu no arranca con MBR'], c: 0, x: 'El límite de 2 TB de MBR no importa: el disco es de 512 GB.' },
     { d: 2, p: '¿Para qué sirve tener /home en una partición separada?', o: ['Para no perder los datos del usuario si hay que reinstalar Ubuntu', 'Para que el sistema arranque más rápido', 'Porque lo exige ext4', 'Para poder hibernar'], c: 0, x: 'Basta con volver a montarla en /home sin formatearla.' },
-    { d: 3, p: '¿Por qué un disco «de 2 TB» cabe entero en MBR?', o: ['El máximo de MBR es 2^32 × 512 B = 2 TiB y 2 TB son unos 1,82 TiB', 'Porque MBR no tiene límite', 'Porque usa sectores de 4 KB', 'No cabe: se pierde la mitad'], c: 0, x: 'MBR guarda inicio y tamaño en campos de 32 bits contados en sectores de 512 bytes.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 3, p: 'Equipo antiguo con BIOS (sin UEFI) y disco de 2 TB. ¿Sería GPT mejor que MBR?', o: ['Sí si es Linux (con una partición BIOS boot); no si se quiere Windows o la BIOS es muy antigua', 'Siempre', 'Nunca, GPT no funciona con BIOS', 'Solo si el disco es de más de 2 TB'], c: 0, x: 'Windows solo arranca desde GPT con UEFI.' },
     { d: 1, p: 'VirtualBox y VMware Workstation son hipervisores de…', o: ['Tipo 2 (se instalan sobre un sistema operativo)', 'Tipo 1 (sobre el hardware)', 'Tipo 0', 'Tipo contenedor'], c: 0, x: 'Los de tipo 1 (ESXi, Hyper-V, Proxmox) se ejecutan directamente sobre el hardware.' },
     { d: 1, p: '¿Cuál de estos es un hipervisor de tipo 1?', o: ['Microsoft Hyper-V', 'VirtualBox', 'VMware Workstation', 'Parallels Desktop'], c: 0, x: 'Tipo 1: VMware ESXi, Hyper-V, Proxmox.' },
@@ -105,7 +105,7 @@ window.REPASO = {
     { d: 2, p: 'Red privada entre el anfitrión y las VM, sin salida a la red externa:', o: ['Solo-anfitrión (host-only)', 'Red interna', 'NAT', 'Adaptador puente'], c: 0, x: 'Útil para desarrollo cliente-servidor seguro.' },
     { d: 2, p: '¿Qué equivale en VMware al disco VDI dinámico de VirtualBox?', o: ['Un disco VMDK sin reservar el espacio', 'Un disco VHD fijo', 'Un archivo ISO', 'Una partición física'], c: 0, x: 'El archivo empieza pequeño y crece a medida que se usa.' },
     { d: 2, p: '¿Qué equivale en VMware a las Guest Additions de VirtualBox?', o: ['Las VMware Tools (paquete open-vm-tools)', 'El paquete build-essential', 'VBoxLinuxAdditions.run', 'El paquete dkms'], c: 0, x: 'Ajustan la resolución, comparten el portapapeles y permiten arrastrar archivos.' },
-    { d: 3, p: 'VMware crea un disco de 25 GiB y el instalador de Ubuntu Desktop lo muestra como 26,84 GB. ¿Por qué?', o: ['Es el mismo disco: 25 GiB (1 GiB = 1.073.741.824 bytes) son 26,84 GB (1 GB = 10⁹ bytes)', 'El instalador añade una partición', 'VMware reserva espacio extra', 'Es un error de VMware'], c: 0, x: 'El instalador de Server muestra GiB y por eso allí sí sale 25.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 1, p: 'En sudo apt update && sudo apt upgrade -y, ¿qué hace -y?', o: ['Responde «sí» a la confirmación', 'Actualiza el núcleo', 'Muestra más información', 'Ignora los errores'], c: 0, x: 'Así apt no se para a preguntar.' },
     { d: 2, p: 'En sudo apt update && sudo apt upgrade -y, ¿qué hace &&?', o: ['Ejecuta la segunda orden solo si la primera ha ido bien', 'Ejecuta las dos a la vez', 'Ejecuta la segunda aunque falle la primera', 'Redirige la salida'], c: 0, x: 'Y el orden importa: primero la lista de paquetes, luego la actualización.' },
     { d: 2, p: '¿Qué diferencia hay entre apt update y apt upgrade?', o: ['update descarga la lista de paquetes; upgrade instala las versiones nuevas', 'Son lo mismo', 'update instala y upgrade descarga', 'upgrade solo actualiza el núcleo'], c: 0, x: 'Si se hace al revés, se instala según un catálogo desactualizado.' },
@@ -115,13 +115,13 @@ window.REPASO = {
     { d: 2, p: '¿Cómo organiza el disco Ubuntu Server por defecto?', o: ['Con LVM', 'Con particiones primarias sin LVM', 'Con una sola partición FAT32', 'Con RAID'], c: 0, x: 'Opción «Use an entire disk» con «Set up this disk as an LVM group».' },
     { d: 3, p: 'En LVM, ¿cuál es el orden de capas?', o: ['Partición → volumen físico (PV) → grupo de volúmenes (VG) → volumen lógico (LV)', 'VG → PV → LV → partición', 'LV → VG → PV', 'Partición → LV → PV → VG'], c: 0, x: 'En Ubuntu Server: sda3 es el PV, ubuntu-vg el grupo y ubuntu-lv el volumen lógico montado en /.' },
     { d: 2, p: 'Al instalar Ubuntu Server con las opciones por defecto (todo el disco con LVM), ¿dónde queda la swap?', o: ['En un archivo, /swap.img, dentro de la raíz', 'En una partición swap propia', 'En /boot', 'No tiene'], c: 0, x: 'Se ve al iniciar sesión: «Swap usage: 0%».' },
-    { d: 3, p: '¿Por qué /boot va fuera de LVM en Ubuntu Server?', o: ['Para que el arranque no dependa de LVM ni del cifrado', 'Porque LVM no admite ext4', 'Porque /boot tiene que ser FAT32', 'Para ahorrar espacio'], c: 0, x: '/boot guarda el núcleo y los archivos de arranque.' },
-    { d: 3, p: 'En un disco de 25 GB, el instalador de Ubuntu Server con LVM usa solo la mitad del grupo ubuntu-vg para / y deja unos 11,5 GiB libres. ¿Para qué?', o: ['Para ampliar / más adelante con lvextend o crear otro volumen', 'Para la swap', 'Por un error del instalador', 'Para la partición EFI'], c: 0, x: 'La ventaja de LVM: ampliar sin reparticionar ni reinstalar.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: 'Un Ubuntu Server con IP fija configurada en el instalador da «Fallo temporal al resolver archive.ubuntu.com» al hacer apt update, aunque ip addr muestra la IP. ¿Qué falta?', o: ['Faltaban la puerta de enlace y el DNS en la configuración de red', 'La tarjeta de red estaba apagada', 'No había espacio en disco', 'El usuario no tenía sudo'], c: 0, x: 'ip addr mostraba la IP, así que la tarjeta funcionaba.' },
     { d: 2, p: '¿Dónde guarda Ubuntu Server la configuración de red y cómo se aplica?', o: ['En /etc/netplan/50-cloud-init.yaml; se aplica con sudo netplan apply', 'En /etc/network.conf; se aplica reiniciando', 'En /boot/red.cfg; con apt update', 'En /etc/hosts; con ping'], c: 0, x: 'Hay que respetar la sangría con espacios del archivo YAML.' },
     { d: 2, p: 'ip route no muestra ninguna línea «default». ¿Qué falta?', o: ['La puerta de enlace', 'La dirección IP', 'El DNS', 'La tarjeta de red'], c: 0, x: 'Sin puerta de enlace no se puede salir de la red.' },
-    { d: 2, p: 'Al instalar Ubuntu Server pones de nombre de equipo ubuntu_server y queda como ubuntuserver. ¿Por qué?', o: ['El guion bajo no es válido en los nombres de equipo', 'Por un límite de longitud', 'Porque se escribió mal', 'Porque Ubuntu quita los números'], c: 0, x: 'Habría sido mejor usar un guion: ubuntu-server.' },
-    { d: 3, p: 'Una VM en la red NAT de VMware 192.168.111.0/24 tiene la IP fija 192.168.111.10. ¿Qué puerta de enlace y DNS hay que poner?', o: ['192.168.111.2, el router virtual de VMware', '192.168.111.1', '192.168.111.10', '8.8.8.8 como puerta de enlace'], c: 0, x: 'En netplan: routes to default via 192.168.111.2 y nameservers 192.168.111.2 y 8.8.8.8.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 1, p: '¿Qué es un contenedor respecto a una imagen?', o: ['Una instancia en ejecución de la imagen', 'Un Dockerfile compilado', 'Una copia de seguridad de la imagen', 'Un registro de imágenes'], c: 0, x: 'La imagen es una plantilla de solo lectura creada a partir de un Dockerfile.' },
     { d: 1, p: '¿Qué hace -p 8080:80?', o: ['Publica el puerto 80 del contenedor en el 8080 del equipo', 'Publica el 8080 del contenedor en el 80 del equipo', 'Limita la memoria a 8080 MB', 'Abre 80 contenedores'], c: 0, x: 'La forma es puerto_equipo:puerto_contenedor.' },
     { d: 1, p: 'Contenedores frente a máquinas virtuales:', o: ['Los contenedores comparten el kernel del anfitrión', 'Cada contenedor tiene su propio sistema operativo completo', 'Los contenedores arrancan en minutos', 'Las máquinas virtuales consumen menos recursos'], c: 0, x: 'Las VM tienen un Guest OS completo y aíslan a nivel de hardware.' },
@@ -134,17 +134,17 @@ window.REPASO = {
     { d: 2, p: '¿Qué hace docker compose down?', o: ['Para y borra contenedores y red, pero no los volúmenes', 'Borra también los volúmenes', 'Solo para los contenedores', 'Borra las imágenes'], c: 0, x: 'Por eso, al volver a levantar con up -d, la base de datos conserva sus datos.' },
     { d: 2, p: 'Una app guarda un contador de visitas en MariaDB con un volumen de Compose. Tras docker compose down -v y docker compose up -d, ¿qué pasa con el contador?', o: ['Vuelve a empezar en 1: se borró el volumen con los datos', 'Sigue donde estaba', 'Da error para siempre', 'Se duplica'], c: 0, x: '-v elimina también los volúmenes (Volume parte2_datos-db Removed).' },
     { d: 3, p: '¿Por qué el puerto 3306 de MariaDB no se publica en el equipo?', o: ['Solo lo usa la app dentro de la red de Compose', 'Porque MariaDB no usa puertos', 'Porque 3306 está prohibido', 'Por un error en compose.yaml'], c: 0, x: 'docker compose ps lo muestra como 3306/tcp, sin 0.0.0.0.' },
-    { d: 2, p: 'Docker dice «failed to read dockerfile: open Dockerfile: no such file or directory» y el archivo se llama DockerFile. ¿Qué pasa?', o: ['El nombre debe ser exactamente Dockerfile, con F minúscula', 'Falta la extensión .txt', 'Docker no está instalado', 'Falta la línea FROM'], c: 0, x: 'En Windows hubo que renombrarlo en dos pasos con Rename-Item.' },
-    { d: 3, p: 'Error «failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine»:', o: ['El cliente funciona pero el motor no responde; se arregla reiniciando Docker Desktop', 'Falta el Dockerfile', 'El puerto 8080 está ocupado', 'La imagen no existe'], c: 0, x: 'Docker Desktop en Windows 11 necesita WSL 2 (wsl --status).' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: '¿Qué hace docker compose up -d --build?', o: ['Construye las imágenes que hagan falta y levanta todos los servicios en segundo plano', 'Solo construye las imágenes', 'Para los servicios', 'Borra los volúmenes'], c: 0, x: 'Luego docker compose ps muestra el estado de los servicios.' },
-    { d: 3, p: 'En un compose.yaml, ¿en qué ruta del contenedor de MariaDB hay que montar el volumen para que los datos persistan?', o: ['/var/lib/mysql', '/usr/share/nginx/html', '/app', '/etc/mysql'], c: 0, x: 'El volumen hay que declararlo también en la sección volumes: al final del fichero.' },
-    { d: 3, p: '¿Para qué sirve docker inspect -f "{{json .Mounts}}" mi-web?', o: ['Para comprobar los montajes (volúmenes) del contenedor', 'Para ver los logs', 'Para ver los puertos del equipo', 'Para entrar en el contenedor'], c: 0, x: 'Con un bind mount muestra Type bind, la carpeta del equipo (Source) y la del contenedor (Destination).' },
-    { d: 3, p: 'Hoy, ¿cómo se escribe el comando de Compose y hace falta la línea version:?', o: ['docker compose (con espacio) y no hace falta version:', 'docker-compose y es obligatoria version:', 'compose-docker sin version:', 'docker compose y version: es obligatoria'], c: 0, x: 'Los apuntes usan docker-compose y version:, pero ya no es necesario.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Tema 2 (teoría de los apartados 1-11 que entran en el examen)
     { d: 1, p: '¿Qué tres objetivos tiene un sistema operativo según el temario?', o: ['Abstraer el hardware, gestionar los recursos y ofrecer un entorno de ejecución estable', 'Compilar, enlazar y ejecutar programas', 'Conectar a Internet, proteger y hacer copias', 'Instalar, actualizar y desinstalar aplicaciones'], c: 0, x: 'Gestiona CPU, memoria y E/S de forma eficiente, segura y transparente.' },
     { d: 1, p: '¿Qué tipo de SO garantiza respuestas dentro de plazos estrictos?', o: ['Tiempo real (RTOS)', 'De propósito general', 'Distribuido', 'De red'], c: 0, x: 'Ejemplos: FreeRTOS, VxWorks, QNX.' },
     { d: 2, p: 'Cisco IOS y Juniper JunOS son sistemas operativos…', o: ['De red', 'Embebidos', 'Distribuidos', 'Móviles'], c: 0, x: 'Ofrecen servicios de red como enrutamiento o cortafuegos.' },
-    { d: 2, p: 'Plan 9 y Amoeba son sistemas operativos…', o: ['Distribuidos', 'De red', 'De tiempo real', 'Embebidos'], c: 0, x: 'Gestionan recursos repartidos entre varias máquinas interconectadas.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 1, p: 'Linux con GNOME o KDE es un ejemplo de interfaz…', o: ['Híbrida (CLI + GUI)', 'Solo CLI', 'Solo GUI', 'De tiempo real'], c: 0, x: 'CLI: MS-DOS, Bash. GUI: Windows, macOS.' },
     { d: 1, p: '¿En qué arquitectura todo el SO se ejecuta en un único espacio de direcciones en modo kernel?', o: ['Monolítica', 'Microkernel', 'Por capas', 'Híbrida'], c: 0, x: 'Rendimiento alto, pero un fallo en un módulo puede tumbar todo el sistema.' },
     { d: 2, p: '¿Qué arquitectura ejecuta en modo kernel solo procesos, memoria e IPC, y el resto en modo usuario?', o: ['Microkernel', 'Monolítica', 'Por capas', 'Híbrida'], c: 0, x: 'Ejemplos: QNX, MINIX, L4.' },
@@ -153,13 +153,13 @@ window.REPASO = {
     { d: 3, p: '¿Qué arquitectura tiene modularidad baja porque cualquier cambio obliga a recompilar el SO completo?', o: ['Monolítica', 'Microkernel', 'Por capas', 'Híbrida'], c: 0, x: 'Ejemplos: MS-DOS, primeras versiones de Unix y el núcleo de Linux.' },
     { d: 2, p: '¿Qué es el Executive de Windows NT?', o: ['La parte en modo kernel con los gestores de procesos, memoria, E/S y objetos', 'El subsistema Win32', 'El explorador de archivos', 'La consola de PowerShell'], c: 0, x: 'En modo usuario están los subsistemas Win32, POSIX y OS/2.' },
     { d: 2, p: '¿Qué componentes forman el kernel XNU de macOS?', o: ['Mach, la capa BSD e IOKit', 'Executive, Win32 y POSIX', 'Proton, proc y fs', 'VFS, módulos .ko y glibc'], c: 0, x: 'Mach: procesos, memoria e IPC. BSD: archivos, red y seguridad. IOKit: controladores.' },
-    { d: 3, p: '¿Cómo se llama el microkernel de QNX?', o: ['Proton', 'Mach', 'XNU', 'Executive'], c: 0, x: 'Gestiona procesos, memoria e IPC; el resto (proc, fs, devc-*) va en modo usuario.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: '¿Qué sistema de archivos usa macOS según el temario?', o: ['APFS', 'NTFS', 'ext4', 'ReFS'], c: 0, x: 'Windows NT: NTFS, FAT32 y ReFS.' },
-    { d: 3, p: '¿Qué tres subsistemas tiene Windows NT en modo usuario?', o: ['Win32, POSIX y OS/2', 'Win32, BSD y Mach', 'POSIX, IOKit y Win32', 'OS/2, MS-DOS y Unix'], c: 0, x: 'Por eso se clasifica como híbrido.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: '¿Qué característica define a un RTOS?', o: ['Determinismo: un tiempo máximo conocido para cada operación', 'Interfaz gráfica avanzada', 'Escalado automático en la nube', 'Compatibilidad con Win32'], c: 0, x: 'También prioridades estrictas, latencia baja y gestión eficiente de interrupciones.' },
-    { d: 2, p: 'Protocolos que debe soportar un SO para IoT según el temario:', o: ['MQTT, CoAP, Bluetooth y LoRaWAN', 'HTTP, FTP y SMTP', 'NTFS, ext4 y FAT32', 'Win32, POSIX y OS/2'], c: 0, x: 'Además: bajo consumo, huella de 16 KB a 1 MB, tiempo real y seguridad ligera.' },
-    { d: 3, p: 'KubeEdge, Akraino y Azure IoT Edge son ejemplos de SO o plataformas para…', o: ['Edge computing', 'La nube', 'Móviles', 'Escritorio'], c: 0, x: 'Procesan los datos cerca de la fuente (sensores, IoT).' },
-    { d: 2, p: 'Amazon Linux, Container OS de Google y Azure Linux son SO para…', o: ['La nube', 'IoT', 'Tiempo real', 'Móviles'], c: 0, x: 'Escalado automático, alta disponibilidad e integración con Docker y Kubernetes.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 1, p: '¿Qué es un proceso?', o: ['Un programa en ejecución que necesita recursos', 'Un archivo ejecutable en disco', 'Un controlador de dispositivo', 'Una parte del kernel'], c: 0, x: 'Necesita CPU, memoria y archivos.' },
     { d: 1, p: 'Un proceso en memoria esperando a que le den la CPU está en estado…', o: ['Listo', 'Bloqueado', 'Nuevo', 'Ejecutando'], c: 0, x: 'Bloqueado = esperando un evento externo como el disco o el teclado.' },
     { d: 2, p: 'Un proceso que espera a que termine una lectura de disco está en estado…', o: ['Bloqueado', 'Listo', 'Nuevo', 'Terminado'], c: 0, x: 'Al acabar la E/S vuelve a Listo.' },
@@ -180,49 +180,49 @@ window.REPASO = {
     { d: 1, p: '¿Qué shell usa objetos .NET?', o: ['PowerShell', 'Bash', 'Zsh', 'cmd.exe'], c: 0, x: 'Bash es la de Linux por defecto; Zsh destaca por el autocompletado y los temas.' },
     { d: 2, p: '¿Qué guarda el superbloque de un sistema de archivos?', o: ['Metadatos generales: tamaño y bloques libres', 'Los permisos de cada archivo', 'El contenido de los archivos', 'La tabla de particiones'], c: 0, x: 'La tabla de inodos guarda los metadatos de cada archivo.' },
     { d: 2, p: 'Un teclado o /dev/tty usan controladores de tipo…', o: ['Carácter', 'Bloque', 'Red', 'Sistema'], c: 0, x: 'De bloque: discos (sda). De red: eth0, wlan0.' },
-    { d: 3, p: '¿Qué hacen sudo modprobe e1000 y lsmod?', o: ['Cargar un controlador y listar los cargados', 'Formatear un disco y listarlo', 'Instalar un paquete y listarlo', 'Montar una partición y ver el espacio'], c: 0, x: 'Ejemplo de controladores en Linux del temario.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: 'glibc, WinAPI y POSIX son…', o: ['Bibliotecas o estándares del sistema', 'Shells', 'Sistemas de archivos', 'Hipervisores'], c: 0, x: 'Funciones precompiladas que usan las aplicaciones.' },
     { d: 1, p: '¿Qué tipo de software es gratuito pero con código cerrado?', o: ['Freeware', 'Software libre', 'Código abierto', 'Copyleft'], c: 0, x: 'El software libre deja usar, estudiar, modificar y redistribuir.' },
     { d: 2, p: 'Una licencia GPL es…', o: ['Copyleft: las obras derivadas mantienen la misma libertad', 'Permisiva: se puede meter en productos cerrados', 'Propietaria', 'Freeware'], c: 0, x: 'El núcleo Linux usa GPL. MIT y BSD son permisivas.' },
     { d: 1, p: '¿Qué licencia de Windows viene preinstalada y queda ligada a ese equipo?', o: ['OEM', 'Retail', 'Por volumen', 'De evaluación'], c: 0, x: 'Retail se compra suelta y se puede transferir; por volumen, para empresas y centros.' },
-    { d: 2, p: '¿Cómo se licencia Windows Server?', o: ['Por núcleos de procesador y licencias de acceso de cliente', 'Por número de usuarios con OEM', 'Es gratuito', 'Por horas de uso'], c: 0, x: 'Antes de desplegar, hay que comprobar que la licencia cubre equipos y uso.' },
-    { d: 2, p: 'Según la tabla del temario, Android tiene una licencia…', o: ['Libre en la base, con componentes propietarios', 'Totalmente propietaria', 'Freeware', 'Shareware'], c: 0, x: 'Está basado en el núcleo Linux.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: '¿Qué estrategia de asignación de bloques es la más usada?', o: ['Indexada', 'Contigua', 'Encadenada', 'Aleatoria'], c: 0, x: 'Un índice guarda las direcciones; no fragmenta y permite acceso secuencial y aleatorio.' },
     { d: 3, p: 'En la asignación encadenada…', o: ['Cada bloque apunta al siguiente: no fragmenta, pero la lectura es lenta', 'Los bloques van seguidos: rápida pero fragmenta', 'Un índice guarda las direcciones', 'Se usa un árbol B'], c: 0, x: 'La contigua es eficiente en acceso secuencial pero fragmenta.' },
     { d: 2, p: '¿Qué sistema de archivos ofrece snapshots, compresión transparente y deduplicación pero es menos maduro que ext4?', o: ['Btrfs', 'ZFS', 'exFAT', 'FAT32'], c: 0, x: 'ZFS también tiene snapshots y checksums, pero consume mucha RAM (al menos 4 GB).' },
-    { d: 3, p: '¿Qué sistema de archivos protege la integridad con checksums y necesita al menos 4 GB de RAM?', o: ['ZFS', 'Btrfs', 'NTFS', 'ext4'], c: 0, x: 'Creado por Sun Microsystems, ahora Oracle; no es nativo en Windows.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: 'Particionado típico de Linux en GPT (UEFI):', o: ['/boot/efi (FAT32), /boot, /, /home (ext4) y swap, todas primarias', '/boot primaria y el resto en una extendida', 'Solo / y swap en lógicas', 'C:, D: y MSR'], c: 0, x: 'En MBR: /boot primaria y /, /home y swap como lógicas dentro de una extendida.' },
     { d: 2, p: '¿Qué herramientas de particionado en línea de comandos tiene Linux?', o: ['fdisk, gdisk y parted', 'diskpart', 'GParted y KDE Partition Manager', 'mkfs y mount'], c: 0, x: 'GParted y KDE Partition Manager son gráficas. En Windows: diskpart y el Administrador de discos.' },
     { d: 1, p: '¿Qué exige Windows 11 para instalarse, entre otros requisitos?', o: ['UEFI, Secure Boot y TPM 2.0', 'BIOS y MBR', 'Solo 2 GB de RAM', 'Un disco ext4'], c: 0, x: 'Los requisitos pueden cambiar con las versiones.' },
     { d: 1, p: '¿Qué tipo de actualización es la más urgente?', o: ['La de seguridad', 'La de funcionalidades', 'La de calidad', 'Todas igual'], c: 0, x: 'Las de funcionalidades pueden requerir copia previa.' },
     { d: 2, p: 'En Ubuntu, ¿qué diferencia hay entre eliminar y purgar un paquete?', o: ['Eliminar conserva la configuración; purgar la borra', 'Son lo mismo', 'Purgar conserva la configuración', 'Eliminar solo borra la configuración'], c: 0, x: 'En Windows, desinstalar puede dejar restos de configuración.' },
-    { d: 2, p: '¿Qué comando muestra qué controlador usa cada dispositivo en Linux?', o: ['lspci -k', 'lsblk', 'apt update', 'ip addr'], c: 0, x: 'En Windows se usa el Administrador de dispositivos.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 3, p: 'En el diagnóstico de controladores, si el problema empezó tras una actualización, ¿qué se hace?', o: ['Revertir el controlador', 'Reinstalar el sistema', 'Formatear el disco', 'Desactivar las actualizaciones'], c: 0, x: 'Pasos: detectar, identificar el modelo, comprobar, actualizar, revertir si hace falta y documentar.' },
-    { d: 2, p: '¿Qué gestor de paquetes de Windows aparece en el temario?', o: ['winget', 'apt', 'dnf', 'snap'], c: 0, x: 'También el instalador oficial y Microsoft Store.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 1, p: '¿Cómo se llama también al hipervisor?', o: ['Monitor de máquina virtual (VMM)', 'Kernel', 'Contenedor', 'Gestor de arranque'], c: 0, x: 'Presenta hardware virtual a cada VM y reparte los recursos físicos.' },
-    { d: 2, p: '¿Qué plataforma combina KVM para máquinas virtuales y LXC para contenedores con interfaz web?', o: ['Proxmox VE', 'VMware ESXi', 'Hyper-V', 'VirtualBox'], c: 0, x: 'Está basada en Debian.' },
-    { d: 2, p: '¿Qué hipervisor forma parte del núcleo de Linux y es base de nubes como OpenStack?', o: ['KVM', 'Xen', 'Hyper-V', 'VirtualBox'], c: 0, x: 'Gratuito y de código abierto.' },
-    { d: 3, p: '¿Qué añaden las licencias de pago de los hipervisores?', o: ['Gestión centralizada, alta disponibilidad, migración en caliente, balanceo y soporte', 'Más núcleos de CPU', 'Contenedores gratis', 'Nada'], c: 0, x: 'Por ejemplo vSphere con vCenter y vMotion.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: 'Usos de VirtualBox según el temario:', o: ['Probar software, entornos de desarrollo aislados, simular redes y analizar malware', 'Solo jugar', 'Sustituir al sistema anfitrión', 'Gestionar centros de datos'], c: 0, x: 'Es tipo 2, gratuito y de código abierto.' },
     { d: 1, p: 'Para entornos críticos, en lugar de Docker Compose el temario recomienda…', o: ['Kubernetes o Docker Swarm', 'VirtualBox', 'WSL', 'LXC'], c: 0, x: 'Compose sirve para desarrollo local, pruebas de integración y producción no crítica.' },
     { d: 2, p: '¿Cuál es la red por defecto de Docker?', o: ['bridge', 'host', 'NAT', 'internal'], c: 0, x: 'Se pueden crear redes propias para que los contenedores se comuniquen.' },
     { d: 2, p: '¿Sobre qué se ejecutan los contenedores?', o: ['Sobre el Docker Engine, compartiendo el kernel del anfitrión', 'Sobre un hipervisor, cada uno con su SO', 'Sobre la BIOS', 'Sobre WSL 1'], c: 0, x: 'Las VM se ejecutan sobre un hipervisor, cada una con su SO invitado.' },
     { d: 3, p: '¿Por qué Docker permite ejecutar más contenedores con menos recursos que una VM?', o: ['No reserva recursos fijos: usa el kernel y los recursos que necesita en cada momento', 'Porque comprime la memoria', 'Porque no usa CPU', 'Porque solo ejecuta Alpine'], c: 0, x: 'Explicación del tutorial de Docker.' },
     { d: 2, p: 'Los datos guardados dentro de un contenedor sin volumen…', o: ['Se pierden al eliminar el contenedor', 'Se guardan en la imagen', 'Se suben al registro', 'Se guardan en el anfitrión automáticamente'], c: 0, x: 'Para persistirlos se usa -v o un volumen.' },
-    { d: 2, p: 'Para guardar de forma definitiva cambios en el código, el tutorial dice que…', o: ['Se reconstruye la imagen con una etiqueta nueva, por ejemplo :v2', 'Se reinicia el contenedor', 'Se borra el volumen', 'Se ejecuta docker ps'], c: 0, x: 'El volumen sirve para probar sin reconstruir.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 1, p: 'Según las buenas prácticas, ¿qué se prefiere?', o: ['COPY frente a ADD', 'ADD frente a COPY', 'RUN frente a COPY', 'CMD frente a FROM'], c: 0, x: 'COPY copia un fichero del anfitrión a la imagen, como cp.' },
     { d: 2, p: '¿Por qué conviene fijar la versión en FROM?', o: ['Para evitar errores al reconstruir con versiones nuevas', 'Para que la imagen pese menos', 'Porque es obligatorio', 'Para usar la caché'], c: 0, x: 'Por ejemplo nginx:stable-alpine o node:24-alpine en vez de latest.' },
     { d: 2, p: '¿Por qué agrupar update e install en la misma línea RUN?', o: ['Para que compartan caché', 'Porque si no da error', 'Para que la imagen arranque antes', 'Para no necesitar FROM'], c: 0, x: 'Y después borrar las listas de paquetes: rm -rf /var/lib/apt/lists/*.' },
-    { d: 3, p: '¿Qué hace --no-install-recommends en Debian?', o: ['No instala los paquetes recomendados innecesarios', 'Instala sin pedir confirmación', 'Actualiza solo la seguridad', 'Instala desde un fichero local'], c: 0, x: 'Ayuda a que la imagen sea más pequeña.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: '¿Para qué sirve un multi-stage build?', o: ['Para que la imagen final solo lleve lo necesario: se compila en una etapa y se copia el resultado a otra ligera', 'Para ejecutar varios contenedores a la vez', 'Para subir la imagen a varios registros', 'Para usar varias versiones de FROM a la vez'], c: 0, x: 'Primera etapa: builder. Final: imagen ligera con COPY --from=builder.' },
     { d: 3, p: 'Las tres ideas del resumen final de buenas prácticas son…', o: ['Imagen lo más pequeña posible, aprovechar la caché y construir los paquetes dentro de Docker', 'Usar latest, ADD y root', 'Copiar todo, no usar caché y compilar fuera', 'Usar VirtualBox, WSL y Compose'], c: 0, x: 'Apartado 10 del temario.' },
     { d: 1, p: '¿Qué comando instala WSL 2 con Ubuntu por defecto?', o: ['wsl --install', 'wsl --shutdown', 'apt install wsl', 'docker install wsl'], c: 0, x: 'Desde PowerShell como administrador; luego reiniciar y comprobar con wsl --list --verbose.' },
     { d: 2, p: '¿En qué se diferencia WSL 2 de WSL 1?', o: ['Usa una máquina virtual ligera con un kernel Linux real', 'Traduce llamadas al sistema con el kernel de Windows', 'No admite Docker', 'Arranca más rápido y consume menos'], c: 0, x: 'WSL 2 rinde mejor en archivos y red, admite GUI e integra Docker Desktop.' },
-    { d: 2, p: '¿En qué arquitecturas está disponible WSL 2?', o: ['Solo x64 y ARM64', 'x64, ARM64 y x86', 'Solo x86', 'Cualquiera'], c: 0, x: 'Además hace falta Windows 11 22000 o superior y la virtualización activada (VT-x o AMD-V).' },
-    { d: 3, p: '¿Dónde se limitan la memoria y los procesadores de WSL 2?', o: ['En C:\\Users\\[Usuario]\\.wslconfig, sección [wsl2]', 'En /etc/wsl.conf de Linux', 'En el Administrador de tareas', 'En la BIOS'], c: 0, x: 'Después hay que ejecutar wsl --shutdown.' },
-    { d: 2, p: 'Desde WSL, ¿dónde está la unidad C: de Windows?', o: ['En /mnt/c/', 'En /c/', 'En /windows/c', 'No se puede acceder'], c: 0, x: 'Los problemas de permisos se corrigen remontando con drvfs y opciones uid/gid.' },
-    { d: 3, p: 'Para usar Docker con WSL, ¿qué hay que activar en Docker Desktop?', o: ['Settings > Resources > WSL Integration', 'Settings > General > Start at login', 'Kubernetes', 'El modo experimental'], c: 0, x: 'Se comprueba con docker --version.' },
-    { d: 3, p: '¿Qué hace wslpath dentro de WSL?', o: ['Convierte rutas entre Windows y Linux', 'Muestra la versión de WSL', 'Apaga WSL', 'Lista las distribuciones'], c: 0, x: 'explorer.exe . abre el explorador y code . abre VS Code.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
   ],
   'Proyecto Intermodular': [
     { p: 'En el patrón MVC, ¿qué parte contiene los datos y la lógica de negocio?', o: ['Vista', 'Modelo', 'Controlador', 'Router'], c: 1, x: 'Modelo = datos y reglas; Vista = presentación; Controlador = recibe acciones y coordina.' },
@@ -254,8 +254,8 @@ window.TARJETAS = {
     { f: 'Particiones lógicas en Linux', b: 'Van dentro de la extendida y se numeran desde 5: /dev/sda5.' },
     { f: 'MSR', b: 'Partición reservada de Microsoft en discos GPT: 16 MB, sin formato ni letra.' },
     { f: 'Partición BIOS boot', b: '1 MB sin formato que GRUB necesita para arrancar con BIOS desde un disco GPT. Por eso el instalador crea una sda1 de 1 MB.' },
-    { f: 'Límite de MBR (cálculo)', b: '2^32 sectores × 512 bytes = 2 TiB (unos 2,2 TB). Un disco de 2 TB (≈1,82 TiB) cabe entero.' },
-    { f: 'GB frente a GiB', b: '1 GB = 1.000.000.000 bytes; 1 GiB = 1.073.741.824 bytes. 25 GiB = 26,84 GB. Un SSD de 512 GB sale como ~476 GiB.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { f: 'Nombre de un disco NVMe', b: '/dev/nvme0n1: nvme0 controladora, n1 namespace, p1, p2… particiones.' },
     { f: 'Dual boot: GRUB', b: 'Gestor de Ubuntu. Detecta los otros sistemas (os-prober) y los añade a su menú.' },
     { f: 'Dual boot: Windows Boot Manager', b: 'Solo arranca Windows y no detecta Linux. Al instalarse se pone el primero en la UEFI.' },
@@ -290,7 +290,7 @@ window.TARJETAS = {
     { f: 'netplan', b: 'Configuración de red de Ubuntu Server: /etc/netplan/50-cloud-init.yaml. Se aplica con sudo netplan apply.' },
     { f: 'Fallo «Fallo temporal al resolver archive.ubuntu.com»', b: 'No hay DNS (ni puerta de enlace). Añadir routes: default via 192.168.111.2 y nameservers [192.168.111.2, 8.8.8.8].' },
     { f: 'ip route sin línea default', b: 'Falta la puerta de enlace.' },
-    { f: 'Nombre de equipo con guion bajo', b: 'No es válido: ubuntu_server quedó como ubuntuserver. Usar guion: ubuntu-server.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { f: 'SSH en Ubuntu Server', b: 'Instalar servidor OpenSSH para administrarlo a distancia: ssh fran@192.168.111.10.' },
     { f: 'Docker', b: 'Empaqueta una aplicación con lo que necesita (sistema base, librerías, configuración) en una imagen.' },
     { f: 'Dockerfile / imagen / contenedor', b: 'Dockerfile: instrucciones. Imagen: plantilla de solo lectura. Contenedor: instancia en ejecución de una imagen.' },
@@ -308,9 +308,9 @@ window.TARJETAS = {
     { f: 'Por qué DB_HOST: db', b: 'En la red de Compose (parte2_default) cada servicio se encuentra por su nombre.' },
     { f: 'docker compose up -d --build / ps', b: 'Construye y levanta todo en segundo plano / muestra el estado de los servicios.' },
     { f: 'docker compose down frente a down -v', b: 'down: borra contenedores y red, conserva volúmenes (contador sigue). down -v: borra también el volumen (contador a 1).' },
-    { f: 'Puerto 3306 de MariaDB', b: 'No se publica: solo lo usa la app dentro de la red de Compose.' },
-    { f: 'docker compose frente a docker-compose', b: 'Hoy es docker compose (con espacio) y la línea version: ya no hace falta.' },
-    { f: 'Incidencias de la práctica de Docker', b: 'Motor sin responder (npipe dockerDesktopLinuxEngine) → reiniciar Docker Desktop. DockerFile con F mayúscula → renombrar a Dockerfile.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Teoría de los apartados 1-11
     { f: 'Objetivos de un sistema operativo', b: 'Abstraer la complejidad del hardware, gestionar los recursos (CPU, memoria, E/S) y ofrecer un entorno de ejecución estable y predecible.' },
     { f: 'Clasificación por estructura', b: 'Monolíticos (MS-DOS, Unix temprano) · por capas (Windows NT) · microkernel (QNX, MINIX) · híbridos (Windows 7/10, macOS).' },
@@ -355,8 +355,8 @@ window.TARJETAS = {
     { f: 'Tipos de actualizaciones', b: 'De seguridad (las más urgentes), de calidad o errores, de funcionalidades (pueden requerir copia).' },
     { f: 'Aplicaciones en Windows y Ubuntu', b: 'Windows: instalador, Microsoft Store, winget. Ubuntu: apt (eliminar conserva configuración, purgar la borra), Snap, Flatpak.' },
     { f: 'Diagnóstico de controladores', b: 'Detectar → identificar modelo → comprobar estado → actualizar → revertir si empezó con una actualización → documentar.' },
-    { f: 'Ecosistema de hipervisores', b: 'ESXi/vSphere (vMotion), Hyper-V (Windows Server, Azure), KVM (núcleo Linux, OpenStack), Xen/Citrix, Proxmox (KVM + LXC). Todos tipo 1.' },
-    { f: 'Por qué pagar un hipervisor', b: 'Gestión centralizada, alta disponibilidad, migración en caliente, balanceo de cargas y soporte profesional.' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { f: 'Características de Docker', b: 'Aislamiento, portabilidad, eficiencia (comparte kernel), escalabilidad horizontal, automatización con Dockerfile.' },
     { f: 'Docker Compose: cuándo', b: 'Desarrollo local, pruebas de integración y producción no crítica. Crítico: Kubernetes o Docker Swarm.' },
     { f: 'Redes en Docker', b: 'Por defecto bridge. Con redes propias los contenedores se encuentran por nombre (Compose crea una para todos los servicios).' },
@@ -371,9 +371,9 @@ window.TARJETAS = {
     { f: 'WSL 1 frente a WSL 2', b: 'WSL 1: traduce llamadas, kernel de Windows, ligero y rápido, sin GUI. WSL 2: VM ligera con kernel Linux real, mejor en archivos y red, GUI, Docker Desktop.' },
     { f: 'Requisitos de WSL', b: 'Windows 11 22000+, x64/ARM64/x86 (WSL 2 solo x64 y ARM64), virtualización activada (VT-x / AMD-V), 1 GB de disco.' },
     { f: 'Instalar WSL', b: 'wsl --install (PowerShell admin) → reiniciar → wsl --list --verbose. Otra distro: wsl --list --online, wsl --install -d.' },
-    { f: '.wslconfig', b: 'C:\\Users\\[Usuario]\\.wslconfig, sección [wsl2]: memoria, procesadores, swap. Aplicar con wsl --shutdown.' },
-    { f: 'WSL: acceso a Windows y Docker', b: 'Unidades en /mnt/c/ (permisos: drvfs con uid/gid). Docker: Docker Desktop + Settings > Resources > WSL Integration.' },
-    { f: 'WSL: aplicaciones gráficas', b: 'Servidor X en Windows (VcXsrv, X410, GWSL), variables DISPLAY y LIBGL_ALWAYS_INDIRECT, prueba con xeyes (x11-apps).' },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
   ],
 };
 
@@ -408,7 +408,7 @@ window.DESARROLLO = {
     { d: 2, p: 'Explica los tipos de software según su licencia y las licencias de Windows.', r: 'Libre: usar, estudiar, modificar y redistribuir (Linux, LibreOffice), con licencias copyleft como la GPL o permisivas como MIT y BSD. Código abierto: código accesible y modificable (base de Android, Chromium). Propietario: solo derecho de uso según el EULA (Windows, macOS). Freeware: gratuito y cerrado. Shareware: prueba gratuita y luego pago. Windows: OEM (ligada al equipo), Retail (transferible) y por volumen (empresas y centros); Windows Server se licencia por núcleos y licencias de acceso de cliente.', k: ['Libre y código abierto', 'Copyleft frente a permisiva', 'Propietario, freeware y shareware', 'OEM, Retail y por volumen', 'Windows Server'] },
     { d: 2, p: 'Explica las estrategias de asignación de bloques y compara exFAT, Btrfs y ZFS.', r: 'Contigua: bloques seguidos, eficiente en acceso secuencial pero fragmenta. Encadenada: cada bloque apunta al siguiente, no fragmenta pero lee despacio. Indexada: un índice guarda las direcciones, no fragmenta y permite acceso secuencial y aleatorio; es la más usada. exFAT: sin límite de 4 GB, para USB y SD, sin permisos ni journaling. Btrfs: snapshots, compresión, deduplicación y RAID, menos maduro que ext4. ZFS: integridad con checksums, snapshots y pools, pero necesita mucha RAM y no es nativo en Windows.', k: ['Contigua', 'Encadenada', 'Indexada (la más usada)', 'exFAT', 'Btrfs y ZFS'] },
     { d: 2, p: '¿Qué hay que hacer tras instalar un SO cliente? Habla de configuración inicial, actualizaciones, aplicaciones y controladores.', r: 'Configuración inicial: nombre del equipo, usuario sin privilegios de administrador para el día a día, red, fecha y hora. Actualizaciones de seguridad, de calidad y de funcionalidades: en Windows con Windows Update; en Ubuntu, apt update y luego apt upgrade. Aplicaciones: en Windows instalador, Store o winget; en Ubuntu apt (eliminar o purgar), Snap y Flatpak. Controladores: en Windows con el Administrador de dispositivos (actualizar, revertir, desinstalar); en Linux vienen en el núcleo y lspci -k muestra cuál usa cada dispositivo.', k: ['Configuración inicial y usuario sin administrador', 'Tipos de actualizaciones', 'apt update antes de apt upgrade', 'Gestión de aplicaciones', 'Controladores en Windows y Linux'] },
-    { d: 1, p: 'Describe el ecosistema de hipervisores de tipo 1 y por qué se paga por ellos.', r: 'VMware vSphere/ESXi: líder empresarial, ESXi gratuito en versión básica y vCenter con vMotion. Hyper-V: rol de Windows Server, integrado con Azure. KVM: parte del núcleo de Linux, base de OpenStack. Xen/Citrix: seguridad y escritorios virtuales. Proxmox VE: basado en Debian, KVM y LXC con interfaz web. Se paga por gestión centralizada, alta disponibilidad, migración en caliente, balanceo de cargas y soporte.', k: ['ESXi/vSphere', 'Hyper-V y KVM', 'Xen y Proxmox', 'Motivos para pagar'] },
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 3, p: 'Enumera y explica las buenas prácticas para escribir un Dockerfile, incluido el multi-stage build.', r: 'Empezar con FROM y fijar su versión; ordenar las instrucciones para aprovechar la caché de capas; no copiar directorios enteros si basta el ejecutable; preferir COPY a ADD; agrupar update e install en el mismo RUN, usar --no-install-recommends en Debian y borrar las listas de paquetes; compilar dentro de la imagen; usar WORKDIR; verificar dependencias antes de compilar. El multi-stage build compila en una etapa builder y copia solo el resultado a una imagen final ligera con COPY --from=builder. Resumen: imagen pequeña, caché y construir dentro de Docker.', k: ['FROM con versión fija', 'Caché y orden de instrucciones', 'COPY mejor que ADD y update + install juntos', 'Limpiar paquetes y --no-install-recommends', 'Multi-stage build'] },
     { d: 2, p: 'Explica qué es WSL, las diferencias entre WSL 1 y WSL 2, sus requisitos y cómo se instala.', r: 'Permite ejecutar un entorno Linux completo en Windows sin VM tradicional ni dual boot, con rendimiento casi nativo. WSL 1 traduce las llamadas al sistema con el kernel de Windows, es ligero y no admite GUI; WSL 2 usa una VM ligera con kernel Linux real, rinde mejor en archivos y red, admite GUI e integra Docker Desktop. Requisitos: Windows 11 22000 o superior, x64 o ARM64 para WSL 2, virtualización activada y 1 GB de disco. Se instala con wsl --install en PowerShell como administrador y se comprueba con wsl --list --verbose.', k: ['Qué es WSL', 'WSL 1: traduce llamadas', 'WSL 2: VM con kernel real, GUI, Docker', 'Requisitos', 'wsl --install'] },
   ],
@@ -428,13 +428,13 @@ window.HUECOS = {
     'QNX, MINIX y L4 son ejemplos de arquitectura [microkernel].',
     'Windows desde NT y macOS tienen una arquitectura [híbrida].',
     'En Windows NT, la parte en modo kernel con los gestores de procesos, memoria, E/S y objetos se llama [Executive].',
-    'Windows NT tiene en modo usuario los subsistemas Win32, [POSIX] y [OS/2].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'El kernel de macOS se llama [XNU] y está formado por Mach, la capa [BSD] e IOKit.',
-    'En macOS, los controladores los gestiona [IOKit].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'El sistema de archivos de macOS es [APFS].',
-    'El microkernel de QNX se llama [Proton].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'La característica clave de un RTOS es el [determinismo]: un tiempo máximo conocido para cada operación.',
-    'MQTT, CoAP, Bluetooth y LoRaWAN son protocolos típicos de los SO para [IoT].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'El edge computing procesa los datos cerca de la [fuente] que los genera.',
     // Apartado 2: elementos
     'Un [proceso] es un programa en ejecución que necesita recursos.',
@@ -455,10 +455,10 @@ window.HUECOS = {
     'Se pasa a modo kernel por llamadas al sistema, [interrupciones] y [excepciones|traps].',
     'read() es un ejemplo de [llamada al sistema].',
     'La shell de Windows que trabaja con objetos .NET es [PowerShell].',
-    'Un script de Bash empieza con la línea [#!/bin/bash].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'El [superbloque] guarda los metadatos generales de un sistema de archivos y la tabla de [inodos], los de cada archivo.',
     'Un teclado usa un controlador de [carácter] y un disco, uno de [bloque].',
-    'En Linux, [modprobe] carga un controlador y [lsmod] lista los cargados.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'La biblioteca de C en Linux es [glibc] y la de Windows, [WinAPI].',
     // Apartado 3: licencias
     'El software [libre] permite usar, estudiar, modificar y redistribuir el programa.',
@@ -466,7 +466,7 @@ window.HUECOS = {
     'La GPL es una licencia [copyleft] y MIT y BSD son [permisivas].',
     'La licencia de Windows que viene preinstalada y queda ligada al equipo es la [OEM].',
     'La licencia [Retail] de Windows se compra suelta y se puede transferir.',
-    'Windows Server se licencia por [núcleos] de procesador y licencias de acceso de cliente.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Apartado 4: sistemas de archivos
     'El [registro] es la unidad lógica de acceso y el [bloque], la unidad física mínima de transferencia.',
     'La asignación más usada es la [indexada].',
@@ -480,7 +480,7 @@ window.HUECOS = {
     'macOS solo puede [leer] NTFS, no escribir.',
     '[exFAT] no tiene el límite de 4 GB por archivo y funciona en Windows, macOS y Linux.',
     '[Btrfs] ofrece snapshots, compresión y deduplicación, pero es menos maduro que ext4.',
-    '[ZFS] protege la integridad con checksums y necesita al menos [4 GB] de RAM.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'La partición EFI de un equipo UEFI va en [FAT32].',
     'Para un pendrive con vídeos de 8 GB que se usa en Windows, macOS y Linux se elige [exFAT].',
     // Apartado 5: particionado
@@ -500,8 +500,8 @@ window.HUECOS = {
     'Las actualizaciones más urgentes son las de [seguridad].',
     'En Ubuntu, primero se ejecuta apt [update] y después apt [upgrade].',
     'En apt, eliminar conserva la configuración y [purgar] la borra.',
-    'En Windows se pueden instalar aplicaciones desde la terminal con [winget].',
-    'En Linux, [lspci -k] muestra qué controlador usa cada dispositivo.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Apartado 7: virtualización
     'El SO de la máquina virtual es el [invitado|guest] y el del equipo real, el [anfitrión|host].',
     'Al hipervisor también se le llama monitor de [máquina virtual|máquinas virtuales] (VMM).',
@@ -511,7 +511,7 @@ window.HUECOS = {
     'Con el adaptador [puente] la VM recibe su propia IP de la red física.',
     'La red [interna] comunica solo las máquinas virtuales entre sí.',
     'La red solo-[anfitrión] conecta el anfitrión con las VM, sin salida a la red externa.',
-    'Proxmox VE combina [KVM] para las VM y [LXC] para los contenedores.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Apartado 8 y 9: contenedores y Docker
     'Los contenedores comparten el [kernel] del anfitrión.',
     'Un contenedor arranca en [segundos] y una máquina virtual, en minutos.',
@@ -529,24 +529,24 @@ window.HUECOS = {
     'Las buenas prácticas prefieren [COPY] frente a ADD.',
     'Hay que fijar la [versión] de la imagen en FROM para evitar errores al reconstruir.',
     'update e install van en la misma línea [RUN] para que compartan caché.',
-    'En Debian se usa --no-install-[recommends] para no instalar paquetes innecesarios.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'Un multi-stage build copia el resultado de la primera etapa con COPY --from=[builder].',
     // Apartado 11: WSL
     'WSL 1 traduce las llamadas al sistema y WSL 2 usa un [kernel] Linux real.',
     'WSL se instala con el comando [wsl --install].',
-    'WSL 2 solo funciona en las arquitecturas x64 y [ARM64].',
-    'La memoria de WSL 2 se limita en el archivo [.wslconfig].',
-    'Desde WSL, la unidad C: de Windows está en [/mnt/c].',
-    'Para usar Docker con WSL se activa WSL [Integration] en Docker Desktop.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Prácticas
     'Un disco NVMe se llama en Linux /dev/[nvme0n1].',
     'En un dual boot se instala primero [Windows] y después Ubuntu.',
-    'GRUB detecta los otros sistemas con [os-prober].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'Al instalar Ubuntu junto a Windows, la partición EFI se usa sin [formatear|formatearla].',
     'Con 16 GB de RAM y sin hibernación, la guía de Ubuntu recomienda [4 GB] de swap.',
     'Con BIOS y disco GPT, GRUB necesita una partición [BIOS boot] de 1 MB.',
-    'MBR llega como máximo a 2^32 × 512 bytes, es decir, [2 TiB].',
-    '25 GiB equivalen a [26,84] GB.',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'En VMware, lo equivalente a las Guest Additions son las [VMware Tools] (paquete open-vm-tools).',
     'El disco dinámico VDI de VirtualBox equivale en VMware a un disco [VMDK].',
     'Ubuntu Server usa el instalador [Subiquity], en modo texto.',
@@ -555,12 +555,12 @@ window.HUECOS = {
     'En Ubuntu Server con LVM, la swap es el archivo [/swap.img].',
     'La red de Ubuntu Server se configura con [netplan] y se aplica con sudo netplan [apply].',
     'Si ip route no muestra una línea [default], falta la puerta de enlace.',
-    'En la red NAT de VMware 192.168.111.0/24, la puerta de enlace es [192.168.111.2].',
-    'Un nombre de equipo no puede llevar guion [bajo].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     'Para servir una web con nginx se copia la carpeta a [/usr/share/nginx/html].',
     'docker build -t mi-web:1.0 . construye la imagen mi-web con la etiqueta [1.0].',
     'En un compose.yaml, la app encuentra la base de datos por el nombre del [servicio].',
-    'MariaDB guarda sus datos en [/var/lib/mysql].',
-    'El fichero de instrucciones de Docker se tiene que llamar exactamente [Dockerfile].',
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
+    null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
   ],
 };

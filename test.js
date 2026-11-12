@@ -249,12 +249,12 @@ await writeFile('js/demo.js', '// Datos de ejemplo (generados por test.js con un
 // --- repaso, tarjetas y desarrollo: cada pregunta bien formada ---
 globalThis.window = globalThis.window || {};
 await import('./js/repaso.js');
-for (const q of Object.values(window.REPASO).flat()) {
+for (const q of Object.values(window.REPASO).flat().filter(Boolean)) {
   assert.ok(Number.isInteger(q.c) && q.o[q.c] !== undefined && new Set(q.o).size === q.o.length && q.x, q.p);
   assert.ok(q.d === undefined || [1, 2, 3].includes(q.d), q.p);
 }
-for (const t of Object.values(window.TARJETAS).flat()) assert.ok(t.f && t.b, JSON.stringify(t));
-for (const q of Object.values(window.DESARROLLO).flat()) assert.ok(q.p && q.r && q.k.length && [1, 2, 3].includes(q.d), q.p);
-for (const h of Object.values(window.HUECOS).flat()) assert.ok(/\[[^\]|]+(\|[^\]|]+)*\]/.test(h) && !/\[[^\]]*\[|\][^\[]*\]/.test(h.replace(/\[[^\]]*\]/g, '')), h);
+for (const t of Object.values(window.TARJETAS).flat().filter(Boolean)) assert.ok(t.f && t.b, JSON.stringify(t));
+for (const q of Object.values(window.DESARROLLO).flat().filter(Boolean)) assert.ok(q.p && q.r && q.k.length && [1, 2, 3].includes(q.d), q.p);
+for (const h of Object.values(window.HUECOS).flat().filter(Boolean)) assert.ok(/\[[^\]|]+(\|[^\]|]+)*\]/.test(h) && !/\[[^\]]*\[|\][^\[]*\]/.test(h.replace(/\[[^\]]*\]/g, '')), h);
 
 console.log('Todas las pruebas OK · js/demo.js regenerado');

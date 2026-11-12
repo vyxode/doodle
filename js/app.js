@@ -1093,7 +1093,7 @@ const DIAS_CAJA = [0, 1, 3, 7, 14, 30];
 const listaRepaso = (m, tipo) => (({ t: window.TARJETAS, h: window.HUECOS }[tipo] || window.REPASO) || {})[m] || [];
 function pendientesRepaso(m, tipo = 'p') {
   const ahora = Date.now();
-  return listaRepaso(m, tipo).map((_, i) => m + ':' + (tipo === 'p' ? '' : tipo + ':') + i).filter((id) => (S.prog.repaso[id]?.sig || 0) <= ahora)
+  return listaRepaso(m, tipo).flatMap((q, i) => q ? [m + ':' + (tipo === 'p' ? '' : tipo + ':') + i] : []).filter((id) => (S.prog.repaso[id]?.sig || 0) <= ahora)
     .sort((a, b) => (S.prog.repaso[a]?.caja || 0) - (S.prog.repaso[b]?.caja || 0));
 }
 function empezarRepaso(m, tipo = 'p') {
@@ -1169,18 +1169,18 @@ function comprobarHuecos(f) {
 }
 function panelHuecos(m) {
   const n = pendientesRepaso(m, 'h').length;
-  return `<section class="bloque"><div class="panel practica-cta"><div><b>Completar huecos</b><p class="suave">${n ? n + ' frases tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.HUECOS[m].length} en total.</p></div><button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}" data-t="h">Completar</button></div></section>`;
+  return `<section class="bloque"><div class="panel practica-cta"><div><b>Completar huecos</b><p class="suave">${n ? n + ' frases tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.HUECOS[m].filter(Boolean).length} en total.</p></div><button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}" data-t="h">Completar</button></div></section>`;
 }
 function panelTarjetas(m) {
   const n = pendientesRepaso(m, 't').length;
-  return `<section class="bloque"><div class="panel practica-cta"><div><b>Tarjetas</b><p class="suave">${n ? n + ' tarjetas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.TARJETAS[m].length} en total.</p></div><button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}" data-t="t">Estudiar</button></div></section>`;
+  return `<section class="bloque"><div class="panel practica-cta"><div><b>Tarjetas</b><p class="suave">${n ? n + ' tarjetas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.TARJETAS[m].filter(Boolean).length} en total.</p></div><button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}" data-t="t">Estudiar</button></div></section>`;
 }
 
 // ---------- examen de prueba: preguntas al azar según el nivel; el test se corrige solo y el desarrollo te lo corriges tú ----------
 const NIVELES = { facil: ['Fácil', [6, 3, 0]], medio: ['Medio', [2, 5, 2]], dificil: ['Difícil', [0, 3, 6]], mixto: ['Mixto', [1, 1, 1]] }; // pesos de dificultad 1, 2 y 3
 const DIF = ['', 'fácil', 'media', 'difícil'];
 // muestreo ponderado sin repetir (clave = azar^(1/peso)); las de peso 0 solo entran si no hay bastantes
-const elegir = (lista, pesos, n) => lista.map((q, i) => { const w = pesos[(q.d || 1) - 1]; return { i, k: w ? Math.random() ** (1 / w) : Math.random() - 1 }; })
+const elegir = (lista, pesos, n) => lista.flatMap((q, i) => { if (!q) return []; const w = pesos[(q.d || 1) - 1]; return [{ i, k: w ? Math.random() ** (1 / w) : Math.random() - 1 }]; })
   .sort((a, b) => b.k - a.k).slice(0, n).map((x) => x.i);
 // ---------- 10 exámenes fijos por módulo: siempre las mismas preguntas (semilla fija) y entre todos cubren el banco ----------
 const azar = (sem) => () => { sem = (sem + 0x6d2b79f5) | 0; let t = Math.imul(sem ^ (sem >>> 15), 1 | sem); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32
@@ -1189,7 +1189,7 @@ const FIJOS = ['facil', 'facil', 'medio', 'medio', 'medio', 'dificil', 'dificil'
 const REPARTO = { facil: [[18, 10, 0], [1, 1, 0]], medio: [[6, 14, 8], [0, 2, 0]], dificil: [[0, 10, 18], [0, 0, 2]], mixto: [[9, 10, 9], [0, 1, 1]] };
 // las menos usadas primero (desempate al azar); si una dificultad no llega, se rellena con las demás
 function tomar(lista, cuantos, rnd, usos) {
-  const orden = lista.map((q, i) => ({ i, d: (q.d || 1) - 1, k: (usos[i] || 0) + rnd() })).sort((a, b) => a.k - b.k);
+  const orden = lista.flatMap((q, i) => q ? [{ i, d: (q.d || 1) - 1, k: (usos[i] || 0) + rnd() }] : []).sort((a, b) => a.k - b.k);
   const total = cuantos.reduce((a, b) => a + b, 0), out = cuantos.flatMap((n, d) => orden.filter((x) => x.d === d).slice(0, n).map((x) => x.i));
   for (const x of orden) if (out.length < total && !out.includes(x.i)) out.push(x.i);
   for (let k = out.length - 1; k > 0; k--) { const r = Math.floor(rnd() * (k + 1)); [out[k], out[r]] = [out[r], out[k]]; }
@@ -1210,10 +1210,10 @@ function panelExamen(m) {
 function vistaRepasoSec() {
   const mods = [...new Set([window.REPASO, window.TARJETAS, window.HUECOS].flatMap((o) => Object.keys(o || {})))];
   if (!mods.includes(S.repMod)) S.repMod = mods.includes('Sistemas Informáticos') ? 'Sistemas Informáticos' : mods[0];
-  const m = S.repMod, L = (window.REPASO || {})[m] || [], h = examenesDe(m);
+  const m = S.repMod, L = ((window.REPASO || {})[m] || []).filter(Boolean), h = examenesDe(m);
   return cabecera('Repaso', '<span class="suave">Test, tarjetas, huecos y exámenes para preparar los exámenes.</span>') + `
   <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="rep-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
-  ${L.length ? `<section class="bloque"><div class="panel practica-cta"><div><b>Preguntas tipo test</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
+  ${L.length ? `<section class="bloque"><div class="panel practica-cta"><div><b>Preguntas tipo test</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].filter(Boolean).length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
   ${(window.TARJETAS || {})[m] ? panelTarjetas(m) : ''}
   ${(window.HUECOS || {})[m] ? panelHuecos(m) : ''}
   ${L.length ? `<section class="bloque"><header><h2>Exámenes</h2><button type="button" class="boton" data-acc="examen-config" data-v="${esc(m)}">Examen al azar</button></header>
@@ -1270,7 +1270,7 @@ function vistaExamen() {
   if (!m || !(window.REPASO || {})[m]) { location.hash = 'repaso'; return ''; }
   const volver = '<a href="#repaso" class="suave">Volver a Repaso</a>', hayDes = !!((window.DESARROLLO || {})[m] || []).length;
   if (!E) {
-    const h = examenesDe(m), total = window.REPASO[m].length;
+    const h = examenesDe(m), total = window.REPASO[m].filter(Boolean).length;
     return cabecera('Examen de prueba · ' + m, volver) + `
     <form id="f-examen-cfg" class="panel rejilla-form ex-cfg">
       <label class="campo"><span>Nivel</span><select id="ex-nivel"><option value="azar">Al azar</option>${Object.entries(NIVELES).map(([k, [t]]) => `<option value="${k}">${t}</option>`).join('')}</select></label>
