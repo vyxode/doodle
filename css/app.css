@@ -720,6 +720,10 @@ kbd { font: 500 11.5px var(--f-texto); padding: 2px 6px; border: 1px solid var(-
 .repaso-botones { display: flex; flex-wrap: wrap; gap: 8px; }
 .tarjeta-b { margin: 0; padding: 12px 14px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; background: var(--panel-2); border-radius: var(--radio); }
 
+.tarjeta-tuya { margin: 0; padding: 12px 14px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; border: 1px solid var(--linea-fuerte); border-radius: var(--radio); }
+.repaso textarea { min-height: 80px; }
+.ex-fin { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+
 /* completar huecos */
 .hueco-texto { line-height: 2.1; }
 input.hueco { display: inline-block; width: auto; min-width: 0; max-width: 100%; height: auto; font: inherit; line-height: 1.4; color: var(--texto); background: var(--panel-2); border: 0; border-bottom: 2px solid var(--linea-fuerte); border-radius: 4px 4px 0 0; padding: 0 6px; margin: 0 2px; box-shadow: none; }

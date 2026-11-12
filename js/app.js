@@ -1115,9 +1115,9 @@ function vistaRepaso() {
   if (t) return cab + `<div class="panel repaso">
     <div class="suave repaso-meta">Quedan ${R.cola.length} · ${S.prog.repaso[id]?.caja ? 'caja ' + S.prog.repaso[id].caja + ' de 5' : 'nueva'}</div>
     <p class="repaso-p">${esc(q.f)}</p>
-    ${R.ver ? `<p class="tarjeta-b">${esc(q.b)}</p>
+    ${R.ver ? `${R.txt ? `<p class="tarjeta-tuya"><b>Tu respuesta.</b> ${esc(R.txt)}</p>` : ''}<p class="tarjeta-b"><b>Respuesta.</b> ${esc(q.b)}</p>
       <div class="repaso-botones"><button type="button" class="boton principal" data-acc="rep-resp" data-v="1">La sabía</button><button type="button" class="boton" data-acc="rep-resp" data-v="0">No la sabía</button></div>`
-    : '<button type="button" class="boton principal" data-acc="rep-ver" autofocus>Ver respuesta</button>'}
+    : '<textarea id="tarjeta-r" rows="3" aria-label="Tu respuesta" placeholder="Escribe lo que recuerdes y pulsa Corregir (también puedes dejarlo en blanco)"></textarea><button type="button" class="boton principal" data-acc="rep-ver">Corregir</button>'}
   </div>`;
   if (R.tipo === 'h') {
     const partes = q.split(/\[([^\]]+)\]/), ok = R.hok, todo = ok && ok.every(Boolean); // impares = huecos
@@ -1157,8 +1157,8 @@ function responderRepaso(i) {
 function siguienteRepaso() {
   const R = S.rep, id = R.cola.shift();
   if (!R.acierto) R.cola.push(id); // la fallada vuelve al final de la tanda
-  R.resp = null; R.orden = null; R.ver = false; R.hok = R.hval = null; render();
-  document.getElementById('h0')?.focus();
+  R.resp = null; R.orden = null; R.ver = false; R.hok = R.hval = null; R.txt = ''; render();
+  (document.getElementById('h0') || document.getElementById('tarjeta-r'))?.focus();
 }
 const normal = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '').replace(/\.$/, '');
 function comprobarHuecos(f) {
@@ -1254,10 +1254,17 @@ function corregirExamen() {
 function anotarExamen(el) { // radio t<n>, textarea d<n>, casilla k<n>:<punto>
   const E = S.ex, tipo = el.dataset.ex[0], [n, k] = el.dataset.ex.slice(1).split(':').map(Number);
   if (!E || E.corregido && tipo !== 'k') return;
-  if (tipo === 't') E.test[n].resp = +el.value;
-  else if (tipo === 'd') E.des[n].txt = el.value;
-  else { E.des[n].marcas[k] = el.checked; guardarNotaExamen(); }
+  if (tipo === 't') {
+    const t = E.test[n];
+    if (t.resp != null) return; // ya corregida
+    t.resp = +el.value;
+    if (t.resp !== window.REPASO[E.m][t.i].c) cambiar('repaso', E.m + ':' + t.i, { caja: 1, sig: 0 }); // lo fallado vuelve al repaso
+    repintarExamen();
+  } else if (tipo === 'd') E.des[n].txt = el.value;
+  else { E.des[n].marcas[k] = el.checked; if (E.corregido) guardarNotaExamen(); }
 }
+function repintarExamen() { const y = scrollY; render(); scrollTo(0, y); } // corrige en el sitio sin saltar arriba
+function corregirDesarrollo(n) { S.ex.des[n].hecha = true; repintarExamen(); }
 function vistaExamen() {
   const E = S.ex, m = E ? E.m : S.exMod;
   if (!m || !(window.REPASO || {})[m]) { location.hash = 'repaso'; return ''; }
@@ -1279,19 +1286,19 @@ function vistaExamen() {
     <button type="button" class="boton principal" data-acc="examen-config" data-v="${esc(m)}">Otro examen</button></div>` : ''}
   <form id="f-examen" class="examen">
     <h3 class="ex-titulo">Test · ${E.test.length} preguntas</h3>
-    ${E.test.map((t, n) => { const q = L[t.i]; return `<div class="panel ex-q" role="radiogroup" aria-labelledby="exp${n}">
+    ${E.test.map((t, n) => { const q = L[t.i], ya = c || t.resp != null; return `<div class="panel ex-q" role="radiogroup" aria-labelledby="exp${n}">
       <p class="ex-p" id="exp${n}">${n + 1}. ${esc(q.p)} <small>${DIF[q.d || 1]}</small></p>
-      ${t.orden.map((k) => `<label class="ex-op ${c ? (k === q.c ? 'bien' : k === t.resp ? 'mal' : '') : ''}"><input type="radio" name="t${n}" value="${k}" data-ex="t${n}" ${t.resp === k ? 'checked' : ''} ${c ? 'disabled' : ''}><span>${esc(q.o[k])}</span></label>`).join('')}
-      ${c ? `<p class="repaso-x">${t.resp === q.c ? '<b>Bien.</b>' : t.resp == null ? '<b>Sin contestar.</b>' : '<b>No.</b>'} ${esc(q.x)}</p>` : ''}
+      ${t.orden.map((k) => `<label class="ex-op ${ya ? (k === q.c ? 'bien' : k === t.resp ? 'mal' : '') : ''}"><input type="radio" name="t${n}" value="${k}" data-ex="t${n}" ${t.resp === k ? 'checked' : ''} ${ya ? 'disabled' : ''}><span>${esc(q.o[k])}</span></label>`).join('')}
+      ${ya ? `<p class="repaso-x">${t.resp === q.c ? '<b>Bien.</b>' : t.resp == null ? '<b>Sin contestar.</b>' : '<b>No.</b>'} ${esc(q.x)}</p>` : ''}
     </div>`; }).join('')}
     ${E.des.length ? `<h3 class="ex-titulo">Desarrollo · ${E.des.length} preguntas</h3>` : ''}
-    ${E.des.map((d, n) => { const q = D[d.i]; return `<div class="panel ex-q">
+    ${E.des.map((d, n) => { const q = D[d.i], ya = c || d.hecha; return `<div class="panel ex-q">
       <label class="ex-p" for="exd${n}">${E.test.length + n + 1}. ${esc(q.p)} <small>${DIF[q.d || 1]}</small></label>
-      <textarea id="exd${n}" data-ex="d${n}" rows="6" ${c ? 'readonly' : ''} placeholder="Escribe tu respuesta…">${esc(d.txt)}</textarea>
-      ${c ? `<p class="ex-modelo"><b>Respuesta modelo.</b> ${esc(q.r)}</p>
-        <div class="ex-k"><span class="suave">Marca los puntos que has puesto:</span>${q.k.map((k, i) => `<label><input type="checkbox" data-ex="k${n}:${i}" ${d.marcas[i] ? 'checked' : ''}><span>${esc(k)}</span></label>`).join('')}</div>` : ''}
+      <textarea id="exd${n}" data-ex="d${n}" rows="6" ${ya ? 'readonly' : ''} placeholder="Escribe tu respuesta…">${esc(d.txt)}</textarea>
+      ${ya ? `<p class="ex-modelo"><b>Respuesta modelo.</b> ${esc(q.r)}</p>
+        <div class="ex-k"><span class="suave">Marca los puntos que has puesto:</span>${q.k.map((k, i) => `<label><input type="checkbox" data-ex="k${n}:${i}" ${d.marcas[i] ? 'checked' : ''}><span>${esc(k)}</span></label>`).join('')}</div>` : `<div><button type="button" class="boton" data-acc="ex-corr" data-n="${n}">Corregir esta pregunta</button></div>`}
     </div>`; }).join('')}
-    ${c ? '' : '<div><button class="boton principal">Corregir</button></div>'}
+    ${c ? '' : `<div class="ex-fin"><span class="suave">Test: ${E.test.filter((t) => t.resp === L[t.i].c).length} bien de ${E.test.filter((t) => t.resp != null).length} contestadas</span><button class="boton principal">Terminar y ver la nota</button></div>`}
   </form>`;
 }
 
@@ -1644,8 +1651,9 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'releer-temas') actualizarTemas(true);
   else if (acc === 'cerrar-chuleta') cerrarChuleta();
   else if (acc === 'repasar') empezarRepaso(el.dataset.v, el.dataset.t);
-  else if (acc === 'rep-ver') { S.rep.ver = true; render(); }
+  else if (acc === 'rep-ver') { S.rep.txt = document.getElementById('tarjeta-r')?.value.trim(); S.rep.ver = true; render(); }
   else if (acc === 'examen-config') configurarExamen(el.dataset.v);
+  else if (acc === 'ex-corr') corregirDesarrollo(+el.dataset.n);
   else if (acc === 'examen-fijo') empezarExamen(el.dataset.v, null, 0, +el.dataset.n);
   else if (acc === 'rep-mod') { S.repMod = el.dataset.v; render(); }
   else if (acc === 'rep-resp') responderRepaso(+el.dataset.v);
