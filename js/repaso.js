@@ -567,5 +567,5 @@ window.HUECOS = {
 
 // Resúmenes en PDF para leer desde Repaso (rutas relativas a la web)
 window.RESUMENES = {
-  'Sistemas Informáticos': [{ t: 'Resumen del examen del Tema 2', f: 'resumenes/sistemas-tema2.pdf' }],
+  'Sistemas Informáticos': [{ t: 'Resumen del examen del Tema 2', f: 'repaso/sistemas/Resumen_Examen_Sistemas_Tema2.pdf' }],
 };
