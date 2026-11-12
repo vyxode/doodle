@@ -1,6 +1,6 @@
 // Resúmenes de solo lectura: cada persona tiene su contraseña, que abre su llave en llaves.json
 // (dentro va su nombre y la clave de los PDF). Los PDF se descifran en memoria y se pintan en canvas
-// con el nombre de quien lee encima; nunca hay un PDF que descargar.
+// sin marca de agua; nunca hay un PDF que descargar.
 // Registro: un Formulario de Google con dos preguntas de respuesta corta (nombre y qué abre).
 const REGISTRO = { form: '', nombre: '', que: '' }; // form: https://docs.google.com/forms/d/e/<id>/formResponse, nombre/que: 'entry.123'
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
@@ -34,17 +34,6 @@ function mostrar() {
   }
 }
 
-function marca(ctx, w, h) {
-  const txt = `${yo.n} · ${new Date().toLocaleDateString('es-ES')} · Doodle`;
-  ctx.save();
-  ctx.globalAlpha = 0.13; ctx.fillStyle = '#d44c47'; ctx.font = `600 ${Math.round(w / 28)}px sans-serif`;
-  ctx.translate(w / 2, h / 2); ctx.rotate(-Math.PI / 6);
-  const paso = w / 3;
-  let fila = 0;
-  for (let y = -h; y < h; y += paso / 1.6, fila++) for (let x = -w; x < w; x += paso * 1.4) ctx.fillText(txt, x + (fila % 2) * paso / 2, y);
-  ctx.restore();
-}
-
 let lectura = 0; // cada clic empieza una lectura nueva; la anterior deja de pintar (si no, dos clics duplican las páginas)
 async function leer(r) {
   const esta = ++lectura;
@@ -63,10 +52,8 @@ async function leer(r) {
       const c = document.createElement('canvas');
       c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
       c.setAttribute('aria-label', `${r.t}, página ${i}`); c.setAttribute('role', 'img');
-      const ctx = c.getContext('2d');
-      await pag.render({ canvasContext: ctx, viewport: vp }).promise;
+      await pag.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
       if (esta !== lectura) return doc.destroy();
-      marca(ctx, c.width, c.height);
       $('hojas').append(c);
     }
     await doc.destroy();
@@ -90,7 +77,7 @@ try { yo = JSON.parse(sessionStorage.getItem('doodle-lector')); } catch { yo = n
 mostrar();
 
 // Solo lectura. shortcut: frena descargas, copias y capturas casuales; una foto al móvil o las herramientas
-// del navegador siguen pudiendo, por eso cada página lleva el nombre de quien la lee.
+// del navegador siguen pudiendo (sin marca de agua, a petición: leer es más cómodo).
 const no = (e) => { if (e.target.closest?.('#dentro') || e.type === 'contextmenu') e.preventDefault(); };
 for (const t of ['contextmenu', 'dblclick', 'selectstart', 'dragstart', 'copy', 'cut']) document.addEventListener(t, no);
 document.addEventListener('mousedown', (e) => { if (e.detail > 1) e.preventDefault(); }); // sin selección con doble clic
