@@ -141,22 +141,22 @@ window.REPASO = {
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Tema 2 (teoría de los apartados 1-11 que entran en el examen)
-    { d: 1, p: '¿Qué tres objetivos tiene un sistema operativo según el temario?', o: ['Abstraer el hardware, gestionar los recursos y ofrecer un entorno de ejecución estable', 'Compilar, enlazar y ejecutar programas', 'Conectar a Internet, proteger y hacer copias', 'Instalar, actualizar y desinstalar aplicaciones'], c: 0, x: 'Gestiona CPU, memoria y E/S de forma eficiente, segura y transparente.' },
-    { d: 1, p: '¿Qué tipo de SO garantiza respuestas dentro de plazos estrictos?', o: ['Tiempo real (RTOS)', 'De propósito general', 'Distribuido', 'De red'], c: 0, x: 'Ejemplos: FreeRTOS, VxWorks, QNX.' },
-    { d: 2, p: 'Cisco IOS y Juniper JunOS son sistemas operativos…', o: ['De red', 'Embebidos', 'Distribuidos', 'Móviles'], c: 0, x: 'Ofrecen servicios de red como enrutamiento o cortafuegos.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 1, p: 'Linux con GNOME o KDE es un ejemplo de interfaz…', o: ['Híbrida (CLI + GUI)', 'Solo CLI', 'Solo GUI', 'De tiempo real'], c: 0, x: 'CLI: MS-DOS, Bash. GUI: Windows, macOS.' },
+    null, // quitada: no entra en el examen
     { d: 1, p: '¿En qué arquitectura todo el SO se ejecuta en un único espacio de direcciones en modo kernel?', o: ['Monolítica', 'Microkernel', 'Por capas', 'Híbrida'], c: 0, x: 'Rendimiento alto, pero un fallo en un módulo puede tumbar todo el sistema.' },
     { d: 2, p: '¿Qué arquitectura ejecuta en modo kernel solo procesos, memoria e IPC, y el resto en modo usuario?', o: ['Microkernel', 'Monolítica', 'Por capas', 'Híbrida'], c: 0, x: 'Ejemplos: QNX, MINIX, L4.' },
     { d: 2, p: 'Desventaja principal del microkernel:', o: ['Sobrecarga de comunicación entre procesos y menos rendimiento', 'Un fallo en un módulo tumba todo el sistema', 'Hay que recompilar todo para cualquier cambio', 'No se puede portar a otras plataformas'], c: 0, x: 'A cambio es muy modular, seguro y estable.' },
     { d: 2, p: 'En la arquitectura por capas, cada capa…', o: ['Ofrece servicios a la de arriba y usa los de la de abajo', 'Se ejecuta en un proceso independiente', 'Tiene su propio kernel', 'Se comunica con todas las demás'], c: 0, x: 'Ejemplos: Windows NT y THE OS. Desventaja: sobrecarga en las llamadas entre capas.' },
     { d: 3, p: '¿Qué arquitectura tiene modularidad baja porque cualquier cambio obliga a recompilar el SO completo?', o: ['Monolítica', 'Microkernel', 'Por capas', 'Híbrida'], c: 0, x: 'Ejemplos: MS-DOS, primeras versiones de Unix y el núcleo de Linux.' },
-    { d: 2, p: '¿Qué es el Executive de Windows NT?', o: ['La parte en modo kernel con los gestores de procesos, memoria, E/S y objetos', 'El subsistema Win32', 'El explorador de archivos', 'La consola de PowerShell'], c: 0, x: 'En modo usuario están los subsistemas Win32, POSIX y OS/2.' },
-    { d: 2, p: '¿Qué componentes forman el kernel XNU de macOS?', o: ['Mach, la capa BSD e IOKit', 'Executive, Win32 y POSIX', 'Proton, proc y fs', 'VFS, módulos .ko y glibc'], c: 0, x: 'Mach: procesos, memoria e IPC. BSD: archivos, red y seguridad. IOKit: controladores.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 2, p: '¿Qué sistema de archivos usa macOS según el temario?', o: ['APFS', 'NTFS', 'ext4', 'ReFS'], c: 0, x: 'Windows NT: NTFS, FAT32 y ReFS.' },
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 2, p: '¿Qué característica define a un RTOS?', o: ['Determinismo: un tiempo máximo conocido para cada operación', 'Interfaz gráfica avanzada', 'Escalado automático en la nube', 'Compatibilidad con Win32'], c: 0, x: 'También prioridades estrictas, latencia baja y gestión eficiente de interrupciones.' },
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
@@ -174,14 +174,14 @@ window.REPASO = {
     { d: 2, p: '¿Qué técnica elimina la fragmentación externa pero añade sobrecarga de tablas?', o: ['Paginación', 'Segmentación', 'Partición dinámica', 'Partición fija'], c: 0, x: 'Divide la memoria en marcos físicos y páginas lógicas.' },
     { d: 2, p: '¿Qué es un page fault?', o: ['La página no está en RAM y hay que cargarla desde disco o swap', 'Un error de división por cero', 'Un bloque defectuoso del disco', 'Un proceso bloqueado'], c: 0, x: 'La tabla de páginas tiene bits de presencia, modificación y referencia.' },
     { d: 3, p: 'Segmentación: ¿en qué divide la memoria y qué ventaja tiene?', o: ['En segmentos lógicos (código, datos, pila); protección y compartición', 'En marcos de 4 KB; sin fragmentación', 'En particiones fijas; sencillez', 'En bloques de disco; más RAM'], c: 0, x: 'Su desventaja es la fragmentación externa.' },
-    { d: 1, p: 'En modo usuario, una aplicación…', o: ['No puede acceder directamente al hardware ni ejecutar instrucciones privilegiadas', 'Tiene acceso total al hardware', 'Puede bloquear todo el sistema', 'Ejecuta el kernel'], c: 0, x: 'Si lo intenta, salta una excepción (trap) y el control pasa al SO.' },
-    { d: 2, p: '¿Cuáles son las tres formas de pasar de modo usuario a modo kernel?', o: ['Llamadas al sistema, interrupciones y excepciones (traps)', 'Pipes, sockets y semáforos', 'FCFS, SJF y Round Robin', 'Paginación, segmentación y swap'], c: 0, x: 'Interrupciones: hardware. Excepciones: software (división por cero, acceso inválido).' },
-    { d: 2, p: 'read() es un ejemplo de…', o: ['Llamada al sistema', 'Interrupción de hardware', 'Excepción', 'Controlador'], c: 0, x: 'La aplicación pide un servicio y el SO pasa a modo kernel para hacerlo.' },
-    { d: 1, p: '¿Qué shell usa objetos .NET?', o: ['PowerShell', 'Bash', 'Zsh', 'cmd.exe'], c: 0, x: 'Bash es la de Linux por defecto; Zsh destaca por el autocompletado y los temas.' },
-    { d: 2, p: '¿Qué guarda el superbloque de un sistema de archivos?', o: ['Metadatos generales: tamaño y bloques libres', 'Los permisos de cada archivo', 'El contenido de los archivos', 'La tabla de particiones'], c: 0, x: 'La tabla de inodos guarda los metadatos de cada archivo.' },
-    { d: 2, p: 'Un teclado o /dev/tty usan controladores de tipo…', o: ['Carácter', 'Bloque', 'Red', 'Sistema'], c: 0, x: 'De bloque: discos (sda). De red: eth0, wlan0.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 2, p: 'glibc, WinAPI y POSIX son…', o: ['Bibliotecas o estándares del sistema', 'Shells', 'Sistemas de archivos', 'Hipervisores'], c: 0, x: 'Funciones precompiladas que usan las aplicaciones.' },
+    null, // quitada: no entra en el examen
     { d: 1, p: '¿Qué tipo de software es gratuito pero con código cerrado?', o: ['Freeware', 'Software libre', 'Código abierto', 'Copyleft'], c: 0, x: 'El software libre deja usar, estudiar, modificar y redistribuir.' },
     { d: 2, p: 'Una licencia GPL es…', o: ['Copyleft: las obras derivadas mantienen la misma libertad', 'Permisiva: se puede meter en productos cerrados', 'Propietaria', 'Freeware'], c: 0, x: 'El núcleo Linux usa GPL. MIT y BSD son permisivas.' },
     { d: 1, p: '¿Qué licencia de Windows viene preinstalada y queda ligada a ese equipo?', o: ['OEM', 'Retail', 'Por volumen', 'De evaluación'], c: 0, x: 'Retail se compra suelta y se puede transferir; por volumen, para empresas y centros.' },
@@ -193,11 +193,11 @@ window.REPASO = {
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 2, p: 'Particionado típico de Linux en GPT (UEFI):', o: ['/boot/efi (FAT32), /boot, /, /home (ext4) y swap, todas primarias', '/boot primaria y el resto en una extendida', 'Solo / y swap en lógicas', 'C:, D: y MSR'], c: 0, x: 'En MBR: /boot primaria y /, /home y swap como lógicas dentro de una extendida.' },
     { d: 2, p: '¿Qué herramientas de particionado en línea de comandos tiene Linux?', o: ['fdisk, gdisk y parted', 'diskpart', 'GParted y KDE Partition Manager', 'mkfs y mount'], c: 0, x: 'GParted y KDE Partition Manager son gráficas. En Windows: diskpart y el Administrador de discos.' },
-    { d: 1, p: '¿Qué exige Windows 11 para instalarse, entre otros requisitos?', o: ['UEFI, Secure Boot y TPM 2.0', 'BIOS y MBR', 'Solo 2 GB de RAM', 'Un disco ext4'], c: 0, x: 'Los requisitos pueden cambiar con las versiones.' },
+    null, // quitada: no entra en el examen
     { d: 1, p: '¿Qué tipo de actualización es la más urgente?', o: ['La de seguridad', 'La de funcionalidades', 'La de calidad', 'Todas igual'], c: 0, x: 'Las de funcionalidades pueden requerir copia previa.' },
-    { d: 2, p: 'En Ubuntu, ¿qué diferencia hay entre eliminar y purgar un paquete?', o: ['Eliminar conserva la configuración; purgar la borra', 'Son lo mismo', 'Purgar conserva la configuración', 'Eliminar solo borra la configuración'], c: 0, x: 'En Windows, desinstalar puede dejar restos de configuración.' },
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 3, p: 'En el diagnóstico de controladores, si el problema empezó tras una actualización, ¿qué se hace?', o: ['Revertir el controlador', 'Reinstalar el sistema', 'Formatear el disco', 'Desactivar las actualizaciones'], c: 0, x: 'Pasos: detectar, identificar el modelo, comprobar, actualizar, revertir si hace falta y documentar.' },
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { d: 1, p: '¿Cómo se llama también al hipervisor?', o: ['Monitor de máquina virtual (VMM)', 'Kernel', 'Contenedor', 'Gestor de arranque'], c: 0, x: 'Presenta hardware virtual a cada VM y reparte los recursos físicos.' },
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
@@ -210,12 +210,12 @@ window.REPASO = {
     { d: 3, p: '¿Por qué Docker permite ejecutar más contenedores con menos recursos que una VM?', o: ['No reserva recursos fijos: usa el kernel y los recursos que necesita en cada momento', 'Porque comprime la memoria', 'Porque no usa CPU', 'Porque solo ejecuta Alpine'], c: 0, x: 'Explicación del tutorial de Docker.' },
     { d: 2, p: 'Los datos guardados dentro de un contenedor sin volumen…', o: ['Se pierden al eliminar el contenedor', 'Se guardan en la imagen', 'Se suben al registro', 'Se guardan en el anfitrión automáticamente'], c: 0, x: 'Para persistirlos se usa -v o un volumen.' },
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 1, p: 'Según las buenas prácticas, ¿qué se prefiere?', o: ['COPY frente a ADD', 'ADD frente a COPY', 'RUN frente a COPY', 'CMD frente a FROM'], c: 0, x: 'COPY copia un fichero del anfitrión a la imagen, como cp.' },
-    { d: 2, p: '¿Por qué conviene fijar la versión en FROM?', o: ['Para evitar errores al reconstruir con versiones nuevas', 'Para que la imagen pese menos', 'Porque es obligatorio', 'Para usar la caché'], c: 0, x: 'Por ejemplo nginx:stable-alpine o node:24-alpine en vez de latest.' },
-    { d: 2, p: '¿Por qué agrupar update e install en la misma línea RUN?', o: ['Para que compartan caché', 'Porque si no da error', 'Para que la imagen arranque antes', 'Para no necesitar FROM'], c: 0, x: 'Y después borrar las listas de paquetes: rm -rf /var/lib/apt/lists/*.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 2, p: '¿Para qué sirve un multi-stage build?', o: ['Para que la imagen final solo lleve lo necesario: se compila en una etapa y se copia el resultado a otra ligera', 'Para ejecutar varios contenedores a la vez', 'Para subir la imagen a varios registros', 'Para usar varias versiones de FROM a la vez'], c: 0, x: 'Primera etapa: builder. Final: imagen ligera con COPY --from=builder.' },
-    { d: 3, p: 'Las tres ideas del resumen final de buenas prácticas son…', o: ['Imagen lo más pequeña posible, aprovechar la caché y construir los paquetes dentro de Docker', 'Usar latest, ADD y root', 'Copiar todo, no usar caché y compilar fuera', 'Usar VirtualBox, WSL y Compose'], c: 0, x: 'Apartado 10 del temario.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { d: 1, p: '¿Qué comando instala WSL 2 con Ubuntu por defecto?', o: ['wsl --install', 'wsl --shutdown', 'apt install wsl', 'docker install wsl'], c: 0, x: 'Desde PowerShell como administrador; luego reiniciar y comprobar con wsl --list --verbose.' },
     { d: 2, p: '¿En qué se diferencia WSL 2 de WSL 1?', o: ['Usa una máquina virtual ligera con un kernel Linux real', 'Traduce llamadas al sistema con el kernel de Windows', 'No admite Docker', 'Arranca más rápido y consume menos'], c: 0, x: 'WSL 2 rinde mejor en archivos y red, admite GUI e integra Docker Desktop.' },
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
@@ -312,21 +312,21 @@ window.TARJETAS = {
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Teoría de los apartados 1-11
-    { f: 'Objetivos de un sistema operativo', b: 'Abstraer la complejidad del hardware, gestionar los recursos (CPU, memoria, E/S) y ofrecer un entorno de ejecución estable y predecible.' },
-    { f: 'Clasificación por estructura', b: 'Monolíticos (MS-DOS, Unix temprano) · por capas (Windows NT) · microkernel (QNX, MINIX) · híbridos (Windows 7/10, macOS).' },
-    { f: 'Clasificación por uso', b: 'Propósito general · tiempo real (FreeRTOS, VxWorks, QNX) · embebidos · distribuidos (Plan 9, Amoeba) · de red (Cisco IOS, JunOS) · móviles (Android, iOS).' },
-    { f: 'Clasificación por interfaz', b: 'CLI (MS-DOS, Bash) · GUI (Windows, macOS) · híbrida (Linux con GNOME o KDE).' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { f: 'Arquitectura monolítica', b: 'Todo el SO en un espacio de direcciones en modo kernel. Rendimiento alto; modularidad y seguridad bajas. MS-DOS, Unix temprano, núcleo de Linux.' },
     { f: 'Arquitectura por capas', b: 'Niveles jerárquicos: cada capa usa la de abajo y sirve a la de arriba. Modular; sobrecarga entre capas. Windows NT, THE OS.' },
     { f: 'Arquitectura microkernel', b: 'Solo procesos, memoria e IPC en modo kernel; el resto en modo usuario. Muy modular y seguro; sobrecarga de comunicación. QNX, MINIX, L4.' },
     { f: 'Arquitectura híbrida', b: 'Mezcla: algunos servicios en el kernel y otros en modo usuario. Equilibrio rendimiento/modularidad; diseño complejo. Windows desde NT, macOS.' },
-    { f: 'Windows NT', b: 'Modo kernel: Executive (gestores de procesos, memoria, E/S y objetos). Modo usuario: subsistemas Win32, POSIX y OS/2. NTFS, FAT32, ReFS.' },
-    { f: 'macOS (XNU)', b: 'Mach (procesos, memoria, IPC) + capa BSD (archivos, red, seguridad) + IOKit (controladores). APFS. Sandboxing, Gatekeeper, FileVault.' },
-    { f: 'QNX', b: 'Microkernel Proton (procesos, memoria, IPC); servicios en modo usuario (proc, fs, devc-*). Tiempo real: automoción, medicina.' },
-    { f: 'SO para la nube', b: 'Amazon Linux, Container OS, Azure Linux. Escalado automático, alta disponibilidad, seguridad, Docker y Kubernetes, varios nodos.' },
-    { f: 'SO para IoT', b: 'FreeRTOS, Zephyr, Raspberry Pi OS. Bajo consumo, 16 KB a 1 MB, tiempo real, seguridad ligera, MQTT, CoAP, Bluetooth, LoRaWAN.' },
-    { f: 'Edge computing', b: 'Procesar cerca de la fuente de datos. KubeEdge, Akraino, Azure IoT Edge.' },
-    { f: 'RTOS', b: 'Tiempo de respuesta crítico. Determinismo, prioridades estrictas, latencia baja, interrupciones eficientes. FreeRTOS, VxWorks, QNX.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { f: 'Estados de un proceso', b: 'Nuevo → Listo → Ejecutando → Bloqueado (espera E/S) → Listo → Terminado.' },
     { f: 'FCFS / SJF', b: 'FCFS: por orden de llegada, simple, efecto convoy. SJF: el más corto primero, menor espera media, difícil predecir duraciones.' },
     { f: 'Round Robin / Prioridad / Multinivel', b: 'RR: cuantos cíclicos, evita monopolio. Prioridad: flexible, riesgo de inanición. Multinivel: combina algoritmos, compleja.' },
@@ -335,12 +335,12 @@ window.TARJETAS = {
     { f: 'Partición fija / dinámica', b: 'Fija: simple, fragmentación interna. Dinámica: según el proceso, sin interna pero con fragmentación externa.' },
     { f: 'Paginación / segmentación / memoria virtual', b: 'Paginación: sin fragmentación externa, sobrecarga de tablas. Segmentación: código, datos, pila; fragmentación externa. Virtual: disco como RAM extra.' },
     { f: 'Página, marco, page fault', b: 'Página: bloque lógico (p. ej. 4 KB). Marco: bloque físico. Page fault: la página no está en RAM y se trae del disco o swap.' },
-    { f: 'Modo usuario / modo kernel', b: 'Usuario: aplicaciones sin acceso directo al hardware (si lo intentan, trap). Kernel: acceso total; un fallo puede bloquear todo.' },
-    { f: 'Transiciones a modo kernel', b: 'Llamadas al sistema (read()), interrupciones (hardware) y excepciones o traps (software: división por cero).' },
-    { f: 'Shells', b: 'Bash (Linux, macOS), Zsh (autocompletado, temas), PowerShell (objetos .NET), cmd.exe (básico). Script Bash: #!/bin/bash.' },
-    { f: 'Superbloque / inodos / bloques', b: 'Superbloque: metadatos generales. Tabla de inodos: metadatos de cada archivo. Bloques de datos: el contenido.' },
-    { f: 'Tipos de controladores', b: 'De bloque (sda), de carácter (teclado, /dev/tty), de red (eth0, wlan0). Linux: modprobe carga, lsmod lista.' },
-    { f: 'Bibliotecas del sistema', b: 'glibc (C en Linux), WinAPI (Windows), POSIX (estándares tipo Unix).' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { f: 'Libre / código abierto / propietario', b: 'Libre: usar, estudiar, modificar, redistribuir. Abierto: código accesible y modificable. Propietario: solo uso según EULA.' },
     { f: 'Freeware / shareware', b: 'Freeware: gratis, código cerrado. Shareware: gratis un tiempo o limitado; luego se paga.' },
     { f: 'Copyleft / permisivas', b: 'Copyleft (GPL, núcleo Linux): las derivadas mantienen la libertad. Permisivas (MIT, BSD): se pueden meter en productos cerrados.' },
@@ -350,26 +350,26 @@ window.TARJETAS = {
     { f: 'Particionado típico Windows', b: 'MBR: C:, D: y extendida con lógica de recuperación (oculta de 100-500 MB). GPT: EFI FAT32, C:, D: y MSR de 16 MB.' },
     { f: 'Particionado típico Linux', b: 'MBR: /boot primaria + extendida con /, /home y swap lógicas. GPT: /boot/efi FAT32, /boot, /, /home y swap, todas primarias.' },
     { f: 'Herramientas de particionado', b: 'Windows: diskpart, Administrador de discos. Linux: fdisk, gdisk, parted; GParted, KDE Partition Manager.' },
-    { f: 'Instalación de Windows (fases)', b: 'Idioma, clave, licencia, tipo (actualizar/personalizada), partición, copia, configuración inicial, primer inicio. W11: UEFI, Secure Boot, TPM 2.0.' },
-    { f: 'Configuración inicial de un SO cliente', b: 'Nombre del equipo, usuario sin privilegios de administrador para el día a día, red, fecha y hora, actualizaciones.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { f: 'Tipos de actualizaciones', b: 'De seguridad (las más urgentes), de calidad o errores, de funcionalidades (pueden requerir copia).' },
-    { f: 'Aplicaciones en Windows y Ubuntu', b: 'Windows: instalador, Microsoft Store, winget. Ubuntu: apt (eliminar conserva configuración, purgar la borra), Snap, Flatpak.' },
-    { f: 'Diagnóstico de controladores', b: 'Detectar → identificar modelo → comprobar estado → actualizar → revertir si empezó con una actualización → documentar.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     { f: 'Características de Docker', b: 'Aislamiento, portabilidad, eficiencia (comparte kernel), escalabilidad horizontal, automatización con Dockerfile.' },
     { f: 'Docker Compose: cuándo', b: 'Desarrollo local, pruebas de integración y producción no crítica. Crítico: Kubernetes o Docker Swarm.' },
     { f: 'Redes en Docker', b: 'Por defecto bridge. Con redes propias los contenedores se encuentran por nombre (Compose crea una para todos los servicios).' },
     { f: 'Instrucciones de Dockerfile', b: 'FROM, RUN, COPY, ADD, WORKDIR, ENV, CMD, ENTRYPOINT, EXPOSE, VOLUME.' },
-    { f: 'ENTRYPOINT', b: 'Alternativa a CMD que permite pasar comandos al contenedor al ejecutarlo.' },
+    null, // quitada: no entra en el examen
     { f: 'Datos de un contenedor', b: 'Son volátiles: se pierden al eliminarlo. Para persistir, -v o volúmenes. Cambios definitivos: reconstruir la imagen con nueva etiqueta (:v2).' },
-    { f: 'Buenas prácticas Docker (1-6)', b: 'FROM primero · ordenar para aprovechar la caché · no copiar directorios enteros · COPY mejor que ADD · update e install en el mismo RUN · --no-install-recommends.' },
-    { f: 'Buenas prácticas Docker (7-11)', b: 'Borrar listas de paquetes · fijar versión en FROM · compilar dentro de la imagen · usar WORKDIR · verificar dependencias antes de compilar.' },
-    { f: 'Multi-stage build', b: 'Etapa builder que compila + etapa final ligera que copia solo el resultado (COPY --from=builder).' },
-    { f: 'Resumen de buenas prácticas', b: 'Imagen lo más pequeña posible, aprovechar la caché, construir los paquetes dentro de Docker.' },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { f: 'WSL', b: 'Entorno Linux completo en Windows sin VM tradicional, dual boot ni servidor remoto. Rendimiento casi nativo, archivos compartidos.' },
     { f: 'WSL 1 frente a WSL 2', b: 'WSL 1: traduce llamadas, kernel de Windows, ligero y rápido, sin GUI. WSL 2: VM ligera con kernel Linux real, mejor en archivos y red, GUI, Docker Desktop.' },
-    { f: 'Requisitos de WSL', b: 'Windows 11 22000+, x64/ARM64/x86 (WSL 2 solo x64 y ARM64), virtualización activada (VT-x / AMD-V), 1 GB de disco.' },
+    null, // quitada: no entra en el examen
     { f: 'Instalar WSL', b: 'wsl --install (PowerShell admin) → reiniciar → wsl --list --verbose. Otra distro: wsl --list --online, wsl --install -d.' },
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
@@ -397,19 +397,19 @@ window.DESARROLLO = {
     { d: 3, p: 'Una app Node.js (puerto 3000) guarda un contador de visitas en MariaDB. Explica cómo sería su compose.yaml con dos servicios, app y db, y cómo se comunican.', r: 'Dos servicios. app se construye con build: ./app (Dockerfile con node:24-alpine, WORKDIR /app, COPY, RUN npm install, CMD node server.js), publica el 3000, tiene las variables DB_HOST: db, DB_USER, DB_PASSWORD, DB_NAME y depends_on: db. db usa mariadb:11.4 con las variables MARIADB_* y guarda los datos en el volumen datos-db montado en /var/lib/mysql, declarado al final en volumes:. Compose crea una red donde app encuentra a db por su nombre; el 3306 no se publica porque solo lo usa la app. Se levanta con docker compose up -d --build.', k: ['Servicio app: build, puerto 3000, variables, depends_on', 'Servicio db: mariadb:11.4 y variables', 'Volumen datos-db en /var/lib/mysql declarado', 'Red de Compose: DB_HOST db', '3306 no publicado'] },
     { d: 2, p: '¿Qué diferencia hay entre docker compose down y docker compose down -v? Explícalo con el contador de visitas.', r: 'docker compose down para y borra los contenedores y la red, pero no los volúmenes: al hacer up -d, MariaDB encuentra sus datos y el contador sigue donde estaba (60). docker compose down -v borra también los volúmenes (parte2_datos-db): al volver a levantar se crea un volumen vacío, la base de datos empieza de cero y el contador vuelve a 1.', k: ['down conserva los volúmenes', 'El contador se mantiene', 'down -v borra los volúmenes', 'El contador vuelve a 1'] },
     { d: 1, p: 'Explica qué hace sudo apt update && sudo apt upgrade -y.', r: 'sudo ejecuta como administrador. apt update descarga la lista de paquetes de los repositorios; apt upgrade instala las versiones nuevas de los paquetes instalados; -y responde «sí» a la confirmación. && hace que la segunda orden solo se ejecute si la primera ha ido bien. El orden importa: sin update, se actualizaría según un catálogo desactualizado.', k: ['sudo: administrador', 'update: lista de paquetes', 'upgrade: instala versiones nuevas', '-y y &&'] },
-    { d: 2, p: 'Define sistema operativo, explica sus objetivos y clasifícalos por estructura, uso e interfaz.', r: 'Software de sistema entre el hardware y las aplicaciones que gestiona los recursos de forma eficiente, segura y transparente. Objetivos: abstraer el hardware, gestionar CPU, memoria y E/S, y ofrecer un entorno de ejecución estable. Por estructura: monolíticos, por capas, microkernel e híbridos. Por uso: propósito general, tiempo real, embebidos, distribuidos, de red y móviles. Por interfaz: CLI, GUI e híbrida.', k: ['Definición (entre hardware y aplicaciones)', 'Los tres objetivos', 'Clasificación por estructura', 'Clasificación por uso con ejemplos', 'Clasificación por interfaz'] },
+    null, // quitada: no entra en el examen
     { d: 3, p: 'Compara las arquitecturas monolítica, por capas, microkernel e híbrida (idea, rendimiento, modularidad, seguridad y ejemplos).', r: 'Monolítica: todo en un espacio de direcciones en modo kernel; rendimiento alto, modularidad y seguridad bajas (MS-DOS, Unix temprano, núcleo de Linux). Por capas: niveles jerárquicos; rendimiento medio, modularidad alta, seguridad media (Windows NT, THE OS). Microkernel: solo procesos, memoria e IPC en kernel; rendimiento medio-bajo por la comunicación, modularidad muy alta, seguridad alta (QNX, MINIX, L4). Híbrida: mezcla de las anteriores; buen rendimiento y modularidad media-alta, diseño complejo (Windows desde NT, macOS).', k: ['Monolítica con ventaja e inconveniente', 'Por capas', 'Microkernel y por qué es más seguro', 'Híbrida', 'Un ejemplo de cada una'] },
-    { d: 3, p: 'Describe la arquitectura de Windows NT, macOS (XNU) y QNX.', r: 'Windows NT (híbrida): en modo kernel el Executive, con gestores de procesos, memoria, E/S y objetos; en modo usuario los subsistemas Win32, POSIX y OS/2; NTFS, FAT32, ReFS. macOS: kernel XNU formado por Mach (procesos, memoria, IPC), la capa BSD (archivos, red, seguridad) e IOKit (controladores); APFS. QNX (microkernel): microkernel Proton con procesos, memoria e IPC y todos los servicios en modo usuario (proc, fs, devc-*); orientado a tiempo real.', k: ['Windows NT: Executive en kernel', 'Windows NT: subsistemas Win32, POSIX, OS/2', 'XNU: Mach + BSD + IOKit', 'QNX: microkernel Proton y servicios en modo usuario'] },
-    { d: 2, p: 'Explica las tendencias modernas: SO para la nube, IoT, edge computing y RTOS.', r: 'Nube: escalabilidad, virtualización y recursos distribuidos (Amazon Linux, Container OS, Azure Linux), con escalado automático, alta disponibilidad e integración con Docker y Kubernetes. IoT: ligeros y de bajo consumo (FreeRTOS, Zephyr), huella de 16 KB a 1 MB, tiempo real y protocolos como MQTT o LoRaWAN. Edge: procesan cerca de la fuente de datos (KubeEdge, Akraino, Azure IoT Edge). RTOS: tiempo de respuesta crítico, con determinismo, prioridades estrictas y latencia baja (FreeRTOS, VxWorks, QNX).', k: ['Nube con características', 'IoT con requisitos', 'Edge computing', 'RTOS y determinismo', 'Ejemplos'] },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { d: 2, p: 'Explica los estados de un proceso y compara los algoritmos de planificación.', r: 'Nuevo (creado, sin cargar), Listo (en memoria esperando CPU), Ejecutando, Bloqueado (espera un evento externo, como E/S) y Terminado; al acabar la E/S vuelve a Listo. FCFS: por orden de llegada, simple pero con efecto convoy. SJF: el más corto primero, menor espera media pero difícil predecir duraciones. Round Robin: cuantos cíclicos, evita el monopolio de la CPU. Prioridad: flexible con riesgo de inanición. Multinivel: combina algoritmos, adaptable pero compleja.', k: ['Los cinco estados', 'Transición Bloqueado → Listo', 'FCFS y efecto convoy', 'SJF y Round Robin', 'Prioridad e inanición'] },
     { d: 3, p: 'Explica la jerarquía de memoria y las técnicas de gestión de memoria, incluida la paginación.', r: 'De más rápida y cara a más lenta y barata: registros, cachés L1/L2/L3, RAM, SSD, HDD y cinta. Técnicas: partición fija (fragmentación interna), partición dinámica (fragmentación externa), paginación (marcos y páginas, sin fragmentación externa, sobrecarga de tablas), segmentación (código, datos, pila; protección; fragmentación externa) y memoria virtual (disco para simular más RAM). En la paginación, la tabla de páginas relaciona páginas lógicas con marcos físicos; si una página no está en RAM hay un page fault y se carga desde disco o swap.', k: ['Jerarquía en orden', 'Partición fija y dinámica con su fragmentación', 'Paginación y segmentación', 'Memoria virtual', 'Page fault'] },
-    { d: 2, p: 'Explica los modos usuario y kernel y cómo se pasa de uno a otro.', r: 'En modo usuario se ejecutan las aplicaciones con restricciones: no acceden al hardware ni a instrucciones privilegiadas; si lo intentan salta una excepción y el control pasa al SO. En modo kernel el SO tiene acceso total y un fallo puede bloquear el sistema. Se pasa a modo kernel por llamadas al sistema (read()), interrupciones de hardware y excepciones o traps de software. En una llamada al sistema el SO cambia a modo kernel, hace la operación, devuelve el resultado y la aplicación sigue en modo usuario.', k: ['Modo usuario y sus restricciones', 'Modo kernel', 'Llamadas al sistema', 'Interrupciones y excepciones', 'Pasos de una llamada al sistema'] },
-    { d: 2, p: 'Describe los componentes clave de un SO: kernel, shell, sistema de archivos, controladores y bibliotecas.', r: 'Kernel: gestiona procesos, memoria, dispositivos, archivos e IPC (monolítico, microkernel o híbrido). Shell: interfaz entre usuario y kernel que interpreta comandos (Bash, Zsh, PowerShell, cmd.exe). Sistema de archivos: superbloque, tabla de inodos y bloques de datos. Controladores: de bloque (discos), de carácter (teclado) y de red (eth0). Bibliotecas: glibc, WinAPI y POSIX.', k: ['Kernel y tipos', 'Shell con ejemplos', 'Superbloque, inodos y bloques', 'Tipos de controladores', 'Bibliotecas'] },
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     { d: 2, p: 'Explica los tipos de software según su licencia y las licencias de Windows.', r: 'Libre: usar, estudiar, modificar y redistribuir (Linux, LibreOffice), con licencias copyleft como la GPL o permisivas como MIT y BSD. Código abierto: código accesible y modificable (base de Android, Chromium). Propietario: solo derecho de uso según el EULA (Windows, macOS). Freeware: gratuito y cerrado. Shareware: prueba gratuita y luego pago. Windows: OEM (ligada al equipo), Retail (transferible) y por volumen (empresas y centros); Windows Server se licencia por núcleos y licencias de acceso de cliente.', k: ['Libre y código abierto', 'Copyleft frente a permisiva', 'Propietario, freeware y shareware', 'OEM, Retail y por volumen', 'Windows Server'] },
     { d: 2, p: 'Explica las estrategias de asignación de bloques y compara exFAT, Btrfs y ZFS.', r: 'Contigua: bloques seguidos, eficiente en acceso secuencial pero fragmenta. Encadenada: cada bloque apunta al siguiente, no fragmenta pero lee despacio. Indexada: un índice guarda las direcciones, no fragmenta y permite acceso secuencial y aleatorio; es la más usada. exFAT: sin límite de 4 GB, para USB y SD, sin permisos ni journaling. Btrfs: snapshots, compresión, deduplicación y RAID, menos maduro que ext4. ZFS: integridad con checksums, snapshots y pools, pero necesita mucha RAM y no es nativo en Windows.', k: ['Contigua', 'Encadenada', 'Indexada (la más usada)', 'exFAT', 'Btrfs y ZFS'] },
-    { d: 2, p: '¿Qué hay que hacer tras instalar un SO cliente? Habla de configuración inicial, actualizaciones, aplicaciones y controladores.', r: 'Configuración inicial: nombre del equipo, usuario sin privilegios de administrador para el día a día, red, fecha y hora. Actualizaciones de seguridad, de calidad y de funcionalidades: en Windows con Windows Update; en Ubuntu, apt update y luego apt upgrade. Aplicaciones: en Windows instalador, Store o winget; en Ubuntu apt (eliminar o purgar), Snap y Flatpak. Controladores: en Windows con el Administrador de dispositivos (actualizar, revertir, desinstalar); en Linux vienen en el núcleo y lspci -k muestra cuál usa cada dispositivo.', k: ['Configuración inicial y usuario sin administrador', 'Tipos de actualizaciones', 'apt update antes de apt upgrade', 'Gestión de aplicaciones', 'Controladores en Windows y Linux'] },
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    { d: 3, p: 'Enumera y explica las buenas prácticas para escribir un Dockerfile, incluido el multi-stage build.', r: 'Empezar con FROM y fijar su versión; ordenar las instrucciones para aprovechar la caché de capas; no copiar directorios enteros si basta el ejecutable; preferir COPY a ADD; agrupar update e install en el mismo RUN, usar --no-install-recommends en Debian y borrar las listas de paquetes; compilar dentro de la imagen; usar WORKDIR; verificar dependencias antes de compilar. El multi-stage build compila en una etapa builder y copia solo el resultado a una imagen final ligera con COPY --from=builder. Resumen: imagen pequeña, caché y construir dentro de Docker.', k: ['FROM con versión fija', 'Caché y orden de instrucciones', 'COPY mejor que ADD y update + install juntos', 'Limpiar paquetes y --no-install-recommends', 'Multi-stage build'] },
+    null, // quitada: no entra en el examen
     { d: 2, p: 'Explica qué es WSL, las diferencias entre WSL 1 y WSL 2, sus requisitos y cómo se instala.', r: 'Permite ejecutar un entorno Linux completo en Windows sin VM tradicional ni dual boot, con rendimiento casi nativo. WSL 1 traduce las llamadas al sistema con el kernel de Windows, es ligero y no admite GUI; WSL 2 usa una VM ligera con kernel Linux real, rinde mejor en archivos y red, admite GUI e integra Docker Desktop. Requisitos: Windows 11 22000 o superior, x64 o ARM64 para WSL 2, virtualización activada y 1 GB de disco. Se instala con wsl --install en PowerShell como administrador y se comprueba con wsl --list --verbose.', k: ['Qué es WSL', 'WSL 1: traduce llamadas', 'WSL 2: VM con kernel real, GUI, Docker', 'Requisitos', 'wsl --install'] },
   ],
 };
@@ -418,24 +418,24 @@ window.DESARROLLO = {
 window.HUECOS = {
   'Sistemas Informáticos': [
     // Apartado 1: arquitectura
-    'Los tres objetivos de un SO son abstraer la complejidad del [hardware], gestionar los [recursos] y ofrecer un entorno de ejecución estable.',
-    'Un SO que debe responder dentro de plazos estrictos es un SO de [tiempo real|RTOS].',
-    'Cisco IOS y Juniper JunOS son sistemas operativos de [red].',
-    'Linux con GNOME o KDE tiene una interfaz [híbrida], que combina CLI y GUI.',
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     'En la arquitectura [monolítica] todo el SO se ejecuta en un único espacio de direcciones en modo kernel.',
     'En la arquitectura por capas, cada capa ofrece servicios a la de [arriba] y usa los de la de [abajo].',
     'Un [microkernel] solo ejecuta en modo kernel la gestión de procesos, la memoria y la [IPC].',
     'QNX, MINIX y L4 son ejemplos de arquitectura [microkernel].',
     'Windows desde NT y macOS tienen una arquitectura [híbrida].',
-    'En Windows NT, la parte en modo kernel con los gestores de procesos, memoria, E/S y objetos se llama [Executive].',
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    'El kernel de macOS se llama [XNU] y está formado por Mach, la capa [BSD] e IOKit.',
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    'El sistema de archivos de macOS es [APFS].',
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    'La característica clave de un RTOS es el [determinismo]: un tiempo máximo conocido para cada operación.',
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    'El edge computing procesa los datos cerca de la [fuente] que los genera.',
+    null, // quitada: no entra en el examen
     // Apartado 2: elementos
     'Un [proceso] es un programa en ejecución que necesita recursos.',
     'Un proceso en memoria esperando la CPU está en estado [Listo].',
@@ -451,15 +451,15 @@ window.HUECOS = {
     'La paginación divide la memoria física en [marcos] y la lógica en [páginas].',
     'Cuando una página no está en RAM se produce un [page fault|fallo de página].',
     'La segmentación divide la memoria en código, [datos] y [pila].',
-    'Las aplicaciones se ejecutan en modo [usuario] y el SO en modo [kernel].',
-    'Se pasa a modo kernel por llamadas al sistema, [interrupciones] y [excepciones|traps].',
-    'read() es un ejemplo de [llamada al sistema].',
-    'La shell de Windows que trabaja con objetos .NET es [PowerShell].',
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    'El [superbloque] guarda los metadatos generales de un sistema de archivos y la tabla de [inodos], los de cada archivo.',
-    'Un teclado usa un controlador de [carácter] y un disco, uno de [bloque].',
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    'La biblioteca de C en Linux es [glibc] y la de Windows, [WinAPI].',
+    null, // quitada: no entra en el examen
     // Apartado 3: licencias
     'El software [libre] permite usar, estudiar, modificar y redistribuir el programa.',
     'El software gratuito pero con código cerrado es [freeware].',
@@ -495,11 +495,11 @@ window.HUECOS = {
     'En Windows se particiona con [diskpart] o el Administrador de discos.',
     'En Linux, las herramientas de particionado en consola son fdisk, gdisk y [parted].',
     // Apartado 6: instalación y actualizaciones
-    'Windows 11 exige UEFI, Secure Boot y [TPM 2.0].',
-    'Para el uso diario se crea una cuenta sin privilegios de [administrador].',
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     'Las actualizaciones más urgentes son las de [seguridad].',
     'En Ubuntu, primero se ejecuta apt [update] y después apt [upgrade].',
-    'En apt, eliminar conserva la configuración y [purgar] la borra.',
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     // Apartado 7: virtualización
@@ -526,11 +526,11 @@ window.HUECOS = {
     'Con docker compose down [-v] se borran también los volúmenes.',
     // Apartado 10: buenas prácticas
     'Un Dockerfile empieza siempre con [FROM].',
-    'Las buenas prácticas prefieren [COPY] frente a ADD.',
-    'Hay que fijar la [versión] de la imagen en FROM para evitar errores al reconstruir.',
-    'update e install van en la misma línea [RUN] para que compartan caché.',
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
+    null, // quitada: no entra en el examen
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
-    'Un multi-stage build copia el resultado de la primera etapa con COPY --from=[builder].',
+    null, // quitada: no entra en el examen
     // Apartado 11: WSL
     'WSL 1 traduce las llamadas al sistema y WSL 2 usa un [kernel] Linux real.',
     'WSL se instala con el comando [wsl --install].',
@@ -563,4 +563,9 @@ window.HUECOS = {
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
     null, // quitada: demasiado rebuscada (se deja el hueco para no mover el progreso)
   ],
+};
+
+// Resúmenes en PDF para leer desde Repaso (rutas relativas a la web)
+window.RESUMENES = {
+  'Sistemas Informáticos': [{ t: 'Resumen del examen del Tema 2', f: 'resumenes/sistemas-tema2.pdf' }],
 };

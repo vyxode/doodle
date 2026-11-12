@@ -1208,12 +1208,13 @@ function panelExamen(m) {
   return `<section class="bloque"><div class="panel practica-cta"><div><b>Examen de prueba</b><p class="suave">${h.length ? `${h.length} hechos · último: ${fNota(h[0].nota)}` : 'Test y desarrollo al azar, con el nivel que elijas.'}</p></div><button type="button" class="boton" data-acc="examen-config" data-v="${esc(m)}">Hacer examen</button></div></section>`;
 }
 function vistaRepasoSec() {
-  const mods = [...new Set([window.REPASO, window.TARJETAS, window.HUECOS].flatMap((o) => Object.keys(o || {})))];
+  const mods = [...new Set([window.REPASO, window.TARJETAS, window.HUECOS, window.RESUMENES].flatMap((o) => Object.keys(o || {})))];
   if (!mods.includes(S.repMod)) S.repMod = mods.includes('Sistemas Informáticos') ? 'Sistemas Informáticos' : mods[0];
   const m = S.repMod, L = ((window.REPASO || {})[m] || []).filter(Boolean), h = examenesDe(m);
   return cabecera('Repaso', '<span class="suave">Test, tarjetas, huecos y exámenes para preparar los exámenes.</span>') + `
   <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="rep-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
   ${L.length ? `<section class="bloque"><div class="panel practica-cta"><div><b>Preguntas tipo test</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].filter(Boolean).length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
+  ${((window.RESUMENES || {})[m] || []).map((r) => `<section class="bloque"><div class="panel practica-cta"><div><b>${esc(r.t)}</b><p class="suave">PDF para leer o descargar.</p></div><a class="boton principal" href="${esc(r.f)}" target="_blank" rel="noopener">Abrir PDF</a></div></section>`).join('')}
   ${(window.TARJETAS || {})[m] ? panelTarjetas(m) : ''}
   ${(window.HUECOS || {})[m] ? panelHuecos(m) : ''}
   ${L.length ? `<section class="bloque"><header><h2>Exámenes</h2><button type="button" class="boton" data-acc="examen-config" data-v="${esc(m)}">Examen al azar</button></header>
