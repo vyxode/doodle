@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Doodle · Resúmenes</title>
+<link rel="stylesheet" href="../css/app.css">
+<style>
+  body { background: var(--fondo); overflow: auto; }
+  .pub { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; display: grid; gap: 16px; }
+  .pub h1 { font-family: var(--f-titulo); font-size: 28px; margin: 0; }
+  .pub form, .pub-fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pub form input { flex: 1 1 220px; }
+  .pub-docs { display: grid; gap: 8px; }
+  .hojas { display: grid; gap: 12px; justify-items: center; }
+  .hojas canvas { width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px var(--sombra); border-radius: 4px; }
+  /* solo lectura: nada se selecciona, arrastra ni guarda con pulsación larga */
+  .lector, .lector * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  .tapado .hojas { filter: blur(24px); opacity: 0.15; }
+  [hidden] { display: none !important; }
+  @media print { body { display: none !important; } }
+</style>
+</head>
+<body>
+<main class="pub">
+  <h1>Resúmenes</h1>
+  <section id="entrada" class="panel">
+    <p class="suave">Solo lectura. Entra con la contraseña personal que te han dado; queda registrado quién entra.</p>
+    <form id="form-entrar">
+      <input type="password" id="clave" autocomplete="current-password" placeholder="Contraseña" aria-label="Contraseña" required>
+      <button class="boton principal" type="submit">Entrar</button>
+    </form>
+    <p class="error-txt" id="error" role="alert"></p>
+  </section>
+  <section id="dentro" class="lector" hidden>
+    <div class="pub-fila"><b id="hola"></b><button class="boton mini" type="button" id="salir">Salir</button></div>
+    <div class="pub-docs" id="docs"></div>
+    <p class="suave" id="estado" aria-live="polite"></p>
+    <div class="hojas" id="hojas"></div>
+  </section>
+</main>
+<script src="../js/repaso.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="publico.js"></script>
+</body>
+</html>

@@ -12,7 +12,7 @@ self.addEventListener('fetch', (e) => {
   const r = e.request, url = new URL(r.url);
   if (r.method !== 'GET' || NO_CACHEAR.some((re) => re.test(r.url)) || r.headers.has('range')) return;
   if (url.origin !== location.origin && url.hostname !== 'cdnjs.cloudflare.com') return;
-  if (r.mode === 'navigate' || url.pathname.endsWith('/data/curso.enc')) {
+  if (r.mode === 'navigate' || /\/data\/curso\.enc$|\/repaso\/.+\.(json|enc)$/.test(url.pathname)) {
     e.respondWith(fetch(r).then((res) => { const c = res.clone(); caches.open(CACHE).then((k) => k.put(r, c)); return res; })
       .catch(() => caches.match(r, { ignoreSearch: r.mode === 'navigate' })));
     return;
