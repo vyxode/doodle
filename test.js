@@ -255,5 +255,6 @@ for (const q of Object.values(window.REPASO).flat()) {
 }
 for (const t of Object.values(window.TARJETAS).flat()) assert.ok(t.f && t.b, JSON.stringify(t));
 for (const q of Object.values(window.DESARROLLO).flat()) assert.ok(q.p && q.r && q.k.length && [1, 2, 3].includes(q.d), q.p);
+for (const h of Object.values(window.HUECOS).flat()) assert.ok(/\[[^\]|]+(\|[^\]|]+)*\]/.test(h) && !/\[[^\]]*\[|\][^\[]*\]/.test(h.replace(/\[[^\]]*\]/g, '')), h);
 
 console.log('Todas las pruebas OK · js/demo.js regenerado');
