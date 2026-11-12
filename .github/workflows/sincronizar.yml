@@ -5,7 +5,7 @@ name: Publicar Doodle
 on:
   push:
     branches: [main]
-    paths-ignore: ['data/progreso.enc', 'data/copias/**'] # se leen con la API de GitHub; no hace falta republicar
+    paths-ignore: ['data/progreso.enc', 'data/lectores.enc', 'data/copias/**'] # se leen con la API de GitHub; no hace falta republicar
   workflow_dispatch:
 
 permissions:

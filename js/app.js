@@ -814,6 +814,7 @@ function vistaAjustes() {
         <div class="campo campo-boton"><div class="fila-botones"><button class="boton principal">Guardar</button>${S.pat ? '<button type="button" class="boton peligro" data-acc="quitar-pat">Quitar</button>' : ''}</div></div>
       </form><p class="suave" id="pat-estado" role="status"></p>`}
     </div></section>
+  ${seccionLectores()}
   <section class="bloque"><header><h2>Otro dispositivo</h2></header>
     <div class="panel corte">
       <p>Pasa la conexión con Aules y GitHub a tu móvil u otro ordenador sin volver a pegar claves.</p>
@@ -844,6 +845,69 @@ function vistaAjustes() {
   <section class="bloque"><header><h2>Sesión</h2></header>
     <div class="panel corte"><p>${LS.get('doodle-recordar') ? 'Este dispositivo recuerda tu contraseña.' : 'Este dispositivo te pide la contraseña cada vez.'}</p>
       <div class="fila-botones"><button class="boton peligro" data-acc="bloquear">Cerrar sesión${LS.get('doodle-recordar') ? ' y olvidar la contraseña' : ''}</button></div></div></section>`;
+}
+
+// ---------- lectores de los resúmenes (repaso/) ----------
+// data/lectores.enc, cifrado con tu contraseña, guarda la clave de los PDF y la contraseña de cada lector;
+// con eso se rehace repaso/llaves.json, lo único que lee la página pública.
+const LECT = 'data/lectores.enc', LLAVES = 'repaso/llaves.json';
+const u8 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)), a64 = (u) => btoa(String.fromCharCode(...u));
+async function claveLector(pass, sal, iter, uso) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: sal, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, [uso]);
+}
+function claveNueva() {
+  const A = 'abcdefghjkmnpqrstuvwxyz23456789'; // sin letras ni números que se confundan
+  return [...crypto.getRandomValues(new Uint8Array(12))].map((x, i) => (i && i % 4 === 0 ? '-' : '') + A[x % A.length]).join('');
+}
+async function cargarLectores() {
+  const { sha, sobre } = await leerArchivo(LECT);
+  S.lect = sobre ? { ...(await descifrar(S.pass, sobre).catch(() => { throw new Error('La lista de lectores usa otra contraseña.'); })), sha } : { nuevo: true };
+}
+// La primera vez, la clave de los PDF sale de tu propia llave de lector.
+async function iniciarLectores(pass) {
+  const L = (await leerArchivo(LLAVES)).sobre, pk = await claveLector(pass, u8(L.sal), L.iter, 'decrypt');
+  for (const l of L.llaves) {
+    const x = u8(l);
+    const yo = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: x.subarray(0, 12) }, pk, x.subarray(12)).then((d) => JSON.parse(new TextDecoder().decode(d)), () => null);
+    if (yo) { S.lect.k = yo.k; return guardarLectores([{ n: yo.n, clave: pass }]); }
+  }
+  throw new Error('Esa contraseña no abre ninguna llave.');
+}
+// shortcut: quitar a alguien no cambia la clave de los PDF; quien la haya sacado a mano de su navegador podría seguir leyendo. Si pasa, volver a cifrar los PDF con una clave nueva.
+async function guardarLectores(lectores) {
+  const k = S.lect.k, sal = crypto.getRandomValues(new Uint8Array(16)), iter = 200000, llaves = [];
+  for (const p of lectores) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await claveLector(p.clave, sal, iter, 'encrypt'), new TextEncoder().encode(JSON.stringify({ n: p.n, k })));
+    llaves.push(a64(new Uint8Array([...iv, ...new Uint8Array(ct)])));
+  }
+  if (!await escribirArchivo(LLAVES, { sal: a64(sal), iter, llaves }, (await leerArchivo(LLAVES)).sha)) throw new Error('GitHub no dejó guardar las llaves; vuelve a intentarlo.');
+  const sha = await escribirArchivo(LECT, await cifrar(S.pass, { k, lectores }), S.lect.sha);
+  if (!sha) throw new Error('GitHub no dejó guardar la lista; pulsa de nuevo Gestionar lectores.');
+  S.lect = { k, lectores, sha };
+}
+async function lectores(fn) {
+  const msg = () => document.getElementById('lect-estado');
+  if (msg()) msg().textContent = 'Guardando en GitHub…';
+  try { await fn(); render(); } catch (e) { if (msg()) msg().textContent = e.message; }
+}
+function seccionLectores() {
+  const L = S.lect, url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'repaso/';
+  let cuerpo;
+  if (S.demo || !S.pat) cuerpo = '<p class="suave">Necesitas la clave de GitHub (arriba) para gestionarlos.</p>';
+  else if (!L) cuerpo = '<div class="fila-botones"><button type="button" class="boton" data-acc="lect-cargar">Gestionar lectores</button></div>';
+  else if (L.nuevo) cuerpo = `<p>Primera vez: escribe tu contraseña de lector para sacar de ella la clave de los PDF.</p>
+    <form id="f-lect-inicio" class="rejilla-form"><label class="campo"><span>Tu contraseña de lector</span><input type="password" id="l-pass" autocomplete="off" required></label>
+    <div class="campo campo-boton"><button class="boton principal">Empezar</button></div></form>`;
+  else cuerpo = `<div class="lista">${L.lectores.map((p, i) => `<div class="nota-fila"><span class="nf-nombre">${esc(p.n)}<small class="mono">${esc(p.clave)}</small></span>
+    <div class="fila-botones"><button type="button" class="boton mini" data-acc="copiar-config" data-v="${esc(`Resúmenes de Doodle: ${url}\nTu contraseña: ${p.clave}`)}">Copiar</button>
+    <button type="button" class="boton mini peligro" data-acc="lect-quitar" data-v="${i}">Quitar</button></div></div>`).join('')}</div>
+    <form id="f-lect" class="rejilla-form"><label class="campo"><span>Nombre</span><input type="text" id="l-nombre" maxlength="40" required></label>
+    <div class="campo campo-boton"><button class="boton principal">Añadir con contraseña nueva</button></div></form>`;
+  return `<section class="bloque"><header><h2>Lectores de los resúmenes</h2>${L && L.lectores ? `<span class="suave">${L.lectores.length}</span>` : ''}</header>
+    <div class="panel corte"><p>Cada persona lee los resúmenes en <span class="mono">${esc(url)}</span> con su propia contraseña. Los cambios tardan unos minutos en publicarse.</p>
+    ${cuerpo}<p class="suave" id="lect-estado" role="status"></p></div></section>`;
 }
 
 // ---------- herramientas de trabajo ----------
@@ -1657,6 +1721,8 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'ex-corr') corregirDesarrollo(+el.dataset.n);
   else if (acc === 'examen-fijo') empezarExamen(el.dataset.v, null, 0, +el.dataset.n);
   else if (acc === 'rep-mod') { S.repMod = el.dataset.v; render(); }
+  else if (acc === 'lect-cargar') lectores(cargarLectores);
+  else if (acc === 'lect-quitar') lectores(() => guardarLectores(S.lect.lectores.filter((_, i) => i !== +el.dataset.v)));
   else if (acc === 'rep-resp') responderRepaso(+el.dataset.v);
   else if (acc === 'rep-sig') siguienteRepaso();
   else if (acc === 'pdf') exportarPdf(el.dataset.v);
@@ -1732,6 +1798,12 @@ document.addEventListener('submit', async (ev) => {
   if (f.id === 'f-hueco') comprobarHuecos(f);
   else if (f.id === 'f-examen-cfg') empezarExamen(S.exMod, val('ex-nivel'), +val('ex-n'));
   else if (f.id === 'f-examen') corregirExamen();
+  else if (f.id === 'f-lect-inicio') lectores(() => iniciarLectores(val('l-pass')));
+  else if (f.id === 'f-lect') {
+    const n = val('l-nombre');
+    if (S.lect.lectores.some((p) => p.n.toLowerCase() === n.toLowerCase())) document.getElementById('lect-estado').textContent = n + ' ya está en la lista.';
+    else lectores(() => guardarLectores([...S.lect.lectores, { n, clave: claveNueva() }]));
+  }
   else if (f.id === 'f-tarea') {
     const [y, m, d] = val('t-fecha').split('-').map(Number), [hh, mm] = (val('t-hora') || '23:59').split(':').map(Number);
     cambiar('tareas', 'p' + Date.now().toString(36), { nombre: val('t-nombre'), modulo: val('t-modulo'), tipo: val('t-tipo'), entrega: Math.floor(new Date(y, m - 1, d, hh, mm).getTime() / 1000), hecha: false, nota: null, max: 10 });
