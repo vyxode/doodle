@@ -352,6 +352,7 @@ const IC = {
   modulos: '<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>',
   calendario: '<path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/>',
   ejercicios: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
+  repaso: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5M9 8h7M9 12h5"/>',
   notas: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   ajustes: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
   buscar: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
@@ -359,7 +360,7 @@ const IC = {
   sync: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
 };
 const icono = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
-const NAV = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['notas', 'Notas'], ['ajustes', 'Ajustes']];
+const NAV = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['repaso', 'Repaso'], ['notas', 'Notas'], ['ajustes', 'Ajustes']];
 const NAV_MOVIL = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['mas', 'Más']];
 
 function render(forzar) {
@@ -367,8 +368,8 @@ function render(forzar) {
   // shortcut: con un trabajo abierto, los repintados (sincronizar, etc.) no lo vuelven a montar para no perder deshacer y selección
   if (v === 'trabajo-' + S.montado && document.getElementById('taller') && !forzar) return pintarEstado();
   S.montado = null;
-  const base = v.startsWith('modulo-') || v.startsWith('tarea-') ? 'modulos' : v.startsWith('trabajo-') ? 'ejercicios' : v;
-  const baseMovil = ['notas', 'ajustes'].includes(base) ? 'mas' : base;
+  const base = v.startsWith('modulo-') || v.startsWith('tarea-') ? 'modulos' : v.startsWith('trabajo-') ? 'ejercicios' : ['repasar', 'examen'].includes(v) ? 'repaso' : v;
+  const baseMovil = ['notas', 'ajustes', 'repaso'].includes(base) ? 'mas' : base;
   app.innerHTML = `
   <div class="marco">
     <aside class="lateral">
@@ -388,7 +389,7 @@ function render(forzar) {
   const vista = document.getElementById('vista');
   document.body.classList.toggle('en-taller', v.startsWith('trabajo-'));
   vista.innerHTML = v.startsWith('modulo-') ? vistaModulo(+v.slice(7)) : v.startsWith('tarea-') ? vistaTarea(v.slice(6)) : v.startsWith('trabajo-') ? vistaTrabajo(v.slice(8))
-    : ({ inicio: vistaInicio, modulos: vistaModulos, calendario: vistaCalendario, notas: vistaNotas, ejercicios: vistaEjercicios, ajustes: vistaAjustes, mas: vistaMas, repaso: vistaRepaso, examen: vistaExamen }[v] || vistaInicio)();
+    : ({ inicio: vistaInicio, modulos: vistaModulos, calendario: vistaCalendario, notas: vistaNotas, ejercicios: vistaEjercicios, ajustes: vistaAjustes, mas: vistaMas, repaso: vistaRepasoSec, repasar: vistaRepaso, examen: vistaExamen }[v] || vistaInicio)();
   if (v.startsWith('trabajo-')) montarTrabajo(v.slice(8));
   actualizarContador();
   const sd = document.getElementById('salir-demo');
@@ -778,6 +779,7 @@ document.addEventListener('drop', (ev) => {
 
 function vistaMas() {
   return cabecera('Más') + `<div class="mas-enlaces">
+    <a href="#repaso" class="mas-enlace corte">${icono('repaso')}<span><b>Repaso</b><small>Test, tarjetas, huecos y exámenes</small></span></a>
     <a href="#notas" class="mas-enlace corte">${icono('notas')}<span><b>Notas</b><small>Medias y calificaciones sobre 10</small></span></a>
     <a href="#ajustes" class="mas-enlace corte">${icono('ajustes')}<span><b>Ajustes</b><small>Aules, GitHub, apariencia y copia</small></span></a>
   </div>`;
@@ -1082,30 +1084,27 @@ function vistaEjercicios() {
     </form></details>` : ''}
   ${m === 'Programación' && window.CHULETA ? `<section class="bloque"><div class="panel practica-cta"><div><b>Chuleta de C#</b><p class="suave">Todo lo de los temas 1 a 5 con ejemplos y buscador. También está en cada ejercicio de C#.</p></div><button type="button" class="boton" data-acc="chuleta">Abrir</button></div></section>` : ''}
   ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejercicios y ejemplos leídos de tus temas de Aules (${S.temas.ejercicios.length} ejercicios, ${Object.keys(S.temas.ejemplos).length} ejemplos) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
-  ${(window.REPASO || {})[m] ? `<section class="bloque"><div class="panel practica-cta"><div><b>Repaso para el examen</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
-  ${(window.TARJETAS || {})[m] ? panelTarjetas(m) : ''}
-  ${(window.REPASO || {})[m] ? panelExamen(m) : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}`;
 }
 // ---------- repaso (cajas de Leitner: acertar sube de caja y espacia la próxima vez; fallar vuelve a la 1) ----------
 const DIAS_CAJA = [0, 1, 3, 7, 14, 30];
 // shortcut: el id es la posición de la pregunta en js/repaso.js; si se reordenan, el progreso se descoloca
-const listaRepaso = (m, tipo) => ((tipo === 't' ? window.TARJETAS : window.REPASO) || {})[m] || [];
+const listaRepaso = (m, tipo) => (({ t: window.TARJETAS, h: window.HUECOS }[tipo] || window.REPASO) || {})[m] || [];
 function pendientesRepaso(m, tipo = 'p') {
   const ahora = Date.now();
-  return listaRepaso(m, tipo).map((_, i) => m + ':' + (tipo === 't' ? 't:' : '') + i).filter((id) => (S.prog.repaso[id]?.sig || 0) <= ahora)
+  return listaRepaso(m, tipo).map((_, i) => m + ':' + (tipo === 'p' ? '' : tipo + ':') + i).filter((id) => (S.prog.repaso[id]?.sig || 0) <= ahora)
     .sort((a, b) => (S.prog.repaso[a]?.caja || 0) - (S.prog.repaso[b]?.caja || 0));
 }
 function empezarRepaso(m, tipo = 'p') {
-  const cola = pendientesRepaso(m, tipo).slice(0, tipo === 't' ? 20 : 10);
+  const cola = pendientesRepaso(m, tipo).slice(0, tipo === 'p' ? 10 : 20);
   S.rep = { modulo: m, tipo, cola, hechas: 0, bien: 0, resp: null, orden: null };
-  location.hash === '#repaso' ? render() : (location.hash = 'repaso');
+  location.hash === '#repasar' ? render() : (location.hash = 'repasar');
 }
 function vistaRepaso() {
   const R = S.rep;
-  if (!R) { location.hash = 'ejercicios'; return ''; }
-  const m = R.modulo, t = R.tipo === 't', cab = cabecera((t ? 'Tarjetas · ' : 'Repaso · ') + m, '<a href="#ejercicios" class="suave">Volver a Ejercicios</a>');
+  if (!R) { location.hash = 'repaso'; return ''; }
+  const m = R.modulo, t = R.tipo === 't', cab = cabecera({ t: 'Tarjetas', h: 'Completar huecos' }[R.tipo] || 'Preguntas tipo test', '<a href="#repaso" class="suave">Volver a Repaso</a>', esc(m));
   if (!R.cola.length) {
     const quedan = pendientesRepaso(m, R.tipo).length;
     return cab + `<div class="panel repaso-fin"><b>${R.hechas ? `${R.bien} de ${R.hechas} a la primera` : 'Nada que repasar ahora'}</b>
@@ -1116,10 +1115,20 @@ function vistaRepaso() {
   if (t) return cab + `<div class="panel repaso">
     <div class="suave repaso-meta">Quedan ${R.cola.length} · ${S.prog.repaso[id]?.caja ? 'caja ' + S.prog.repaso[id].caja + ' de 5' : 'nueva'}</div>
     <p class="repaso-p">${esc(q.f)}</p>
-    ${R.ver ? `<p class="tarjeta-b">${esc(q.b)}</p>
+    ${R.ver ? `${R.txt ? `<p class="tarjeta-tuya"><b>Tu respuesta.</b> ${esc(R.txt)}</p>` : ''}<p class="tarjeta-b"><b>Respuesta.</b> ${esc(q.b)}</p>
       <div class="repaso-botones"><button type="button" class="boton principal" data-acc="rep-resp" data-v="1">La sabía</button><button type="button" class="boton" data-acc="rep-resp" data-v="0">No la sabía</button></div>`
-    : '<button type="button" class="boton principal" data-acc="rep-ver" autofocus>Ver respuesta</button>'}
+    : '<textarea id="tarjeta-r" rows="3" aria-label="Tu respuesta" placeholder="Escribe lo que recuerdes y pulsa Corregir (también puedes dejarlo en blanco)"></textarea><button type="button" class="boton principal" data-acc="rep-ver">Corregir</button>'}
   </div>`;
+  if (R.tipo === 'h') {
+    const partes = q.split(/\[([^\]]+)\]/), ok = R.hok, todo = ok && ok.every(Boolean); // impares = huecos
+    return cab + `<form id="f-hueco" class="panel repaso" autocomplete="off">
+    <div class="suave repaso-meta">Quedan ${R.cola.length} · ${S.prog.repaso[id]?.caja ? 'caja ' + S.prog.repaso[id].caja + ' de 5' : 'nueva'}</div>
+    <p class="repaso-p hueco-texto">${partes.map((x, i) => { if (i % 2 === 0) return esc(x); const n = (i - 1) / 2, sol = x.split('|')[0];
+      return `<input type="text" class="hueco ${ok ? (ok[n] ? 'bien' : 'mal') : ''}" id="h${n}" size="12" spellcheck="false" aria-label="Hueco ${n + 1}" value="${esc(R.hval?.[n] || '')}" ${ok ? 'readonly' : ''}>${ok && !ok[n] ? `<small class="hueco-sol">${esc(sol)}</small>` : ''}`; }).join('')}</p>
+    ${ok ? `<p class="repaso-x"><b>${todo ? 'Todo bien.' : 'Revisa los huecos en rojo.'}</b></p><button type="button" class="boton principal" data-acc="rep-resp" data-v="${todo ? 1 : 0}">Siguiente</button>`
+    : '<button class="boton principal">Comprobar</button>'}
+  </form>`;
+  }
   if (!R.orden) R.orden = q.o.map((_, i) => i).sort(() => Math.random() - 0.5);
   const caja = S.prog.repaso[id]?.caja || 0;
   return cab + `<div class="panel repaso">
@@ -1137,18 +1146,30 @@ function responderRepaso(i) {
   const R = S.rep, id = R.cola[0], q = listaRepaso(R.modulo, R.tipo)[+id.split(':').pop()];
   if (R.resp != null) return;
   R.resp = i;
-  const acierto = R.acierto = R.tipo === 't' ? i === 1 : i === q.c, prev = S.prog.repaso[id] || {}, primera = !R.fallos?.includes(id);
+  const acierto = R.acierto = R.tipo === 'p' ? i === q.c : i === 1, prev = S.prog.repaso[id] || {}, primera = !R.fallos?.includes(id);
   const caja = acierto ? Math.min(5, (prev.caja || 0) + 1) : 1;
   cambiar('repaso', id, { caja, sig: acierto ? Date.now() + DIAS_CAJA[caja] * 864e5 - 36e5 : 0 });
   if (primera) { R.hechas++; if (acierto) R.bien++; }
   if (!acierto) R.fallos = [...(R.fallos || []), id];
-  if (R.tipo === 't') return siguienteRepaso(); // en las tarjetas, contestar ya es pasar a la siguiente
+  if (R.tipo !== 'p') return siguienteRepaso(); // en tarjetas y huecos, contestar ya es pasar a la siguiente
   render();
 }
 function siguienteRepaso() {
   const R = S.rep, id = R.cola.shift();
   if (!R.acierto) R.cola.push(id); // la fallada vuelve al final de la tanda
-  R.resp = null; R.orden = null; R.ver = false; render();
+  R.resp = null; R.orden = null; R.ver = false; R.hok = R.hval = null; R.txt = ''; render();
+  (document.getElementById('h0') || document.getElementById('tarjeta-r'))?.focus();
+}
+const normal = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '').replace(/\.$/, '');
+function comprobarHuecos(f) {
+  const R = S.rep, q = listaRepaso(R.modulo, 'h')[+R.cola[0].split(':').pop()];
+  R.hval = [...f.querySelectorAll('.hueco')].map((x) => x.value);
+  R.hok = q.match(/\[[^\]]+\]/g).map((x, n) => x.slice(1, -1).split('|').some((a) => normal(a) === normal(R.hval[n])));
+  render(); document.querySelector('[data-acc="rep-resp"]')?.focus();
+}
+function panelHuecos(m) {
+  const n = pendientesRepaso(m, 'h').length;
+  return `<section class="bloque"><div class="panel practica-cta"><div><b>Completar huecos</b><p class="suave">${n ? n + ' frases tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.HUECOS[m].length} en total.</p></div><button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}" data-t="h">Completar</button></div></section>`;
 }
 function panelTarjetas(m) {
   const n = pendientesRepaso(m, 't').length;
@@ -1161,19 +1182,55 @@ const DIF = ['', 'fácil', 'media', 'difícil'];
 // muestreo ponderado sin repetir (clave = azar^(1/peso)); las de peso 0 solo entran si no hay bastantes
 const elegir = (lista, pesos, n) => lista.map((q, i) => { const w = pesos[(q.d || 1) - 1]; return { i, k: w ? Math.random() ** (1 / w) : Math.random() - 1 }; })
   .sort((a, b) => b.k - a.k).slice(0, n).map((x) => x.i);
+// ---------- 10 exámenes fijos por módulo: siempre las mismas preguntas (semilla fija) y entre todos cubren el banco ----------
+const azar = (sem) => () => { sem = (sem + 0x6d2b79f5) | 0; let t = Math.imul(sem ^ (sem >>> 15), 1 | sem); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32
+const FIJOS = ['facil', 'facil', 'medio', 'medio', 'medio', 'dificil', 'dificil', 'dificil', 'mixto', 'mixto'], fijos = {};
+// preguntas de dificultad fácil, media y difícil en cada nivel: 28 de test y 2 de desarrollo
+const REPARTO = { facil: [[18, 10, 0], [1, 1, 0]], medio: [[6, 14, 8], [0, 2, 0]], dificil: [[0, 10, 18], [0, 0, 2]], mixto: [[9, 10, 9], [0, 1, 1]] };
+// las menos usadas primero (desempate al azar); si una dificultad no llega, se rellena con las demás
+function tomar(lista, cuantos, rnd, usos) {
+  const orden = lista.map((q, i) => ({ i, d: (q.d || 1) - 1, k: (usos[i] || 0) + rnd() })).sort((a, b) => a.k - b.k);
+  const total = cuantos.reduce((a, b) => a + b, 0), out = cuantos.flatMap((n, d) => orden.filter((x) => x.d === d).slice(0, n).map((x) => x.i));
+  for (const x of orden) if (out.length < total && !out.includes(x.i)) out.push(x.i);
+  for (let k = out.length - 1; k > 0; k--) { const r = Math.floor(rnd() * (k + 1)); [out[k], out[r]] = [out[r], out[k]]; }
+  for (const i of out) usos[i] = (usos[i] || 0) + 1;
+  return out;
+}
+// shortcut: salen del banco actual; si se añaden preguntas, los fijos cambian (las notas guardadas se quedan)
+function examenesFijos(m) {
+  if (fijos[m]) return fijos[m];
+  const rnd = azar(2026), L = window.REPASO[m], D = (window.DESARROLLO || {})[m] || [], uT = [], uD = [];
+  return (fijos[m] = FIJOS.map((nivel) => ({ nivel, t: tomar(L, REPARTO[nivel][0], rnd, uT), d: tomar(D, REPARTO[nivel][1], rnd, uD) })));
+}
 const examenesDe = (m) => Object.values(S.prog.examenes).filter((x) => x.m === m).sort((a, b) => b.t - a.t);
 function panelExamen(m) {
   const h = examenesDe(m);
   return `<section class="bloque"><div class="panel practica-cta"><div><b>Examen de prueba</b><p class="suave">${h.length ? `${h.length} hechos · último: ${fNota(h[0].nota)}` : 'Test y desarrollo al azar, con el nivel que elijas.'}</p></div><button type="button" class="boton" data-acc="examen-config" data-v="${esc(m)}">Hacer examen</button></div></section>`;
 }
+function vistaRepasoSec() {
+  const mods = [...new Set([window.REPASO, window.TARJETAS, window.HUECOS].flatMap((o) => Object.keys(o || {})))];
+  if (!mods.includes(S.repMod)) S.repMod = mods.includes('Sistemas Informáticos') ? 'Sistemas Informáticos' : mods[0];
+  const m = S.repMod, L = (window.REPASO || {})[m] || [], h = examenesDe(m);
+  return cabecera('Repaso', '<span class="suave">Test, tarjetas, huecos y exámenes para preparar los exámenes.</span>') + `
+  <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="rep-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
+  ${L.length ? `<section class="bloque"><div class="panel practica-cta"><div><b>Preguntas tipo test</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
+  ${(window.TARJETAS || {})[m] ? panelTarjetas(m) : ''}
+  ${(window.HUECOS || {})[m] ? panelHuecos(m) : ''}
+  ${L.length ? `<section class="bloque"><header><h2>Exámenes</h2><button type="button" class="boton" data-acc="examen-config" data-v="${esc(m)}">Examen al azar</button></header>
+    ${L.length >= 30 ? `<div class="ex-fijos">${examenesFijos(m).map((F, k) => { const hk = h.filter((x) => x.fijo === k), mejor = hk.length ? Math.max(...hk.map((x) => x.nota)) : null;
+      return `<button type="button" class="panel ex-fijo" data-acc="examen-fijo" data-v="${esc(m)}" data-n="${k}"><b>Examen ${k + 1}</b><span class="ex-nivel nivel-${F.nivel}">${NIVELES[F.nivel][0]}</span>
+        <small class="suave">${F.t.length + F.d.length} preguntas · ${mejor == null ? 'sin hacer' : `mejor nota ${fNota(mejor)} (${hk.length} ${hk.length === 1 ? 'intento' : 'intentos'})`}</small></button>`; }).join('')}</div>` : ''}
+  </section>` : ''}`;
+}
 function configurarExamen(m) { S.ex = null; S.exMod = m; location.hash === '#examen' ? render() : (location.hash = 'examen'); }
-function empezarExamen(m, nivel, n) {
-  if (!NIVELES[nivel]) nivel = Object.keys(NIVELES)[Math.floor(Math.random() * 4)];
+function empezarExamen(m, nivel, n, fijo) {
+  const F = fijo != null && examenesFijos(m)[fijo];
+  if (F) nivel = F.nivel; else if (!NIVELES[nivel]) nivel = Object.keys(NIVELES)[Math.floor(Math.random() * 4)];
   const w = NIVELES[nivel][1], L = window.REPASO[m], des = (window.DESARROLLO || {})[m] || [];
-  S.ex = { m, nivel, id: 'x' + Date.now().toString(36), corregido: false,
-    test: elegir(L, w, n).map((i) => ({ i, orden: L[i].o.map((_, k) => k).sort(() => Math.random() - 0.5), resp: null })),
-    des: elegir(des, w, Math.min(2, des.length)).map((i) => ({ i, txt: '', marcas: [] })) };
-  render(); scrollTo(0, 0);
+  S.ex = { m, nivel, fijo: F ? fijo : null, id: 'x' + Date.now().toString(36), corregido: false,
+    test: (F ? F.t : elegir(L, w, n)).map((i) => ({ i, orden: L[i].o.map((_, k) => k).sort(() => Math.random() - 0.5), resp: null })),
+    des: (F ? F.d : elegir(des, w, Math.min(2, des.length))).map((i) => ({ i, txt: '', marcas: [] })) };
+  location.hash === '#examen' ? render() : (location.hash = 'examen'); scrollTo(0, 0);
 }
 function notaExamen() {
   const E = S.ex, L = window.REPASO[E.m], D = (window.DESARROLLO || {})[E.m] || [], pDes = E.des.length ? 3 : 0;
@@ -1184,7 +1241,7 @@ function notaExamen() {
 }
 function guardarNotaExamen() {
   const E = S.ex, N = notaExamen();
-  cambiar('examenes', E.id, { m: E.m, nivel: E.nivel, nota: N.total });
+  cambiar('examenes', E.id, { m: E.m, nivel: E.nivel, fijo: E.fijo, nota: N.total });
   const a = document.getElementById('ex-nota'), b = document.getElementById('ex-des');
   if (a) a.textContent = fNota(N.total); if (b) b.textContent = fNota(Math.round(N.des * 100) / 100);
 }
@@ -1197,14 +1254,21 @@ function corregirExamen() {
 function anotarExamen(el) { // radio t<n>, textarea d<n>, casilla k<n>:<punto>
   const E = S.ex, tipo = el.dataset.ex[0], [n, k] = el.dataset.ex.slice(1).split(':').map(Number);
   if (!E || E.corregido && tipo !== 'k') return;
-  if (tipo === 't') E.test[n].resp = +el.value;
-  else if (tipo === 'd') E.des[n].txt = el.value;
-  else { E.des[n].marcas[k] = el.checked; guardarNotaExamen(); }
+  if (tipo === 't') {
+    const t = E.test[n];
+    if (t.resp != null) return; // ya corregida
+    t.resp = +el.value;
+    if (t.resp !== window.REPASO[E.m][t.i].c) cambiar('repaso', E.m + ':' + t.i, { caja: 1, sig: 0 }); // lo fallado vuelve al repaso
+    repintarExamen();
+  } else if (tipo === 'd') E.des[n].txt = el.value;
+  else { E.des[n].marcas[k] = el.checked; if (E.corregido) guardarNotaExamen(); }
 }
+function repintarExamen() { const y = scrollY; render(); scrollTo(0, y); } // corrige en el sitio sin saltar arriba
+function corregirDesarrollo(n) { S.ex.des[n].hecha = true; repintarExamen(); }
 function vistaExamen() {
   const E = S.ex, m = E ? E.m : S.exMod;
-  if (!m || !(window.REPASO || {})[m]) { location.hash = 'ejercicios'; return ''; }
-  const volver = '<a href="#ejercicios" class="suave">Volver a Ejercicios</a>', hayDes = !!((window.DESARROLLO || {})[m] || []).length;
+  if (!m || !(window.REPASO || {})[m]) { location.hash = 'repaso'; return ''; }
+  const volver = '<a href="#repaso" class="suave">Volver a Repaso</a>', hayDes = !!((window.DESARROLLO || {})[m] || []).length;
   if (!E) {
     const h = examenesDe(m), total = window.REPASO[m].length;
     return cabecera('Examen de prueba · ' + m, volver) + `
@@ -1217,24 +1281,24 @@ function vistaExamen() {
     ${h.length ? `<section class="bloque"><h3 class="ex-titulo">Tus exámenes</h3><ul class="ex-hist">${h.slice(0, 8).map((x) => `<li><b>${fNota(x.nota)}</b> · ${esc(NIVELES[x.nivel]?.[0] || '')} · ${esc(cuando(Math.floor(x.t / 1000)))}</li>`).join('')}</ul></section>` : ''}`;
   }
   const L = window.REPASO[m], D = (window.DESARROLLO || {})[m] || [], N = E.corregido ? notaExamen() : null, c = E.corregido;
-  return cabecera(`Examen · ${NIVELES[E.nivel][0]}`, `<button type="button" class="enlace" data-acc="examen-config" data-v="${esc(m)}">${c ? 'Otro examen' : 'Dejarlo'}</button>`, esc(m)) + `
+  return cabecera(`${E.fijo != null ? 'Examen ' + (E.fijo + 1) : 'Examen al azar'} · ${NIVELES[E.nivel][0]}`, `<button type="button" class="enlace" data-acc="examen-config" data-v="${esc(m)}">${c ? 'Otro examen' : 'Dejarlo'}</button>`, esc(m)) + `
   ${c ? `<div class="panel ex-nota"><div><b id="ex-nota">${fNota(N.total)}</b> / 10</div><p class="suave">Test: ${N.bien} de ${E.test.length} bien${N.pDes ? ` · Desarrollo: <span id="ex-des">${fNota(Math.round(N.des * 100) / 100)}</span> de ${N.pDes} (marca abajo lo que pusiste)` : ''}</p>
     <button type="button" class="boton principal" data-acc="examen-config" data-v="${esc(m)}">Otro examen</button></div>` : ''}
   <form id="f-examen" class="examen">
     <h3 class="ex-titulo">Test · ${E.test.length} preguntas</h3>
-    ${E.test.map((t, n) => { const q = L[t.i]; return `<div class="panel ex-q" role="radiogroup" aria-labelledby="exp${n}">
+    ${E.test.map((t, n) => { const q = L[t.i], ya = c || t.resp != null; return `<div class="panel ex-q" role="radiogroup" aria-labelledby="exp${n}">
       <p class="ex-p" id="exp${n}">${n + 1}. ${esc(q.p)} <small>${DIF[q.d || 1]}</small></p>
-      ${t.orden.map((k) => `<label class="ex-op ${c ? (k === q.c ? 'bien' : k === t.resp ? 'mal' : '') : ''}"><input type="radio" name="t${n}" value="${k}" data-ex="t${n}" ${t.resp === k ? 'checked' : ''} ${c ? 'disabled' : ''}><span>${esc(q.o[k])}</span></label>`).join('')}
-      ${c ? `<p class="repaso-x">${t.resp === q.c ? '<b>Bien.</b>' : t.resp == null ? '<b>Sin contestar.</b>' : '<b>No.</b>'} ${esc(q.x)}</p>` : ''}
+      ${t.orden.map((k) => `<label class="ex-op ${ya ? (k === q.c ? 'bien' : k === t.resp ? 'mal' : '') : ''}"><input type="radio" name="t${n}" value="${k}" data-ex="t${n}" ${t.resp === k ? 'checked' : ''} ${ya ? 'disabled' : ''}><span>${esc(q.o[k])}</span></label>`).join('')}
+      ${ya ? `<p class="repaso-x">${t.resp === q.c ? '<b>Bien.</b>' : t.resp == null ? '<b>Sin contestar.</b>' : '<b>No.</b>'} ${esc(q.x)}</p>` : ''}
     </div>`; }).join('')}
     ${E.des.length ? `<h3 class="ex-titulo">Desarrollo · ${E.des.length} preguntas</h3>` : ''}
-    ${E.des.map((d, n) => { const q = D[d.i]; return `<div class="panel ex-q">
+    ${E.des.map((d, n) => { const q = D[d.i], ya = c || d.hecha; return `<div class="panel ex-q">
       <label class="ex-p" for="exd${n}">${E.test.length + n + 1}. ${esc(q.p)} <small>${DIF[q.d || 1]}</small></label>
-      <textarea id="exd${n}" data-ex="d${n}" rows="6" ${c ? 'readonly' : ''} placeholder="Escribe tu respuesta…">${esc(d.txt)}</textarea>
-      ${c ? `<p class="ex-modelo"><b>Respuesta modelo.</b> ${esc(q.r)}</p>
-        <div class="ex-k"><span class="suave">Marca los puntos que has puesto:</span>${q.k.map((k, i) => `<label><input type="checkbox" data-ex="k${n}:${i}" ${d.marcas[i] ? 'checked' : ''}><span>${esc(k)}</span></label>`).join('')}</div>` : ''}
+      <textarea id="exd${n}" data-ex="d${n}" rows="6" ${ya ? 'readonly' : ''} placeholder="Escribe tu respuesta…">${esc(d.txt)}</textarea>
+      ${ya ? `<p class="ex-modelo"><b>Respuesta modelo.</b> ${esc(q.r)}</p>
+        <div class="ex-k"><span class="suave">Marca los puntos que has puesto:</span>${q.k.map((k, i) => `<label><input type="checkbox" data-ex="k${n}:${i}" ${d.marcas[i] ? 'checked' : ''}><span>${esc(k)}</span></label>`).join('')}</div>` : `<div><button type="button" class="boton" data-acc="ex-corr" data-n="${n}">Corregir esta pregunta</button></div>`}
     </div>`; }).join('')}
-    ${c ? '' : '<div><button class="boton principal">Corregir</button></div>'}
+    ${c ? '' : `<div class="ex-fin"><span class="suave">Test: ${E.test.filter((t) => t.resp === L[t.i].c).length} bien de ${E.test.filter((t) => t.resp != null).length} contestadas</span><button class="boton principal">Terminar y ver la nota</button></div>`}
   </form>`;
 }
 
@@ -1561,7 +1625,7 @@ document.addEventListener('keydown', (ev) => {
   if (escribiendo || ev.ctrlKey || ev.metaKey || ev.altKey || !S.curso || document.getElementById('lab')?.hidden === false) return;
   const k = ev.key.toLowerCase();
   if (Date.now() - tiempoG < 1200) {
-    const ir = { i: 'inicio', m: 'modulos', c: 'calendario', e: 'ejercicios', n: 'notas', a: 'ajustes' }[k];
+    const ir = { i: 'inicio', m: 'modulos', c: 'calendario', e: 'ejercicios', r: 'repaso', n: 'notas', a: 'ajustes' }[k];
     tiempoG = 0; if (ir) { ev.preventDefault(); location.hash = ir; } return;
   }
   if (k === 'g') tiempoG = Date.now();
@@ -1587,8 +1651,11 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'releer-temas') actualizarTemas(true);
   else if (acc === 'cerrar-chuleta') cerrarChuleta();
   else if (acc === 'repasar') empezarRepaso(el.dataset.v, el.dataset.t);
-  else if (acc === 'rep-ver') { S.rep.ver = true; render(); }
+  else if (acc === 'rep-ver') { S.rep.txt = document.getElementById('tarjeta-r')?.value.trim(); S.rep.ver = true; render(); }
   else if (acc === 'examen-config') configurarExamen(el.dataset.v);
+  else if (acc === 'ex-corr') corregirDesarrollo(+el.dataset.n);
+  else if (acc === 'examen-fijo') empezarExamen(el.dataset.v, null, 0, +el.dataset.n);
+  else if (acc === 'rep-mod') { S.repMod = el.dataset.v; render(); }
   else if (acc === 'rep-resp') responderRepaso(+el.dataset.v);
   else if (acc === 'rep-sig') siguienteRepaso();
   else if (acc === 'pdf') exportarPdf(el.dataset.v);
@@ -1661,7 +1728,8 @@ document.addEventListener('change', async (ev) => {
 document.addEventListener('submit', async (ev) => {
   const f = ev.target; ev.preventDefault();
   const val = (id) => document.getElementById(id).value.trim();
-  if (f.id === 'f-examen-cfg') empezarExamen(S.exMod, val('ex-nivel'), +val('ex-n'));
+  if (f.id === 'f-hueco') comprobarHuecos(f);
+  else if (f.id === 'f-examen-cfg') empezarExamen(S.exMod, val('ex-nivel'), +val('ex-n'));
   else if (f.id === 'f-examen') corregirExamen();
   else if (f.id === 'f-tarea') {
     const [y, m, d] = val('t-fecha').split('-').map(Number), [hh, mm] = (val('t-hora') || '23:59').split(':').map(Number);
