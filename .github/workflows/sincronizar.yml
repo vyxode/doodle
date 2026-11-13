@@ -31,8 +31,10 @@ jobs:
           V=${GITHUB_SHA::8}
           sed -i -E "s#(from '\./[a-z]+\.js)'#\1?v=$V'#g" js/*.js
           sed -i -E "s#(src=\"js/[a-z]+\.js)\"#\1?v=$V\"#g; s#(href=\"css/[a-z]+\.css)\"#\1?v=$V\"#g" index.html
+          # la página de los resúmenes, igual: sus scripts y los de la web que usa
+          sed -i -E "s#(src=\"(\.\./js/)?[a-z]+\.js)\"#\1?v=$V\"#g; s#(href=\"\.\./css/[a-z]+\.css)\"#\1?v=$V\"#g" repaso/index.html
           sed -i "s/doodle-v1/doodle-$V/" sw.js
-          grep -c "?v=$V" index.html js/app.js
+          grep -c "?v=$V" index.html js/app.js repaso/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
