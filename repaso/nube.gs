@@ -1,13 +1,15 @@
 // Guardado de los lectores de repaso/ en una hoja de cálculo de Google (Apps Script).
-// Montaje: hoja de cálculo nueva → Extensiones → Apps Script → pega este archivo → Implementar →
+// Montaje: hoja de cálculo nueva → Extensiones → Apps Script (o un proyecto suelto en script.google.com con el
+// id de la hoja en HOJA) → pega este archivo → Implementar →
 // Nueva implementación → Aplicación web (ejecutar como: yo; acceso: cualquier usuario) → copia la URL
 // (…/exec) en NUBE, al principio de repaso/publico.js.
-// - Hoja «datos»: lo de cada lector, ya cifrado en su navegador con su contraseña (aquí no se puede leer).
-//   La fila se busca por un id que solo sale de su contraseña.
+// - Hoja «datos»: lo de cada lector, ya cifrado en su navegador con el secreto de su llave (aquí no se puede leer).
+//   La fila se busca por un id que solo sale de ese secreto.
 // - Hoja «registro»: fecha, nombre y qué abre cada lector.
 // Solo guardan y apuntan los lectores que están en repaso/llaves.json (su huella en «v»): quitar a alguien en
 // Doodle le cierra también esto, a los pocos minutos.
 const LLAVES = 'https://vyxode.github.io/doodle/repaso/llaves.json';
+const HOJA = ''; // id de la hoja de cálculo (lo que va tras /d/ en su dirección); vacío si el script está dentro de ella
 const TROZO = 45000; // una celda admite 50 000 caracteres: lo largo se reparte en varias columnas
 // Todo se guarda con «~» delante para que la hoja no lo tome nunca por un número o una fórmula.
 
@@ -53,7 +55,7 @@ function valido(id) {
 }
 
 function hoja(nombre, cabecera) {
-  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  const libro = HOJA ? SpreadsheetApp.openById(HOJA) : SpreadsheetApp.getActiveSpreadsheet();
   let h = libro.getSheetByName(nombre);
   if (!h) { h = libro.insertSheet(nombre); h.appendRow(cabecera); }
   return h;
