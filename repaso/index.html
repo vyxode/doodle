@@ -8,15 +8,43 @@
 <link rel="stylesheet" href="../css/app.css">
 <style>
   body { background: var(--fondo); overflow: auto; }
-  .pub { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; display: grid; gap: 16px; }
+  .pub { max-width: 900px; margin: 0 auto; padding: 32px 16px 64px; display: grid; gap: 16px; }
   .pub h1 { font-family: var(--f-titulo); font-size: 28px; margin: 0; }
   .pub form, .pub-fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .pub form input { flex: 1 1 220px; }
-  .pub-docs { display: grid; gap: 8px; }
+  .pub #form-entrar input { flex: 1 1 220px; }
+  .pub-docs, #lector, .pestana, .notas-lista, #resultados { display: grid; gap: 8px; }
+  #lector { gap: 14px; }
   .hojas { display: grid; gap: 12px; justify-items: center; }
-  .hojas canvas { width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px var(--sombra); border-radius: 4px; }
-  /* solo lectura: nada se selecciona, arrastra ni guarda con pulsación larga */
+  .hoja { position: relative; max-width: 100%; background: #fff; box-shadow: 0 1px 4px var(--sombra); border-radius: 4px; overflow: hidden; }
+  .hoja canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .marcas { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .marcas i { position: absolute; opacity: 0.45; mix-blend-mode: multiply; border-radius: 2px; }
+  .avisos { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .aviso { position: absolute; right: 4px; pointer-events: auto; width: 20px; height: 20px; padding: 0; font-size: 12px; line-height: 20px; border: 0; border-radius: 50%; background: var(--texto); color: var(--fondo); cursor: pointer; }
+  /* capa de texto de pdf.js (transparente, encima del dibujo): es lo que se selecciona para subrayar */
+  .textLayer { position: absolute; inset: 0; overflow: hidden; line-height: 1; text-size-adjust: none; -webkit-text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 2; }
+  .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+  .textLayer span.markedContent { top: 0; height: 0; }
+  .textLayer ::selection { background: rgba(0, 110, 255, 0.28); }
+  .textLayer br::selection { background: transparent; }
+  .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: -1; cursor: default; user-select: none; }
+  .textLayer .endOfContent.active { top: 0; }
+  .flota { position: fixed; z-index: 50; display: flex; gap: 6px; align-items: center; padding: 6px; background: var(--panel); border: 1px solid var(--linea-fuerte); border-radius: var(--radio); box-shadow: 0 4px 16px var(--sombra); }
+  .color { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+  .color[aria-pressed="true"] { border-color: var(--texto); }
+  #editor { flex-direction: column; align-items: stretch; width: min(340px, calc(100vw - 16px)); padding: 10px; }
+  #editor textarea { min-height: 90px; }
+  #ed-cita { margin: 0; font-size: 13px; max-height: 4.5em; overflow: auto; }
+  .nota-item { display: grid; gap: 4px; text-align: left; font: inherit; color: var(--texto); background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 10px 12px; cursor: pointer; }
+  .nota-item:hover { background: var(--hover); }
+  .nota-cita { border-left: 4px solid; padding-left: 8px; }
+  .nota-texto { white-space: pre-line; }
+  #buscar { width: 100%; }
+  #resultados { max-height: 40vh; overflow: auto; }
+  #resultados:empty { display: none; }
+  /* solo lectura: nada se selecciona, arrastra ni guarda con pulsación larga, salvo el texto para subrayar y lo que se escribe */
   .lector, .lector * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+  .lector .textLayer span, .lector :is(input, textarea, select) { user-select: text; -webkit-user-select: text; }
   .tapado .hojas { filter: blur(24px); opacity: 0.15; }
   [hidden] { display: none !important; }
   @media print { body { display: none !important; } }
@@ -34,14 +62,46 @@
     <p class="error-txt" id="error" role="alert"></p>
   </section>
   <section id="dentro" class="lector" hidden>
-    <div class="pub-fila"><b id="hola"></b><button class="boton mini" type="button" id="salir">Salir</button></div>
+    <div class="pub-fila"><b id="hola"></b><button class="boton mini" type="button" id="salir">Salir</button><span class="suave" id="nube" role="status"></span></div>
     <div class="pub-docs" id="docs"></div>
-    <p class="suave" id="estado" aria-live="polite"></p>
-    <div class="hojas" id="hojas"></div>
+    <div id="lector" hidden>
+      <nav class="chips-mod" id="pestanas" aria-label="Qué hacer con el resumen">
+        <button type="button" data-p="leer">Leer</button><button type="button" data-p="examen">Examen</button><button type="button" data-p="tarjetas">Tarjetas</button><button type="button" data-p="huecos">Huecos</button><button type="button" data-p="notas">Mis notas</button>
+      </nav>
+      <div class="pestana" id="p-leer">
+        <input type="search" id="buscar" placeholder="Buscar en el resumen" aria-label="Buscar en el resumen" autocomplete="off">
+        <div id="resultados"></div>
+        <p class="suave" id="estado" aria-live="polite"></p>
+        <div class="hojas" id="hojas"></div>
+      </div>
+      <div class="pestana" id="p-examen" hidden></div>
+      <div class="pestana" id="p-tarjetas" hidden></div>
+      <div class="pestana" id="p-huecos" hidden></div>
+      <div class="pestana" id="p-notas" hidden></div>
+    </div>
   </section>
 </main>
+<div class="flota" id="barra" hidden>
+  <button type="button" class="color" data-c="a" style="background:#ffd54a" aria-label="Subrayar en amarillo"></button>
+  <button type="button" class="color" data-c="v" style="background:#7ee08a" aria-label="Subrayar en verde"></button>
+  <button type="button" class="color" data-c="r" style="background:#ff8fb1" aria-label="Subrayar en rosa"></button>
+  <button type="button" class="boton mini" data-c="a" data-nota="1">Nota</button>
+</div>
+<div class="flota" id="editor" role="dialog" aria-label="Nota del subrayado" hidden>
+  <p class="suave" id="ed-cita"></p>
+  <textarea id="ed-nota" placeholder="Tu nota (se guarda sola)" aria-label="Tu nota"></textarea>
+  <div class="pub-fila">
+    <button type="button" class="color" data-c="a" style="background:#ffd54a" aria-label="Amarillo"></button>
+    <button type="button" class="color" data-c="v" style="background:#7ee08a" aria-label="Verde"></button>
+    <button type="button" class="color" data-c="r" style="background:#ff8fb1" aria-label="Rosa"></button>
+    <button type="button" class="boton mini peligro" id="ed-borrar">Borrar</button>
+    <button type="button" class="boton mini" id="ed-cerrar">Cerrar</button>
+  </div>
+</div>
 <script src="../js/repaso.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="publico.js"></script>
+<script src="marcas.js"></script>
+<script src="estudio.js"></script>
 </body>
 </html>

@@ -565,7 +565,8 @@ window.HUECOS = {
   ],
 };
 
-// Resúmenes en PDF para leer desde Repaso (rutas relativas a la web)
+// Resúmenes en PDF para leer en repaso/ (f: ruta dentro de repaso/, sin .enc; desde: primera posición de
+// cada banco —p preguntas, t tarjetas, h huecos— que es de ese resumen, para su examen y tarjetas)
 window.RESUMENES = {
-  'Sistemas Informáticos': [{ t: 'Resumen del examen del Tema 2', f: 'sistemas/Resumen_Examen_Sistemas_Tema2.pdf' }],
+  'Sistemas Informáticos': [{ t: 'Resumen del examen del Tema 2', f: 'sistemas/Resumen_Examen_Sistemas_Tema2.pdf', desde: { p: 10 } }],
 };
