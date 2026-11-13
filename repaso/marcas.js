@@ -2,6 +2,8 @@
 // rectángulos en proporción a la página (0-1), así se ven igual en cualquier pantalla.
 const COLORES = { a: ['amarillo', '#ffd54a'], v: ['verde', '#7ee08a'], r: ['rosa', '#ff8fb1'] };
 const marcasDoc = () => ((D.docs[A.r.f] ||= { marcas: [] }).marcas);
+// la marca que se está editando, buscada de nuevo por si una fusión con otro dispositivo la ha cambiado de sitio
+const marcaViva = (m) => marcasDoc().find((x) => x.i === m.i) || m;
 
 // la selección actual, recortada a la página donde empieza
 function seleccion() {
@@ -53,7 +55,7 @@ $('barra').onmousedown = (e) => e.preventDefault(); // que pulsar la barra no qu
 $('barra').onclick = (e) => {
   const b = e.target.closest('button');
   if (!b || !pendiente) return;
-  const m = { i: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...pendiente, c: b.dataset.c || 'a', n: '' };
+  const m = { i: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ...pendiente, c: b.dataset.c || 'a', n: '', u: Date.now() };
   marcasDoc().push(m); guardar(); pintarMarcas(m.p);
   getSelection().removeAllRanges(); $('barra').hidden = true;
   if (b.dataset.nota) editar(m, b.getBoundingClientRect());
@@ -84,12 +86,13 @@ function editar(m, donde) {
   $('ed-nota').focus();
 }
 function cerrarEditor() { if (!editando) return; const p = editando.p; editando = null; $('editor').hidden = true; pintarMarcas(p); if (!$('p-notas').hidden) verNotas(); }
-$('ed-nota').oninput = () => { editando.n = $('ed-nota').value.slice(0, 2000); guardar(); };
+$('ed-nota').oninput = () => { editando = marcaViva(editando); editando.n = $('ed-nota').value.slice(0, 2000); editando.u = Date.now(); guardar(); };
 $('editor').onclick = (e) => {
   const b = e.target.closest('button');
   if (!b || !editando) return;
-  if (b.dataset.c) { editando.c = b.dataset.c; guardar(); for (const x of $('editor').querySelectorAll('[data-c]')) x.setAttribute('aria-pressed', x === b); pintarMarcas(editando.p); }
-  if (b.id === 'ed-borrar') { const l = marcasDoc(); l.splice(l.indexOf(editando), 1); guardar(); cerrarEditor(); }
+  editando = marcaViva(editando);
+  if (b.dataset.c) { editando.c = b.dataset.c; editando.u = Date.now(); guardar(); for (const x of $('editor').querySelectorAll('[data-c]')) x.setAttribute('aria-pressed', x === b); pintarMarcas(editando.p); }
+  if (b.id === 'ed-borrar') { const l = marcasDoc(); l.splice(l.indexOf(editando), 1); D.borradas[editando.i] = 1; guardar(); cerrarEditor(); }
   if (b.id === 'ed-cerrar') cerrarEditor();
 };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarEditor(); });

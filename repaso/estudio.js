@@ -27,6 +27,8 @@ const verPagina = (texto) => { const n = paginaDe(texto); return n ? `<button ty
 function estudio(p) {
   if (p === 'notas') return verNotas();
   if (!A.pags.length) { $('p-' + p).innerHTML = '<p class="suave">Espera a que cargue el resumen…</p>'; return; }
+  const tipo = { examen: 'p', tarjetas: 't', huecos: 'h' }[p];
+  if (!banco(tipo).length) { $('p-' + p).innerHTML = '<p class="suave">Este resumen aún no tiene de esto.</p>'; return; }
   $('p-' + p).innerHTML = { examen: vistaExamen, tarjetas: vistaTarjetas, huecos: vistaHuecos }[p]();
 }
 const inicio = (tipo, texto, acc) => {

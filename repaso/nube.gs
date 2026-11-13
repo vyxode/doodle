@@ -5,6 +5,9 @@
 // - Hoja «datos»: lo de cada lector, ya cifrado en su navegador con su contraseña (aquí no se puede leer).
 //   La fila se busca por un id que solo sale de su contraseña.
 // - Hoja «registro»: fecha, nombre y qué abre cada lector.
+// Solo guardan y apuntan los lectores que están en repaso/llaves.json (su huella en «v»): quitar a alguien en
+// Doodle le cierra también esto, a los pocos minutos.
+const LLAVES = 'https://vyxode.github.io/doodle/repaso/llaves.json';
 const TROZO = 45000; // una celda admite 50 000 caracteres: lo largo se reparte en varias columnas
 // Todo se guarda con «~» delante para que la hoja no lo tome nunca por un número o una fórmula.
 
@@ -21,11 +24,12 @@ function doPost(e) {
   const cerrojo = LockService.getScriptLock();
   cerrojo.waitLock(10000);
   try {
+    if (!valido(m.id)) return salida({ error: 'lector no válido' });
     if (m.t === 'log') {
       hoja('registro', ['Fecha', 'Nombre', 'Qué']).appendRow([new Date(), texto(m.n, 60), texto(m.que, 120)]);
       return salida({ ok: true });
     }
-    if (!/^[0-9a-f]{64}$/.test(m.id) || typeof m.d !== 'string' || m.d.length > 2e6) return salida({ error: 'petición no válida' });
+    if (typeof m.d !== 'string' || !/^[A-Za-z0-9+/=]{16,2000000}$/.test(m.d)) return salida({ error: 'petición no válida' });
     const h = hoja('datos', ['id', 'fecha', 'datos']), trozos = [];
     for (let i = 0; i < m.d.length; i += TROZO) trozos.push('~' + m.d.slice(i, i + TROZO));
     const ancho = Math.max(trozos.length, h.getLastColumn() - 2);
@@ -36,6 +40,16 @@ function doPost(e) {
   } finally {
     cerrojo.releaseLock();
   }
+}
+
+// el id es secreto de cada lector; llaves.json solo publica la huella (SHA-256) de cada id válido
+function valido(id) {
+  if (!/^[0-9a-f]{64}$/.test(String(id))) return false;
+  const cache = CacheService.getScriptCache();
+  let v = cache.get('v');
+  if (!v) { v = JSON.stringify(JSON.parse(UrlFetchApp.fetch(LLAVES + '?t=' + Date.now()).getContentText()).v || []); cache.put('v', v, 300); }
+  const h = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, id, Utilities.Charset.UTF_8).map((b) => ((b + 256) % 256).toString(16).padStart(2, '0')).join('');
+  return JSON.parse(v).includes(h);
 }
 
 function hoja(nombre, cabecera) {
