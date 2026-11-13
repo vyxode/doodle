@@ -3,7 +3,7 @@
 // nunca hay un PDF que descargar. Encima van el subrayado y las notas (marcas.js) y el estudio (estudio.js).
 // Lo de cada lector (subrayado, notas, fallos y resultados) se guarda cifrado con el secreto de su llave en la
 // aplicación web de Apps Script de nube.gs, que también apunta quién entra; además queda copia en el navegador.
-const NUBE = ''; // https://script.google.com/macros/s/<id>/exec
+const NUBE = 'https://script.google.com/macros/s/AKfycbzj2gsQfRnNVXM5x4KDJvWXMyJwpRK-82KHzD5t9xKy_hOGThiUhHnkAuIu1TNf186VOg/exec'; // aplicación web de nube.gs
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
 const $ = (id) => document.getElementById(id);
 const bytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)), b64 = (u) => btoa(String.fromCharCode(...u));
