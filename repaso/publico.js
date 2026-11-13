@@ -61,6 +61,7 @@ async function deLaNube() {
 async function cargarDatos() {
   D = vacio();
   if (!yo.id) return nube('Tus notas no se guardarán hasta que te den la llave nueva');
+  nube(NUBE ? 'Guardado' : 'En este navegador');
   D = juntar(await descifrarDatos(local.get()).catch(vacio), await deLaNube().catch(() => (nube('Sin conexión: se guarda en este navegador'), vacio())));
 }
 // trae lo hecho en otro dispositivo (al volver a la pestaña) y lo pinta
@@ -89,18 +90,24 @@ async function subir(alCerrar) {
 }
 document.addEventListener('visibilitychange', () => (document.hidden ? subir(true) : traer()));
 addEventListener('pagehide', () => subir(true));
-const nube = (t) => { $('nube').textContent = t; };
+// estado del guardado, con su icono: va (guardando), ok, local (solo en este navegador) o mal
+function nube(t, estado = /^Guardando/.test(t) ? 'va' : t === 'Guardado' ? 'ok' : /no válido|no se guardar/.test(t) ? 'mal' : 'local') {
+  $('nube').className = 'nube ' + estado; $('nube').title = t;
+  $('nube').innerHTML = ico(estado === 'ok' || estado === 'va' ? 'nube' : 'sinnube') + `<span>${esc(estado === 'local' ? 'En este navegador' : t)}</span>`;
+}
 
 // ---------- pantalla ----------
 function mostrar() {
   $('entrada').hidden = !!yo; $('dentro').hidden = !yo;
   if (!yo) return;
   $('hola').textContent = 'Hola, ' + yo.n;
+  $('avatar').textContent = yo.n.trim()[0]?.toUpperCase() || '·';
   $('docs').innerHTML = '';
   for (const [mod, lista] of Object.entries(window.RESUMENES || {})) for (const r of lista) {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'boton'; b.textContent = `${mod} · ${r.t}`;
-    b.onclick = () => leer(r, mod);
+    b.type = 'button'; b.className = 'doc'; b.setAttribute('aria-pressed', A?.r === r);
+    b.innerHTML = `${ico('archivo')}<span><small>${esc(mod)}</small>${esc(r.t)}</span>`;
+    b.onclick = () => { for (const x of $('docs').children) x.setAttribute('aria-pressed', x === b); leer(r, mod); };
     $('docs').append(b);
   }
 }
@@ -110,6 +117,16 @@ function pestana(p) {
   if (p !== 'leer') estudio(p);
 }
 function repintar() { A?.hojas.forEach((_, i) => pintarMarcas(i + 1)); if (A && !$('p-notas').hidden) verNotas(); }
+// página que se está leyendo, en la barra de herramientas
+let tPag = 0;
+addEventListener('scroll', () => {
+  if (tPag || !A?.hojas.length) return;
+  tPag = requestAnimationFrame(() => {
+    tPag = 0;
+    const tope = $('dock').getBoundingClientRect().bottom + 20, n = A.hojas.findIndex((h) => h.getBoundingClientRect().bottom > tope) + 1;
+    $('pagina').textContent = `${n || A.hojas.length} / ${A.total || A.hojas.length}`;
+  });
+}, { passive: true });
 // si cambia el ancho (girar el móvil, otra ventana), se vuelve a pintar en la misma página
 let reajuste = 0;
 addEventListener('resize', () => {
@@ -121,7 +138,7 @@ addEventListener('resize', () => {
   }, 400);
 });
 // lleva a una página del resumen, desde las notas, la búsqueda o una pregunta
-function irPagina(n) { pestana('leer'); A.hojas[n - 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+function irPagina(n) { $('resultados').innerHTML = ''; pestana('leer'); A.hojas[n - 1]?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
 let lectura = 0; // cada clic empieza una lectura nueva; la anterior deja de pintar (si no, dos clics duplican las páginas)
 async function leer(r, mod, volverA) {
@@ -130,14 +147,14 @@ async function leer(r, mod, volverA) {
   E = T = H = null; // lo de estudio era del resumen anterior
   A.ancho = $('hojas').clientWidth;
   $('lector').hidden = false; pestana('leer');
-  $('hojas').innerHTML = ''; $('estado').textContent = 'Abriendo…';
+  $('hojas').innerHTML = ''; $('resultados').innerHTML = ''; $('buscar').value = ''; $('estado').textContent = 'Abriendo…';
   try {
     const k = await crypto.subtle.importKey('raw', bytes(yo.k), 'AES-GCM', false, ['decrypt']);
     const res = await fetch(r.f + '.enc', { cache: 'no-cache' });
     if (!res.ok) throw new Error('No se encuentra el resumen');
     const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await abrir(k, await res.arrayBuffer())) }).promise;
     if (esta !== lectura) return doc.destroy();
-    registrar(r.t);
+    registrar(r.t); A.total = doc.numPages; $('pagina').textContent = `1 / ${doc.numPages}`;
     // shortcut: el tamaño se fija al abrir; si se gira el móvil o cambia la ventana, hay que volver a abrirlo
     const ancho = Math.min($('hojas').clientWidth || 800, 860), dpr = Math.min(devicePixelRatio || 1, 2);
     for (let i = 1; i <= doc.numPages; i++) {
@@ -158,7 +175,7 @@ async function leer(r, mod, volverA) {
       if (i === volverA) hoja.scrollIntoView({ block: 'start' });
     }
     await doc.destroy();
-    $('estado').textContent = `${r.t} · ${doc.numPages} páginas · selecciona texto para subrayarlo`;
+    $('estado').textContent = `${r.t} · ${doc.numPages} páginas · elige el rotulador y selecciona texto para subrayarlo`;
   } catch (e) { $('estado').textContent = e.message || 'No se ha podido abrir'; }
 }
 
