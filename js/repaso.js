@@ -25,18 +25,6 @@ window.REPASO = {
     { p: '¿Qué hace Convert.ToInt32("abc")?', o: ['Devuelve 0', 'Lanza una FormatException', 'Devuelve -1', 'Devuelve 97'], c: 1, x: 'Si el texto no es un número se produce una excepción; se puede capturar con try/catch.' },
     { p: '¿Qué hace Split(\' \') sobre "uno dos tres"?', o: ['Devuelve el número de espacios', 'Devuelve un array con "uno", "dos" y "tres"', 'Quita los espacios', 'Devuelve "unodostres"'], c: 1, x: 'Parte la cadena por el separador indicado.' },
   ],
-  'Entornos de Desarrollo': [
-    { p: '¿Qué ciclo de vida sigue las fases una tras otra, sin volver atrás?', o: ['Espiral', 'Cascada', 'Incremental', 'Ágil'], c: 1, x: 'Cascada: requisitos, diseño, implementación, pruebas y mantenimiento en secuencia.' },
-    { p: '¿Qué caracteriza al modelo en espiral?', o: ['No tiene fases', 'Iteraciones con análisis de riesgos en cada vuelta', 'Solo sirve para proyectos pequeños', 'No hay pruebas'], c: 1, x: 'Cada vuelta: planificación, análisis de riesgos, ingeniería y evaluación.' },
-    { p: 'En Scrum, ¿cómo se llama cada iteración?', o: ['Fase', 'Sprint', 'Hito', 'Release'], c: 1, x: 'Un sprint suele durar de 1 a 4 semanas y termina con un incremento del producto.' },
-    { p: '«La aplicación debe responder en menos de 2 segundos» es un requisito…', o: ['Funcional', 'No funcional', 'De usuario', 'De dominio'], c: 1, x: 'Los no funcionales describen cualidades (rendimiento, seguridad, usabilidad), no qué hace el sistema.' },
-    { p: '«El usuario podrá exportar sus notas a PDF» es un requisito…', o: ['Funcional', 'No funcional', 'De hardware', 'Legal'], c: 0, x: 'Describe una función que el sistema debe ofrecer.' },
-    { p: '¿Qué es el Product Backlog?', o: ['La lista priorizada de todo lo que hay que hacer en el producto', 'El informe final', 'El equipo de desarrollo', 'Un tipo de prueba'], c: 0, x: 'Lo gestiona el Product Owner.' },
-    { p: 'En un tablero Kanban, el objetivo principal es…', o: ['Fijar sprints', 'Visualizar el flujo de trabajo y limitar el trabajo en curso', 'Escribir documentación', 'Hacer pruebas unitarias'], c: 1, x: 'Columnas como Por hacer / En curso / Hecho y límites de WIP.' },
-    { p: '¿Qué es un IDE?', o: ['Un lenguaje de programación', 'Un entorno con editor, compilador y depurador integrados', 'Un sistema operativo', 'Una metodología'], c: 1, x: 'Por ejemplo Visual Studio, IntelliJ IDEA o VS Code con extensiones.' },
-    { p: 'Un lenguaje compilado…', o: ['Se traduce entero a código máquina antes de ejecutarse', 'Se ejecuta línea a línea sin traducir', 'No necesita traducción', 'Solo funciona en la web'], c: 0, x: 'Frente a los interpretados, que se traducen mientras se ejecutan. Java y C# usan un paso intermedio (bytecode / IL).' },
-    { p: 'En una prueba unitaria con JUnit, assertEquals(esperado, real)…', o: ['Imprime los valores', 'Falla la prueba si no son iguales', 'Compara referencias siempre', 'Solo sirve para cadenas'], c: 1, x: 'Si real no coincide con esperado, la prueba falla con un mensaje.' },
-  ],
   'Lenguajes de Marcas': [
     { p: '¿Qué etiqueta HTML define el título que se ve en la pestaña del navegador?', o: ['<h1>', '<title>', '<header>', '<head>'], c: 1, x: '<title> va dentro de <head>.' },
     { p: '¿Cuál es el selector CSS de un elemento con id="menu"?', o: ['.menu', '#menu', 'menu', '*menu'], c: 1, x: '# para id, . para clase.' },

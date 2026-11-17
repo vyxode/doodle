@@ -7,7 +7,6 @@ import { descargarAules, raizAules, nombreModulo } from './aules.js';
 import { crearEditor, montarSql, montarWeb, montarKanban, montarJava, cargarScript, comprobarCaso, conMainDePrueba, montarPracticaSql, EJ_SQL } from './herramientas.js';
 const EJ_SQL_N = EJ_SQL.length;
 import { montarDiagrama, svgExportable, tam } from './diagrama.js';
-import { PRACTICA_UML, comprobarCasos, comprobarActividad, solucionUml } from './uml.js';
 import { leerTemas } from './temas.js';
 
 const D = 86400;
@@ -1125,27 +1124,9 @@ function vistaTrabajo(id) {
       <button type="button" class="boton mini" data-acc="pdf" data-v="${esc(id)}" title="Un PDF con tu nombre, el enunciado y tu trabajo, listo para subir a Aules">PDF</button>
     </header>
     ${t && t.enunciado ? `<aside class="taller-enun panel corte" hidden><p class="pre">${esc(t.enunciado)}</p></aside>` : ''}
-    ${panelUml(w)}
     ${S.aviso ? `<div class="aviso taller-aviso"><span class="pre">${esc(S.aviso)}</span><button type="button" class="boton mini" data-acc="cerrar-aviso">Entendido</button></div>` : ''}
     <div class="taller-herr" id="taller-herr"></div>
   </div>`;
-}
-// Práctica de UML: enunciado (inglés, con traducción), comprobar el diagrama y ver una solución.
-const ejUml = (w) => w.uml && PRACTICA_UML.find((e) => e.id === w.uml);
-function panelUml(w) {
-  const ej = ejUml(w); if (!ej) return '';
-  return `<aside class="taller-uml panel corte" lang="en"><p class="uml-en">${esc(ej.en)}</p><p class="uml-es suave" lang="es" hidden>${esc(ej.tr)}</p>
-    ${ej.nota ? `<p class="suave" lang="es">${esc(ej.nota)}</p>` : ''}
-    <div class="fila-botones" lang="es"><button type="button" class="boton mini principal" data-acc="uml-comprobar">Comprobar</button><button type="button" class="boton mini" data-acc="uml-es" aria-pressed="false">Ver en español</button><button type="button" class="boton mini" data-acc="uml-solucion">Ver una solución</button><span class="suave">${esc(ej.fuente)}</span></div>
-    <div class="uml-res" lang="es" aria-live="polite"></div></aside>`;
-}
-function comprobarUml() {
-  const w = S.prog.trabajos[S.montado], ej = w && ejUml(w), caja = document.querySelector('.uml-res'); if (!ej || !caja) return;
-  const d = (w.datos || {}).diagrama || { nodos: [], aristas: [] };
-  const r = ej.tipo === 'casos' ? comprobarCasos(d, ej, tam) : comprobarActividad(d, ej), mal = r.filter((x) => x.ok === false).length;
-  if (!mal && !w.ok) cambiar('trabajos', S.montado, { ok: true });
-  caja.innerHTML = `<div class="aviso ${mal ? 'error' : 'ok'}"><b>${mal ? `${mal} cosa${mal > 1 ? 's' : ''} por arreglar` : 'Bien hecho: cumple lo que pide el enunciado'}</b>
-    <ul class="pruebas">${r.map((x) => `<li class="${x.ok ? 'ok' : x.ok === false ? 'mal' : ''}">${x.ok ? '✓' : x.ok === false ? '✗' : '💡'} ${esc(x.t)}</li>`).join('')}</ul></div>`;
 }
 function montarTrabajo(id) {
   const w = S.prog.trabajos[id], caja = document.getElementById('taller-herr');
@@ -1192,7 +1173,6 @@ function vistaEjercicios() {
     </form></details>` : ''}
   ${m === 'Programación' && window.CHULETA ? `<section class="bloque"><div class="panel practica-cta"><div><b>Chuleta de C#</b><p class="suave">Todo lo de los temas 1 a 5 con ejemplos y buscador. También está en cada ejercicio de C#.</p></div><button type="button" class="boton" data-acc="chuleta">Abrir</button></div></section>` : ''}
   ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejercicios y ejemplos leídos de tus temas de Aules (${S.temas.ejercicios.length} ejercicios, ${Object.keys(S.temas.ejemplos).length} ejemplos) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
-  ${m === 'Entornos de Desarrollo' ? listaUml() : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}`;
 }
@@ -1216,6 +1196,12 @@ function empezarRepaso(m, tipo = 'p') {
   S.rep = { modulo: m, tipo, cola, hechas: 0, bien: 0, resp: null, orden: null };
   location.hash === '#repasar' ? render() : (location.hash = 'repasar');
 }
+// cabecera de cada tarjeta: lo que queda, la barra de la tanda y la caja de Leitner (1 a 5)
+function metaRepaso(R, id) {
+  const caja = S.prog.repaso[id]?.caja || 0, total = R.hechas + R.cola.length;
+  return `<div class="repaso-meta"><span>Quedan ${R.cola.length}</span><span class="cajas" title="${caja ? 'Caja ' + caja + ' de 5' : 'Nueva'}" aria-label="${caja ? 'Caja ' + caja + ' de 5' : 'Nueva'}">${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= caja ? 'llena' : ''}"></i>`).join('')}</span></div>
+    <div class="repaso-barra" aria-hidden="true"><i style="width:${total ? (R.hechas / total) * 100 : 0}%"></i></div>`;
+}
 function vistaRepaso() {
   const R = S.rep;
   if (!R) { location.hash = 'repaso'; return ''; }
@@ -1228,8 +1214,8 @@ function vistaRepaso() {
   }
   const id = R.cola[0], q = listaRepaso(m, R.tipo)[+id.split(':').pop()];
   if (t) return cab + `<div class="panel repaso">
-    <div class="suave repaso-meta">Quedan ${R.cola.length} · ${S.prog.repaso[id]?.caja ? 'caja ' + S.prog.repaso[id].caja + ' de 5' : 'nueva'}</div>
-    <p class="repaso-p">${esc(enEs(q, 'f'))}</p>
+    ${metaRepaso(R, id)}
+    <p class="repaso-p tarjeta-f">${esc(enEs(q, 'f'))}</p>
     ${R.ver ? `${R.txt ? `<p class="tarjeta-tuya"><b>Tu respuesta.</b> ${esc(R.txt)}</p>` : ''}<p class="tarjeta-b"><b>Respuesta.</b> ${esc(enEs(q, 'b'))}</p>
       <div class="repaso-botones"><button type="button" class="boton principal" data-acc="rep-resp" data-v="1">La sabía</button><button type="button" class="boton" data-acc="rep-resp" data-v="0">No la sabía</button></div>`
     : '<textarea id="tarjeta-r" rows="3" aria-label="Tu respuesta" placeholder="Escribe lo que recuerdes y pulsa Corregir (también puedes dejarlo en blanco)"></textarea><button type="button" class="boton principal" data-acc="rep-ver">Corregir</button>'}
@@ -1237,24 +1223,23 @@ function vistaRepaso() {
   if (R.tipo === 'h') {
     const partes = textoHueco(q).split(/\[([^\]]+)\]/), ok = R.hok, todo = ok && ok.every(Boolean); // impares = huecos
     return cab + `<form id="f-hueco" class="panel repaso" autocomplete="off">
-    <div class="suave repaso-meta">Quedan ${R.cola.length} · ${S.prog.repaso[id]?.caja ? 'caja ' + S.prog.repaso[id].caja + ' de 5' : 'nueva'}</div>
+    ${metaRepaso(R, id)}
     <p class="repaso-p hueco-texto">${partes.map((x, i) => { if (i % 2 === 0) return esc(x); const n = (i - 1) / 2, sol = x.split('|')[0];
       return `<input type="text" class="hueco ${ok ? (ok[n] ? 'bien' : 'mal') : ''}" id="h${n}" size="12" spellcheck="false" aria-label="Hueco ${n + 1}" value="${esc(R.hval?.[n] || '')}" ${ok ? 'readonly' : ''}>${ok && !ok[n] ? `<small class="hueco-sol">${esc(sol)}</small>` : ''}`; }).join('')}</p>
     ${esp() && q.es ? `<p class="suave hueco-es" lang="es">${esc(q.es)}</p>` : ''}
-    ${ok ? `<p class="repaso-x"><b>${todo ? 'Todo bien.' : 'Revisa los huecos en rojo.'}</b></p><button type="button" class="boton principal" data-acc="rep-resp" data-v="${todo ? 1 : 0}">Siguiente</button>`
+    ${ok ? `<p class="repaso-x ${todo ? 'ok' : 'mal'}"><b>${todo ? 'Todo bien.' : 'Revisa los huecos en rojo.'}</b></p><button type="button" class="boton principal" data-acc="rep-resp" data-v="${todo ? 1 : 0}">Siguiente</button>`
     : '<button class="boton principal">Comprobar</button>'}
   </form>`;
   }
   if (!R.orden) R.orden = q.o.map((_, i) => i).sort(() => Math.random() - 0.5);
-  const caja = S.prog.repaso[id]?.caja || 0;
   return cab + `<div class="panel repaso">
-    <div class="suave repaso-meta">Quedan ${R.cola.length} · ${caja ? 'caja ' + caja + ' de 5' : 'nueva'}</div>
+    ${metaRepaso(R, id)}
     <p class="repaso-p">${esc(enEs(q, 'p'))}</p>
-    <div class="repaso-ops">${R.orden.map((i) => {
+    <div class="repaso-ops">${R.orden.map((i, k) => {
       const cls = R.resp == null ? '' : i === q.c ? 'bien' : i === R.resp ? 'mal' : '';
-      return `<button type="button" class="repaso-op ${cls}" data-acc="rep-resp" data-v="${i}" ${R.resp != null ? 'disabled' : ''}>${esc(enEs(q, 'o')[i])}</button>`;
+      return `<button type="button" class="repaso-op ${cls}" data-acc="rep-resp" data-v="${i}" ${R.resp != null ? 'disabled' : ''}><span class="letra" aria-hidden="true">${cls === 'bien' ? '✓' : cls === 'mal' ? '✗' : 'ABCDEF'[k]}</span><span>${esc(enEs(q, 'o')[i])}</span></button>`;
     }).join('')}</div>
-    ${R.resp == null ? '' : `<p class="repaso-x"><b>${R.resp === q.c ? 'Correcto.' : 'No.'}</b> ${esc(enEs(q, 'x'))}</p>
+    ${R.resp == null ? '' : `<p class="repaso-x ${R.resp === q.c ? 'ok' : 'mal'}"><b>${R.resp === q.c ? 'Correcto.' : 'No.'}</b> ${esc(enEs(q, 'x'))}</p>
       <button type="button" class="boton principal" data-acc="rep-sig" autofocus>Siguiente</button>`}
   </div>`;
 }
@@ -1283,13 +1268,16 @@ function comprobarHuecos(f) {
   R.hok = textoHueco(q).match(/\[[^\]]+\]/g).map((x, n) => x.slice(1, -1).split('|').some((a) => normal(a) === normal(R.hval[n])));
   render(); document.querySelector('[data-acc="rep-resp"]')?.focus();
 }
-function panelHuecos(m) {
-  const n = pendientesRepaso(m, 'h').length;
-  return `<section class="bloque"><div class="panel practica-cta"><div><b>Completar huecos</b><p class="suave">${n ? n + ' frases tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.HUECOS[m].filter(Boolean).length} en total.</p></div><button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}" data-t="h">Completar</button></div></section>`;
-}
-function panelTarjetas(m) {
-  const n = pendientesRepaso(m, 't').length;
-  return `<section class="bloque"><div class="panel practica-cta"><div><b>Tarjetas</b><p class="suave">${n ? n + ' tarjetas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.TARJETAS[m].filter(Boolean).length} en total.</p></div><button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}" data-t="t">Estudiar</button></div></section>`;
+// ficha de test, tarjetas o huecos: cuántas tocan hoy y cuántas ya están aprendidas (caja 3 o más)
+function fichaRepaso(m, tipo, titulo, verbo) {
+  const ids = listaRepaso(m, tipo).flatMap((q, i) => (q ? [m + ':' + (tipo === 'p' ? '' : tipo + ':') + i] : []));
+  if (!ids.length) return '';
+  const n = pendientesRepaso(m, tipo).length, sabe = ids.filter((id) => (S.prog.repaso[id]?.caja || 0) >= 3).length;
+  return `<div class="panel rep-ficha"><span class="rep-tipo">${titulo}</span>
+    <div class="rep-num"><b>${n}</b><span class="suave">${n ? 'para hoy' : 'nada para hoy'}</span></div>
+    <div class="rep-dominio" aria-label="${sabe} de ${ids.length} aprendidas"><i style="width:${(sabe / ids.length) * 100}%"></i></div>
+    <small class="suave">${sabe} de ${ids.length} aprendidas</small>
+    <button type="button" class="boton ${n ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}"${tipo === 'p' ? '' : ` data-t="${tipo}"`}>${verbo}</button></div>`;
 }
 
 // ---------- examen de prueba: preguntas al azar según el nivel; el test se corrige solo y el desarrollo te lo corriges tú ----------
@@ -1329,15 +1317,13 @@ function vistaRepasoSec() {
   const m = S.repMod, L = ((window.REPASO || {})[m] || []).filter(Boolean), h = examenesDe(m);
   return cabecera('Repaso', '<span class="suave">Test, tarjetas, huecos y exámenes para preparar los exámenes.</span>') + `
   <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="rep-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
-  ${L.length ? `<section class="bloque"><div class="panel practica-cta"><div><b>Preguntas tipo test</b><p class="suave">${pendientesRepaso(m).length ? pendientesRepaso(m).length + ' preguntas tocan hoy' : 'Hoy no te toca ninguna: vuelve mañana'} · ${window.REPASO[m].filter(Boolean).length} en total.</p></div><button type="button" class="boton ${pendientesRepaso(m).length ? 'principal' : ''}" data-acc="repasar" data-v="${esc(m)}">Repasar</button></div></section>` : ''}
-  ${((window.RESUMENES || {})[m] || []).map((r) => `<section class="bloque"><div class="panel practica-cta"><div><b>${esc(r.t)}</b><p class="suave">PDF de solo lectura, con contraseña personal.</p></div><a class="boton principal" href="repaso/" target="_blank" rel="noopener">Leer</a></div></section>`).join('')}
-  ${(window.TARJETAS || {})[m] ? panelTarjetas(m) : ''}
-  ${(window.HUECOS || {})[m] ? panelHuecos(m) : ''}
+  <div class="rep-fichas">${fichaRepaso(m, 'p', 'Preguntas tipo test', 'Repasar')}${fichaRepaso(m, 't', 'Tarjetas', 'Estudiar')}${fichaRepaso(m, 'h', 'Completar huecos', 'Completar')}</div>
+  ${((window.RESUMENES || {})[m] || []).map((r) => `<a class="panel rep-resumen" href="repaso/" target="_blank" rel="noopener"><span class="rep-pdf" aria-hidden="true">PDF</span><span><b>${esc(r.t)}</b><small class="suave">Solo lectura, con tu contraseña personal</small></span><span class="rep-ir" aria-hidden="true">↗</span></a>`).join('')}
   ${L.length ? `<section class="bloque"><header><h2>Exámenes</h2><button type="button" class="boton" data-acc="examen-config" data-v="${esc(m)}">Examen al azar</button></header>
     ${L.length >= 30 || reales(m).length ? `<div class="ex-fijos">${reales(m).map((r, k) => { const hk = h.filter((x) => x.real === k), mejor = hk.length ? Math.max(...hk.map((x) => x.nota)) : null;
-      return `<button type="button" class="panel ex-fijo" data-acc="examen-real" data-v="${esc(m)}" data-n="${k}"><b>${esc(r.t)}</b><span class="ex-nivel nivel-real">Real</span>
+      return `<button type="button" class="panel ex-fijo" data-nivel="real" data-acc="examen-real" data-v="${esc(m)}" data-n="${k}"><b>${esc(r.t)}</b><span class="ex-nivel nivel-real">Real</span>
         <small class="suave">${r.p.length} preguntas · ${mejor == null ? 'sin hacer' : `mejor nota ${fNota(mejor)} (${hk.length} ${hk.length === 1 ? 'intento' : 'intentos'})`}</small></button>`; }).join('')}${(L.length >= 30 ? examenesFijos(m) : []).map((F, k) => { const hk = h.filter((x) => x.fijo === k), mejor = hk.length ? Math.max(...hk.map((x) => x.nota)) : null;
-      return `<button type="button" class="panel ex-fijo" data-acc="examen-fijo" data-v="${esc(m)}" data-n="${k}"><b>Examen ${k + 1}</b><span class="ex-nivel nivel-${F.nivel}">${NIVELES[F.nivel][0]}</span>
+      return `<button type="button" class="panel ex-fijo" data-nivel="${F.nivel}" data-acc="examen-fijo" data-v="${esc(m)}" data-n="${k}"><b>Examen ${k + 1}</b><span class="ex-nivel nivel-${F.nivel}">${NIVELES[F.nivel][0]}</span>
         <small class="suave">${F.t.length + F.d.length} preguntas · ${mejor == null ? 'sin hacer' : `mejor nota ${fNota(mejor)} (${hk.length} ${hk.length === 1 ? 'intento' : 'intentos'})`}</small></button>`; }).join('')}</div>` : ''}
   </section>` : ''}`;
 }
@@ -1408,8 +1394,8 @@ function vistaExamen() {
     <h3 class="ex-titulo">Test · ${E.test.length} preguntas</h3>
     ${E.test.map((t, n) => { const q = L[t.i], ya = c || t.resp != null; return `<div class="panel ex-q" role="radiogroup" aria-labelledby="exp${n}">
       <p class="ex-p" id="exp${n}">${n + 1}. ${esc(enEs(q, 'p'))} <small>${DIF[q.d || 1]}</small></p>
-      ${t.orden.map((k) => `<label class="ex-op ${ya ? (k === q.c ? 'bien' : k === t.resp ? 'mal' : '') : ''}"><input type="radio" name="t${n}" value="${k}" data-ex="t${n}" ${t.resp === k ? 'checked' : ''} ${ya ? 'disabled' : ''}><span>${esc(enEs(q, 'o')[k])}</span></label>`).join('')}
-      ${ya ? `<p class="repaso-x">${t.resp === q.c ? '<b>Bien.</b>' : t.resp == null ? '<b>Sin contestar.</b>' : '<b>No.</b>'} ${esc(enEs(q, 'x'))}</p>` : ''}
+      ${t.orden.map((k, j) => { const cls = ya ? (k === q.c ? 'bien' : k === t.resp ? 'mal' : '') : ''; return `<label class="ex-op ${cls}"><input type="radio" name="t${n}" value="${k}" data-ex="t${n}" ${t.resp === k ? 'checked' : ''} ${ya ? 'disabled' : ''}><span class="letra" aria-hidden="true">${cls === 'bien' ? '✓' : cls === 'mal' ? '✗' : 'ABCDEF'[j]}</span><span>${esc(enEs(q, 'o')[k])}</span></label>`; }).join('')}
+      ${ya ? `<p class="repaso-x ${t.resp === q.c ? 'ok' : 'mal'}">${t.resp === q.c ? '<b>Bien.</b>' : t.resp == null ? '<b>Sin contestar.</b>' : '<b>No.</b>'} ${esc(enEs(q, 'x'))}</p>` : ''}
     </div>`; }).join('')}
     ${E.des.length ? `<h3 class="ex-titulo">Desarrollo · ${E.des.length} preguntas</h3>` : ''}
     ${E.des.map((d, n) => { const q = D[d.i], ya = c || d.hecha; return `<div class="panel ex-q">
@@ -1422,20 +1408,11 @@ function vistaExamen() {
   </form>`;
 }
 
-function listaUml() {
-  const fila = (ej) => { const w = trabajos().find((x) => x.uml === ej.id);
-    return `<div class="ej ej-t corte"><span class="ej-num">${ej.tipo === 'casos' ? 'Casos de uso' : 'Actividades'}</span><span class="ej-txt"><b lang="en">${esc(ej.titulo)}</b> <span class="suave">${esc(ej.es)}</span></span>
-      ${w && w.ok ? '<span class="chip ok">Comprobado</span>' : '<span></span>'}
-      <div class="ej-acc"><button type="button" class="boton mini ${w ? 'principal' : ''}" data-acc="practicar-uml" data-v="${ej.id}">${w ? 'Seguir' : 'Empezar'}</button></div></div>`; };
-  return `<details class="bloque tema corte" style="--mod:${colorDe('Entornos de Desarrollo')}"><summary><span class="tema-nombre">Práctica de diagramas UML (tema 4)</span><span class="suave num">${PRACTICA_UML.filter((e) => trabajos().some((w) => w.uml === e.id && w.ok)).length} de ${PRACTICA_UML.length} comprobados</span></summary>
-    <p class="suave">Dibuja el diagrama en Doodle y pulsa «Comprobar»: te dice qué actores, casos o flechas faltan. Enunciados en inglés, como en el examen, con traducción.</p>
-    <div class="lista">${PRACTICA_UML.map(fila).join('')}</div></details>`;
-}
 function listaEjercicios(modulo) {
   const color = colorDe(modulo);
   const conTrabajo = (t) => trabajoDeTarea(t.clave);
   const ts = tareas().filter((t) => t.modulo === modulo && t.origen === 'aules');
-  const libres = trabajos().filter((w) => w.modulo === modulo && !w.tarea && !w.uml).sort((a, b) => (b.t || 0) - (a.t || 0));
+  const libres = trabajos().filter((w) => w.modulo === modulo && !w.tarea).sort((a, b) => (b.t || 0) - (a.t || 0));
   let html = '';
   const filaEj = (t) => { const est = estadoTarea(t), w = conTrabajo(t);
     return `<div class="ej ej-t corte s-${situacion(t)}"><span class="ej-num">${t.entrega ? cuando(t.entrega).replace(/ a las .*/, '') : 'Sin fecha'}</span>
@@ -1817,19 +1794,6 @@ document.addEventListener('click', async (ev) => {
     catch (e) { el.textContent = 'No se pudo abrir esta copia'; }
   }
   else if (acc === 'trabajar') trabajarEnTarea(el.dataset.v);
-  else if (acc === 'practicar-uml') { const w = trabajos().find((x) => x.uml === el.dataset.v), ej = PRACTICA_UML.find((e) => e.id === el.dataset.v); if (ej) location.hash = 'trabajo-' + (w ? w.id : crearTrabajo({ titulo: ej.titulo, modulo: 'Entornos de Desarrollo', tipo: 'diagrama', notacion: ej.tipo, uml: ej.id })); }
-  else if (acc === 'uml-comprobar') comprobarUml();
-  else if (acc === 'uml-es') { const on = el.getAttribute('aria-pressed') !== 'true'; el.setAttribute('aria-pressed', String(on)); el.textContent = on ? 'Ver en inglés' : 'Ver en español'; document.querySelector('.uml-en').hidden = on; document.querySelector('.uml-es').hidden = !on; }
-  else if (acc === 'uml-solucion') {
-    const ej = ejUml(S.prog.trabajos[S.montado] || {}); if (!ej) return;
-    // misma capa que la chuleta
-    const capa = document.createElement('div'); capa.className = 'chuleta'; capa.id = 'uml-capa'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-label', 'Solución');
-    capa.innerHTML = `<div class="chuleta-caja"><header class="chuleta-cab"><b>Una solución: ${esc(ej.titulo)}</b><button type="button" class="boton mini" data-acc="cerrar-uml">Cerrar</button></header>
-      <p class="suave">La tuya puede ser distinta y estar bien.${ej.tipo === 'casos' ? ' Lo importante: los mismos actores, los casos principales y los «include»/«extend» bien orientados.' : ''}</p><div class="uml-svg">${svgExportable(solucionUml(ej))}</div></div>`;
-    capa.addEventListener('click', (ev) => { if (ev.target === capa) capa.remove(); });
-    document.body.append(capa); capa.querySelector('button').focus();
-  }
-  else if (acc === 'cerrar-uml') document.getElementById('uml-capa')?.remove();
   else if (acc === 'enunciado') { const a = document.querySelector('.taller-enun'), abierto = el.getAttribute('aria-expanded') === 'true'; a.hidden = abierto; el.setAttribute('aria-expanded', String(!abierto)); }
   else if (acc === 'borrar-trabajo') { if (el.dataset.confirmar !== 'si') { el.dataset.confirmar = 'si'; el.textContent = '¿Seguro?'; return; } cambiar('trabajos', el.dataset.v, { borrado: true }); render(); }
   else if (acc === 'filtro-mod') { S.filtro.modulo = el.dataset.v; render(); }

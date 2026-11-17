@@ -4,7 +4,7 @@ Mi curso de DAM en una web: tareas, entregas y notas de Aules, calendario, estad
 
 - **Aules**: la web descarga tus datos desde tu navegador con el token de la app de Moodle (Ajustes → Conexión con Aules). Aules no acepta conexiones desde los servidores de GitHub.
 - **Cifrado**: todo se guarda cifrado (AES-256-GCM, clave derivada de tu contraseña) en el navegador y, si pones una clave de GitHub en Ajustes, en `data/curso.enc` y `data/progreso.enc` para tenerlo igual en todos tus dispositivos.
-- **Repaso** (sección propia; en el móvil, en Más): preguntas de test, tarjetas y frases para completar huecos con cajas de Leitner, 10 exámenes fijos de 30 preguntas (fácil, medio, difícil y mixto) y exámenes al azar, con test y desarrollo. Todo sale de `js/repaso.js` y, para Entornos (tema 4, en inglés con traducción en `es` y el examen 04 real en `EXAMENES_REALES`), de `js/entornos.js`; añade preguntas siempre al final de cada módulo para no descolocar el progreso.
+- **Repaso** (sección propia; en el móvil, en Más): preguntas de test, tarjetas y frases para completar huecos con cajas de Leitner, 10 exámenes fijos de 30 preguntas (fácil, medio, difícil y mixto) y exámenes al azar, con test y desarrollo. Todo sale de `js/repaso.js` (una pregunta puede llevar su traducción en `es`, con el botón «Ver en español», y `window.EXAMENES_REALES` añade exámenes reales con posiciones del banco); añade preguntas siempre al final de cada módulo para no descolocar el progreso.
 - **Resúmenes** (`repaso/`): PDF de solo lectura, guardados solo cifrados (`repaso/<ruta>.enc`) y listados en `window.RESUMENES`. Cada lector entra con su contraseña; se dan de alta y de baja en Ajustes → Lectores de los resúmenes (con la clave de GitHub), donde también se sube el PDF de cada resumen (se cifra en el navegador), que guarda la lista cifrada en `data/lectores.enc` y rehace `repaso/llaves.json`. Dentro de cada resumen se puede subrayar con notas, buscar y estudiar con examen aleatorio, tarjetas y huecos del módulo (repetir lo fallado y saltar a la página donde se explica). Lo de cada lector se guarda cifrado con su contraseña en una hoja de Google mediante `repaso/nube.gs` (Apps Script; cómo montarlo, en el propio archivo), que también apunta quién entra; su URL va en `NUBE` (`repaso/publico.js`). Sin ella, se guarda solo en el navegador.
 - **Publicación**: `.github/workflows/sincronizar.yml` publica la web en GitHub Pages en cada push.
 
@@ -12,7 +12,7 @@ Mi curso de DAM en una web: tareas, entregas y notas de Aules, calendario, estad
 
 | Herramienta | Para | Notas |
 |---|---|---|
-| Diagrama | E/R (Chen extendido), modelo relacional, UML de clases, casos de uso, actividades | Exporta a `.drawio`, PNG y SVG. Práctica de UML con corrección en `js/uml.js` |
+| Diagrama | E/R (Chen extendido), modelo relacional, UML de clases, casos de uso, actividades | Exporta a `.drawio`, PNG y SVG |
 | SQL | Bases de Datos | SQLite en el navegador (`js/vendor/sql-wasm.*`); adapta lo típico de MySQL |
 | Java | Entornos | Java 8 real con CheerpJ + `javac` de OpenJDK (`js/vendor/tools.jar`); mini JUnit 4/5 incluido |
 | C# | Programación | Simulador de los temas 1–5 |

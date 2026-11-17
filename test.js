@@ -192,20 +192,6 @@ r = er([{ id: 'e', tipo: 'entidad', texto: 'Edificio' }, { id: 'ec', tipo: 'atri
   [{ de: 'e', a: 'ec' }, { de: 'au', a: 'an' }, { de: 'e', a: 'r' }, { de: 'r', a: 'au' }]);
 assert.equal(r.esquema, 'EDIFICIO(#cod)\nAULA(#num, #cod → EDIFICIO)', r.esquema);
 
-// --- práctica UML: cada solución pasa su propia comprobación y un diagrama malo no ---
-{
-  const { PRACTICA_UML, comprobarCasos, comprobarActividad, solucionUml } = await import('./js/uml.js');
-  const ids = new Set();
-  for (const ej of PRACTICA_UML) {
-    assert.ok(!ids.has(ej.id) && ej.en && ej.tr && ej.titulo && ej.es, 'práctica UML incompleta: ' + ej.id); ids.add(ej.id);
-    const sol = solucionUml(ej), res = ej.tipo === 'casos' ? comprobarCasos(sol, ej, tam) : comprobarActividad(sol, ej);
-    assert.deepEqual(res.filter((x) => x.ok === false).map((x) => x.t), [], ej.id);
-    svgExportable(sol); aDrawio(sol);
-  }
-  const malo = comprobarCasos({ nodos: [{ id: 'a', tipo: 'caso', x: 0, y: 0, texto: 'Confirm purchase' }, { id: 'b', tipo: 'caso', x: 0, y: 99, texto: 'Deliver product' }], aristas: [{ id: 'e', de: 'b', a: 'a', estilo: 'discontinua', etiqueta: '«include»' }] }, PRACTICA_UML[0], tam);
-  assert.ok(malo.some((x) => /sistema/.test(x.t) && x.ok === false) && malo.some((x) => /al revés/.test(x.t)) && malo.some((x) => /User/.test(x.t)));
-}
-
 // --- Java: el mini JUnit y el lanzador con un javac real ---
 const { LIB_JAVA } = await import('./js/herramientas.js');
 const dir = '/tmp/doodle-java'; await rm(dir, { recursive: true, force: true });
@@ -263,7 +249,6 @@ await writeFile('js/demo.js', '// Datos de ejemplo (generados por test.js con un
 // --- repaso, tarjetas y desarrollo: cada pregunta bien formada ---
 globalThis.window = globalThis.window || {};
 await import('./js/repaso.js');
-await import('./js/entornos.js');
 for (const q of Object.values(window.REPASO).flat().filter(Boolean)) {
   assert.ok(Number.isInteger(q.c) && q.o[q.c] !== undefined && new Set(q.o).size === q.o.length && q.x, q.p);
   assert.ok(q.d === undefined || [1, 2, 3].includes(q.d), q.p);
