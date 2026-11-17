@@ -14,7 +14,8 @@
   --f-texto: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   --f-code: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", ui-monospace, monospace;
   --radio: 8px; --mod: var(--texto);
-  --grad: linear-gradient(135deg, #2383E2 0%, #4F6BED 50%, #8B5CF6 100%); --brillo: rgba(79, 107, 237, 0.45);
+  /* fosforito: el mismo amarillo que el subrayador de Repaso; los botones principales son teclas de ese color */
+  --marcador: #FFD54A; --marcador-borde: #C99A0C; --marcador-suave: rgba(255, 213, 74, 0.55); --sobre-marcador: #1D1B16;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -552,11 +553,13 @@ body.en-taller .demo-banda { display: none; }
 .trabajar { border-color: var(--linea); background: var(--panel-2); }
 .boton { border-radius: 6px; font-weight: 500; border-color: var(--linea-fuerte); }
 .boton:hover { background: var(--hover); border-color: var(--linea-fuerte); }
-.boton { transition: background 0.15s, border-color 0.15s, box-shadow 0.2s, transform 0.15s, filter 0.15s; }
-.boton:active:not([disabled]) { transform: translateY(1px) scale(0.98); }
-.boton.principal { background: var(--grad); border-color: transparent; color: #FFFFFF; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.14), 0 6px 16px -8px var(--brillo), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
-.boton.principal:hover:not([disabled]) { background: var(--grad); border-color: transparent; opacity: 1; filter: brightness(1.07) saturate(1.08); transform: translateY(-1px); box-shadow: 0 2px 4px rgba(15, 23, 42, 0.14), 0 10px 22px -8px var(--brillo), inset 0 1px 0 rgba(255, 255, 255, 0.22); }
-.boton.principal:active:not([disabled]) { transform: translateY(0) scale(0.98); filter: brightness(0.97); }
+.boton { transition: background 0.15s, border-color 0.15s, box-shadow 0.12s, transform 0.12s; box-shadow: 0 2px 0 var(--linea-fuerte); }
+.boton:hover:not([disabled]) { transform: translateY(-1px); box-shadow: 0 3px 0 var(--linea-fuerte); }
+.boton:active:not([disabled]) { transform: translateY(2px); box-shadow: 0 0 0 var(--linea-fuerte); }
+.boton.principal { background: var(--marcador); border-color: var(--marcador-borde); color: var(--sobre-marcador); font-weight: 600; box-shadow: 0 2px 0 var(--marcador-borde); }
+.boton.principal:hover:not([disabled]) { background: #FFDC66; border-color: var(--marcador-borde); opacity: 1; box-shadow: 0 3px 0 var(--marcador-borde); }
+.boton.principal:active:not([disabled]) { box-shadow: 0 0 0 var(--marcador-borde); }
+.barra-sup .boton.mini, .barra-sup .boton.mini:hover { box-shadow: none; transform: none; }
 .boton.peligro:hover { background: var(--rojo-fondo); }
 .chip { border-radius: 4px; font-size: 12px; padding: 3px 7px; }
 .chip.ok { background: var(--ok-fondo); color: var(--ok); box-shadow: none; }

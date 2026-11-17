@@ -8,17 +8,17 @@ const prog = () => (D.prog ||= {});
 const titulo = (e) => e.texto.split(':')[0];
 let abierto = null; // id del ejercicio abierto
 
-const resto = (e) => e.texto.slice(e.texto.indexOf(':') + 1).trim();
+const resto = (e) => { const r = e.texto.slice(e.texto.indexOf(':') + 1).trim(); return r.charAt(0).toUpperCase() + r.slice(1); };
 const SUPERADO = '<span class="chip ok">✓ Superado</span>';
 
 function lista() {
   const L = ejercicios(), hechos = L.filter((e) => prog()[e.id]?.ok).length, temas = [...new Set(L.map((e) => e.grupo))];
-  const estado = (e) => (prog()[e.id]?.ok ? SUPERADO : prog()[e.id]?.c ? '<span class="chip">Empezado</span>' : '');
+  const estado = (e) => (!prog()[e.id]?.ok && prog()[e.id]?.c ? '<span class="chip">Empezado</span>' : ''); // lo superado ya va en verde
   let i = 0;
-  return `<div class="prog-cab"><div><h2>Banco de ejercicios para el examen</h2><p class="suave">C# de los temas 1 a 5. Escribe el programa, pruébalo con «Ejecutar» y pulsa «Comprobar» para corregirlo. Se guarda solo.</p></div>
-    <div class="anillo peq" style="--p:${L.length ? (hechos / L.length) * 100 : 0};--c:var(--acento)" role="img" aria-label="${hechos} de ${L.length} superados"><b>${hechos}/${L.length}<small>superados</small></b></div></div>
+  return `<div class="prog-cab"><div><h2><span>Banco de ejercicios</span></h2><p class="suave">Para el examen de C# (temas 1 a 5). Escribe el programa, pruébalo con «Ejecutar» y pulsa «Comprobar» para corregirlo. Se guarda solo.</p></div>
+    <div class="postit" role="img" aria-label="${hechos} de ${L.length} superados"><b>${hechos}/${L.length}</b><small>superados</small></div></div>
     ${temas.map((t) => { const del = L.filter((e) => e.grupo === t); return `<section class="prog-tema"><h3>${esc(t)}<small>${del.filter((e) => prog()[e.id]?.ok).length} de ${del.length}</small></h3><div class="prog-lista">${del.map((e) => `
-      <button type="button" class="prog-ej${prog()[e.id]?.ok ? ' hecho' : ''}" data-ej="${esc(e.id)}" style="--i:${i++}"><span class="prog-n">${esc(e.n)}</span><span class="prog-t">${esc(titulo(e))}</span>${estado(e)}<span class="prog-ir" aria-hidden="true">›</span></button>`).join('')}</div></section>`; }).join('')}`;
+      <button type="button" class="prog-ej${prog()[e.id]?.ok ? ' hecho' : ''}" data-ej="${esc(e.id)}" style="--i:${i++}"><span class="prog-n">${esc(e.n)}</span><span class="prog-t"><span>${esc(titulo(e))}</span></span>${estado(e)}<span class="prog-ir" aria-hidden="true">›</span></button>`).join('')}</div></section>`; }).join('')}`;
 }
 
 function ejercicio(id) {
