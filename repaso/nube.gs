@@ -14,8 +14,9 @@
 // Solo guardan y apuntan los lectores de repaso/llaves.json (su huella en «v») y los de «usuarios»: quitar a
 // alguien en Doodle le cierra también esto, a los pocos minutos.
 // Registro con Google: en Configuración del proyecto → Propiedades del script pon CLIENT_ID (el id de cliente OAuth
-// de Google, tipo web, con el origen https://vyxode.github.io), INVITACION (el código del enlace para tu grupo)
-// CLAVE_PDF y ADMIN (las dos se copian en Doodle → Ajustes → Lectores). SAL se crea sola.
+// de Google, tipo web, con el origen https://vyxode.github.io), CLAVE_PDF y ADMIN (las dos se copian en Doodle →
+// Ajustes → Lectores). SAL, INVITACION (el código del enlace para tu grupo) y ANTIGUOS (los lectores de antes,
+// que manda Doodle) se ponen solas.
 const LLAVES = 'https://vyxode.github.io/doodle/repaso/llaves.json';
 const HOJA = ''; // id de la hoja de cálculo (lo que va tras /d/ en su dirección); vacío si el script está dentro de ella
 const TROZO = 45000; // una celda admite 50 000 caracteres: lo largo se reparte en varias columnas
@@ -39,6 +40,7 @@ function doPost(e) {
   cerrojo.waitLock(10000);
   try {
     if (m.t === 'google') return salida(conGoogle(m));
+    if (m.t === 'nombre') return salida(elegirNombre(m));
     if (m.t === 'llave') return salida(guardarLlave(m));
     if (m.t === 'entrar') return salida(entrarConClave(m));
     if (m.t === 'admin') return salida(admin(m));
@@ -127,11 +129,42 @@ function conGoogle(m) {
     if (!/^[A-Za-z0-9+/=]{40,60}$/.test(s) || !valido(sha(s + ':id'))) return { error: 'Tu llave de antes no es válida.' };
     if (buscar(h, 3, s)) return { error: 'Tu llave de antes ya está vinculada a otra cuenta de Google.' };
   } else {
-    if (!m.codigo || String(m.codigo) !== P.getProperty('INVITACION')) return { error: 'Para registrarte necesitas el enlace de invitación.' };
+    if (!m.codigo || String(m.codigo) !== invitacion()) return { error: 'Para registrarte necesitas el enlace de invitación.' };
     s = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Utilities.getUuid() + Date.now()));
   }
   h.appendRow(['~' + correo, '~' + n, '~' + s, '', '~' + sha(sha(s + ':id')), new Date(), '~' + origen, origen === 'migrado' ? '~conocido' : '', '']);
   return { existe: false, n, k, s, llave: false };
+}
+// el código del enlace para el grupo: si no está en las propiedades, se crea solo (Doodle lo enseña)
+function invitacion() {
+  let c = P.getProperty('INVITACION');
+  if (!c) { c = Utilities.getUuid().replace(/-/g, '').slice(0, 12); P.setProperty('INVITACION', c); }
+  return c;
+}
+// Lectores de antes (los de llaves.json): Doodle manda su nombre y su secreto. Quien se registra con Google y pone
+// el mismo nombre se queda con ese secreto (y con sus notas); su contraseña de antes deja de valer. Cada uno solo
+// se puede reclamar una vez, y en Doodle sale como «lector de antes» para que lo revises.
+const normal = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+function antiguoPorNombre(n, h) {
+  const L = JSON.parse(P.getProperty('ANTIGUOS') || '[]').filter((a) => !buscar(h, 3, a.s)), x = normal(n);
+  const igual = L.filter((a) => normal(a.n) === x);
+  if (igual.length === 1) return igual[0];
+  // «Ana» en Doodle y «Ana García» al registrarse: vale si no hay otra «Ana» por reclamar
+  const nombre = L.filter((a) => !normal(a.n).includes(' ') && normal(a.n) === x.split(' ')[0]);
+  return !igual.length && nombre.length === 1 ? nombre[0] : null;
+}
+function elegirNombre(m) {
+  const correo = cuentaGoogle(m.token);
+  if (!correo) return { error: 'No se ha podido comprobar tu cuenta de Google.' };
+  const h = usuarios(), f = buscar(h, 1, correo);
+  if (!f) return { error: 'Primero entra con Google.' };
+  const v = h.getRange(f, 1, 1, COLS.length).getValues()[0];
+  if (celda(v[7]) === 'vetado') return { error: 'No tienes acceso.' };
+  // solo al registrarse: quien ya tiene contraseña o ya es un lector de antes conserva lo suyo
+  const a = celda(v[3]) || celda(v[6]) === 'migrado' ? null : antiguoPorNombre(m.n, h);
+  if (!a) return { s: celda(v[2]) };
+  h.getRange(f, 3).setValue('~' + a.s); h.getRange(f, 5).setValue('~' + sha(sha(a.s + ':id'))); h.getRange(f, 7).setValue('~migrado');
+  return { s: a.s, antiguo: true, n: a.n };
 }
 // guarda su nombre y su llave (cifrada en su navegador con la contraseña que ha elegido)
 function guardarLlave(m) {
@@ -154,13 +187,17 @@ function admin(m) {
   const clave = P.getProperty('ADMIN');
   if (!clave || String(m.clave) !== clave) return { error: 'Clave de administrador no válida.' };
   const h = usuarios();
+  if (Array.isArray(m.antiguos)) {
+    const L = m.antiguos.slice(0, 200).filter((a) => a && /^[A-Za-z0-9+/=]{40,60}$/.test(String(a.s)) && String(a.n || '').trim()).map((a) => ({ n: String(a.n).slice(0, 40), s: String(a.s) }));
+    P.setProperty('ANTIGUOS', JSON.stringify(L));
+  }
   if (m.accion === 'estado') {
     const f = buscar(h, 1, String(m.correo || '').toLowerCase());
     if (!f || !['', 'conocido', 'vetado'].includes(m.estado)) return { error: 'petición no válida' };
     h.getRange(f, 8).setValue(m.estado ? '~' + m.estado : '');
   }
   const filas = h.getLastRow() > 1 ? h.getRange(2, 1, h.getLastRow() - 1, COLS.length).getValues() : [];
-  return { usuarios: filas.map((f) => ({ correo: celda(f[0]), n: celda(f[1]), fecha: f[5] ? new Date(f[5]).getTime() : 0, origen: celda(f[6]), estado: celda(f[7]), clave: !!celda(f[3]) })) };
+  return { invitacion: invitacion(), usuarios: filas.map((f) => ({ correo: celda(f[0]), n: celda(f[1]), fecha: f[5] ? new Date(f[5]).getTime() : 0, origen: celda(f[6]), estado: celda(f[7]), clave: !!celda(f[3]) })) };
 }
 
 function hoja(nombre, cabecera) {

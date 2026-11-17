@@ -901,8 +901,10 @@ async function guardarLectores(lectores) {
 const NUBE_LECTORES = 'https://script.google.com/macros/s/AKfycbzj2gsQfRnNVXM5x4KDJvWXMyJwpRK-82KHzD5t9xKy_hOGThiUhHnkAuIu1TNf186VOg/exec';
 async function cargarRegistrados(cambio) {
   try {
-    const r = await (await fetch(NUBE_LECTORES, { method: 'POST', body: JSON.stringify({ t: 'admin', clave: S.lect.admin, accion: cambio ? 'estado' : 'lista', ...cambio }) })).json();
+    const r = await (await fetch(NUBE_LECTORES, { method: 'POST', body: JSON.stringify({ t: 'admin', clave: S.lect.admin, accion: cambio ? 'estado' : 'lista', ...cambio, antiguos: (S.lect.lectores || []).map((p) => ({ n: p.n, s: p.s })) }) })).json();
+    // antiguos: quien se registre con Google con el nombre de uno de ellos se queda con sus notas
     S.registrados = r.error ? { error: r.error } : r.usuarios.sort((a, b) => b.fecha - a.fecha);
+    if (r.invitacion) S.invitacion = r.invitacion;
   } catch (e) { S.registrados = { error: 'No se ha podido conectar con la hoja de los lectores.' }; }
   if (location.hash === '#ajustes') render();
 }
@@ -948,6 +950,8 @@ function seccionLectores() {
     <form id="f-lect" class="rejilla-form"><label class="campo"><span>Nombre</span><input type="text" id="l-nombre" maxlength="40" required></label>
     <div class="campo campo-boton"><button class="boton principal">Añadir con contraseña nueva</button></div></form>
     <p class="suave">Registro con Google: copia esta clave en la propiedad <span class="mono">CLAVE_PDF</span> del Apps Script de <span class="mono">repaso/nube.gs</span>. <button type="button" class="boton mini" data-acc="copiar-config" data-v="${esc(L.k)}">Copiar CLAVE_PDF</button></p>
+    ${S.invitacion ? `<p>Enlace para tu grupo: <span class="mono">${esc(url)}#alta=${esc(S.invitacion)}</span> <button type="button" class="boton mini" data-acc="copiar-config" data-v="${esc(url + '#alta=' + S.invitacion)}">Copiar enlace</button></p>
+    <p class="suave">Entran con Google, eligen nombre y contraseña. Si el nombre es el de un lector de esta lista que aún no se ha pasado, se queda con sus notas y su contraseña de antes deja de valer.</p>` : ''}
     <h3 class="ex-titulo">Registrados con Google${Array.isArray(S.registrados) && S.registrados.some((u) => !u.estado) ? ` · <span class="chip info">${S.registrados.filter((u) => !u.estado).length} nuevos</span>` : ''}</h3>
     <p class="suave">Entran sin esperar. Si no sabes quién es alguien, vétalo: deja de poder entrar con su contraseña y con Google.</p>
     ${listaRegistrados()}

@@ -104,6 +104,8 @@ $('form-alta').onsubmit = async (e) => {
   if (!n) return (err.textContent = 'Escribe tu nombre.');
   err.textContent = ''; $('b-alta').disabled = true; $('b-alta').textContent = 'Guardando…';
   try {
+    // si su nombre es el de un lector de antes que aún no se ha pasado, se queda con su secreto (y sus notas)
+    if (!yo?.antiguo) G.s = (await pedir({ t: 'nombre', token: G.token, n }).catch(() => ({ s: G.s }))).s || G.s; // sin esto en nube.gs: sigue como nuevo
     const T = await todasLasLlaves(), vieja = await llaveDeDoodle(c, T.L);
     // para entrar solo se usa la contraseña: no puede abrir la llave de otra persona (las de nube.gs lo comprueba nube.gs)
     if (vieja && vieja.s !== G.s) throw new Error('Esa contraseña no se puede usar: elige otra.');
