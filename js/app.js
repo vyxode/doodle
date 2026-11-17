@@ -925,6 +925,7 @@ function seccionLectores() {
     <button type="button" class="boton mini peligro" data-acc="lect-quitar" data-v="${i}">Quitar</button></div></div>`).join('')}</div>
     <form id="f-lect" class="rejilla-form"><label class="campo"><span>Nombre</span><input type="text" id="l-nombre" maxlength="40" required></label>
     <div class="campo campo-boton"><button class="boton principal">Añadir con contraseña nueva</button></div></form>
+    <p class="suave">Registro con Google: copia esta clave en la propiedad <span class="mono">CLAVE_PDF</span> del Apps Script de <span class="mono">repaso/nube.gs</span>. <button type="button" class="boton mini" data-acc="copiar-config" data-v="${esc(L.k)}">Copiar CLAVE_PDF</button></p>
     <h3 class="ex-titulo">Resúmenes</h3><p class="suave">Elige el PDF de cada resumen: se cifra aquí con la clave de los lectores y se sube; si ya estaba, se sustituye.</p>
     <div class="lista">${Object.entries(window.RESUMENES || {}).flatMap(([m, rs]) => rs.map((r) => `<label class="nota-fila"><span class="nf-nombre">${esc(r.t)}<small>${esc(m)} · <span class="mono">${esc(r.f)}</span></small></span>
       <input type="file" accept="application/pdf" data-acc="subir-resumen" data-v="${esc(r.f)}" aria-label="PDF de ${esc(r.t)}"></label>`)).join('')}</div>`;

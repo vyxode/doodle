@@ -13,6 +13,9 @@
   .pub h1 .ico { width: 28px; height: 28px; color: var(--acento); }
   .pub form, .pub-fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .pub #form-entrar input { flex: 1 1 220px; }
+  .form-alta { display: grid !important; gap: 10px; max-width: 420px; }
+  .form-alta .campo { display: grid; gap: 4px; }
+  .g-boton { min-height: 44px; margin-top: 12px; }
   .ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
   .boton { display: inline-flex; align-items: center; gap: 6px; }
   /* cabecera: quién lee y si está guardado */
@@ -171,12 +174,31 @@
 <main class="pub">
   <h1><span data-ico="libro"></span>Resúmenes</h1>
   <section id="entrada" class="panel">
-    <p class="suave">Solo lectura. Entra con la contraseña personal que te han dado; queda registrado quién entra.</p>
+    <p class="suave">Solo lectura. Entra con tu contraseña personal; queda registrado quién entra.</p>
     <form id="form-entrar">
       <input type="password" id="clave" autocomplete="current-password" placeholder="Contraseña" aria-label="Contraseña" required>
       <button class="boton principal" type="submit">Entrar</button>
     </form>
+    <div id="e-google" class="g-boton" hidden></div>
+    <p class="suave" id="e-alta" hidden>¿Primera vez? Pulsa «Continuar con Google» y luego elige tu nombre y tu contraseña. Después, para entrar solo necesitas tu contraseña.</p>
     <p class="error-txt" id="error" role="alert"></p>
+  </section>
+  <section id="alta" class="panel" hidden>
+    <h2 style="margin:0 0 6px">Tu contraseña</h2>
+    <p class="suave">Con ella entrarás a partir de ahora, sin Google. Que sea solo tuya (al menos 8 caracteres).</p>
+    <form id="form-alta" class="form-alta">
+      <label class="campo"><span>Tu nombre</span><input type="text" id="a-nombre" maxlength="40" autocomplete="name"></label>
+      <label class="campo"><span>Contraseña</span><input type="password" id="a-clave" autocomplete="new-password" minlength="8" required></label>
+      <label class="campo"><span>Repite la contraseña</span><input type="password" id="a-clave2" autocomplete="new-password" minlength="8" required></label>
+      <div class="pub-fila"><button class="boton principal" type="submit">Guardar y entrar</button><button class="boton" type="button" id="a-volver">Cancelar</button></div>
+    </form>
+    <p class="error-txt" id="a-error" role="alert"></p>
+  </section>
+  <section id="migrar" class="panel" hidden>
+    <h2 style="margin:0 0 6px">Un paso antes de entrar</h2>
+    <p class="suave">Ahora cada uno tiene su propia contraseña. Vincula tu cuenta de Google y elige la tuya: tus notas y subrayados se conservan. La contraseña que te dieron dejará de funcionar.</p>
+    <div id="m-google" class="g-boton"></div>
+    <p class="error-txt" id="m-error" role="alert"></p>
   </section>
   <section id="dentro" class="lector modo-marcar" hidden>
     <div class="cab"><span class="avatar" id="avatar" aria-hidden="true"></span><b id="hola"></b><span class="nube" id="nube" role="status"></span>

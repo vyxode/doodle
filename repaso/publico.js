@@ -1,4 +1,4 @@
-// Resúmenes de solo lectura: cada persona tiene su contraseña, que abre su llave en llaves.json
+// Resúmenes de solo lectura: cada persona tiene su contraseña, que abre su llave (en llaves.json o, si se registró con Google, en nube.gs)
 // (dentro va su nombre y la clave de los PDF). Los PDF se descifran en memoria y se pintan en canvas;
 // nunca hay un PDF que descargar. Encima van el subrayado y las notas (marcas.js) y el estudio (estudio.js).
 // Lo de cada lector (subrayado, notas, fallos y resultados) se guarda cifrado con el secreto de su llave en la
@@ -16,21 +16,93 @@ let A = null; // el resumen abierto: { r, mod, pags: [texto por página], hojas:
 const registrar = (que) => NUBE && yo.id && fetch(NUBE, { method: 'POST', body: JSON.stringify({ t: 'log', id: yo.id, n: yo.n, que }) }).catch(() => {});
 const huella = async (txt) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)))].map((x) => x.toString(16).padStart(2, '0')).join('');
 
-async function entrar(clave) {
-  clave = clave.trim();
+// Dos sitios con llaves: llaves.json (las que das en Doodle) y la hoja de nube.gs (quien se registra con Google,
+// cada uno con su contraseña). Con una sola contraseña se prueban todas.
+const GOOGLE_ID = ''; // id de cliente OAuth de Google (web); vacío = sin «Iniciar sesión con Google»
+const derivar = async (clave, sal, iter, uso) => crypto.subtle.deriveKey({ name: 'PBKDF2', salt: bytes(sal), iterations: iter, hash: 'SHA-256' },
+  await crypto.subtle.importKey('raw', new TextEncoder().encode(clave.trim()), 'PBKDF2', false, ['deriveKey']), { name: 'AES-GCM', length: 256 }, false, [uso]);
+async function todasLasLlaves() {
   const L = await (await fetch('llaves.json', { cache: 'no-cache' })).json();
-  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(clave), 'PBKDF2', false, ['deriveKey']);
-  const pk = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: bytes(L.sal), iterations: L.iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-  for (const l of L.llaves) {
-    const llave = await abrir(pk, bytes(l)).then((d) => JSON.parse(new TextDecoder().decode(d)), () => null);
-    if (!llave) continue;
-    // la clave y el sitio de sus datos salen de su secreto (aleatorio, el mismo aunque le cambien la contraseña);
-    // las llaves de antes de los secretos no tienen: leen, pero no guardan hasta que se rehagan en Doodle
-    if (!llave.s) return { ...llave, nk: null, id: null };
-    const nk = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(llave.s + ':clave'));
-    return { ...llave, nk: b64(new Uint8Array(nk)), id: await huella(llave.s + ':id') };
+  const G = NUBE ? await fetch(NUBE + '?t=llaves', { cache: 'no-store' }).then((r) => r.json()).catch(() => null) : null;
+  return { L, G: G && G.sal ? G : { llaves: [], migradas: [] } };
+}
+async function buscarLlave(clave, { L, G }) {
+  for (const [conj, origen] of [[G, 'google'], [L, 'doodle']]) {
+    if (!conj.llaves.length) continue;
+    const pk = await derivar(clave, conj.sal, conj.iter, 'decrypt');
+    for (const l of conj.llaves) {
+      const llave = await abrir(pk, bytes(l)).then((d) => JSON.parse(new TextDecoder().decode(d)), () => null);
+      if (llave) return { llave, origen };
+    }
   }
-  throw new Error('Contraseña incorrecta');
+  return null;
+}
+// la clave y el sitio de sus datos salen de su secreto (aleatorio, el mismo aunque cambie la contraseña);
+// las llaves de antes de los secretos no tienen: leen, pero no guardan hasta que se rehagan en Doodle
+async function desdeLlave(llave) {
+  if (!llave.s) return { ...llave, nk: null, id: null };
+  const nk = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(llave.s + ':clave'));
+  return { n: llave.n, k: llave.k, s: llave.s, nk: b64(new Uint8Array(nk)), id: await huella(llave.s + ':id') };
+}
+async function entrar(clave) {
+  const T = await todasLasLlaves(), r = await buscarLlave(clave, T);
+  if (!r) throw new Error('Contraseña incorrecta');
+  const quien = await desdeLlave(r.llave);
+  if (r.origen === 'doodle' && quien.id && T.G.migradas.includes(await huella(quien.id))) throw new Error('Esa contraseña ya no vale: entra con la tuya o con Google');
+  // lector de antes: tiene que poner su contraseña propia y vincular Google (si el registro con Google está activo)
+  return { ...quien, antiguo: r.origen === 'doodle' && !!GOOGLE_ID && !!T.G.sal && !!quien.s };
+}
+
+// ---------- Google: registrarse con el enlace, entrar si se olvida la contraseña y pasar a contraseña propia ----------
+const codigoAlta = (() => { const m = location.hash.match(/alta=([\w-]+)/); if (m) { try { sessionStorage.setItem('doodle-alta', m[1]); } catch { /* nada */ } history.replaceState(null, '', location.pathname); } try { return m?.[1] || sessionStorage.getItem('doodle-alta'); } catch { return m?.[1]; } })();
+let G = null; // { token, n, k, s } mientras elige nombre y contraseña
+const pedir = async (cuerpo) => { const r = await (await fetch(NUBE, { method: 'POST', body: JSON.stringify(cuerpo) })).json(); if (r.error) throw new Error(r.error); return r; };
+function botonGoogle(sitio) {
+  if (!GOOGLE_ID || !NUBE) return;
+  const pintar = () => { google.accounts.id.initialize({ client_id: GOOGLE_ID, callback: (r) => conGoogle(r.credential) }); google.accounts.id.renderButton($(sitio), { theme: 'outline', size: 'large', text: 'continue_with', locale: 'es' }); };
+  if (window.google?.accounts) return pintar();
+  const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.onload = pintar; document.head.append(sc);
+}
+async function conGoogle(token) {
+  const err = yo?.antiguo ? $('m-error') : $('error');
+  err.textContent = 'Comprobando con Google…';
+  try {
+    const r = await pedir({ t: 'google', token, codigo: codigoAlta, antiguo: yo?.antiguo ? { n: yo.n, s: yo.s } : undefined });
+    G = { token, n: r.n || yo?.n || '', k: r.k, s: r.s };
+    err.textContent = '';
+    if (r.existe && r.llave && !yo?.antiguo) return dentro(await desdeLlave(G)); // ya tenía cuenta: entra (p. ej. si olvidó la contraseña)
+    pantallaClave();
+  } catch (e) { err.textContent = e.message; }
+}
+function pantallaClave() {
+  $('entrada').hidden = true; $('migrar').hidden = true; $('alta').hidden = false;
+  $('a-nombre').value = G.n; $('a-nombre').closest('label').hidden = !!yo?.antiguo; $('a-clave').focus();
+}
+$('form-alta').onsubmit = async (e) => {
+  e.preventDefault();
+  const n = $('a-nombre').value.trim() || G.n, c = $('a-clave').value, c2 = $('a-clave2').value, err = $('a-error');
+  if (c.trim().length < 8) return (err.textContent = 'La contraseña tiene que tener al menos 8 caracteres.');
+  if (c !== c2) return (err.textContent = 'Las dos contraseñas no coinciden.');
+  if (!n) return (err.textContent = 'Escribe tu nombre.');
+  err.textContent = 'Guardando…';
+  try {
+    const T = await todasLasLlaves(), otra = await buscarLlave(c, T);
+    // para entrar solo se usa la contraseña: no puede abrir la llave de otra persona
+    if (otra && otra.llave.s !== G.s) return (err.textContent = 'Esa contraseña no se puede usar: elige otra.');
+    const iv = crypto.getRandomValues(new Uint8Array(12)), llave = { n, k: G.k, s: G.s };
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await derivar(c, T.G.sal, T.G.iter, 'encrypt'), new TextEncoder().encode(JSON.stringify(llave))));
+    await pedir({ t: 'llave', token: G.token, n, llave: b64(new Uint8Array([...iv, ...ct])) });
+    $('a-clave').value = $('a-clave2').value = ''; err.textContent = '';
+    try { sessionStorage.removeItem('doodle-alta'); } catch { /* nada */ }
+    dentro(await desdeLlave(llave));
+  } catch (e2) { err.textContent = e2.message; }
+};
+async function dentro(quien) {
+  yo = quien; G = null;
+  try { sessionStorage.setItem('doodle-lector', JSON.stringify(yo)); } catch { /* sin almacenamiento: se pide otra vez */ }
+  $('alta').hidden = $('migrar').hidden = true;
+  if (yo.antiguo) { $('entrada').hidden = true; $('migrar').hidden = false; botonGoogle('m-google'); return; }
+  await cargarDatos(); registrar('entrada'); mostrar();
 }
 
 // ---------- sus datos: copia en el navegador y en Apps Script; dos dispositivos se fusionan ----------
@@ -98,7 +170,7 @@ function nube(t, estado = /^Guardando/.test(t) ? 'va' : t === 'Guardado' ? 'ok' 
 
 // ---------- pantalla ----------
 function mostrar() {
-  $('entrada').hidden = !!yo; $('dentro').hidden = !yo;
+  $('entrada').hidden = !!yo; $('dentro').hidden = !yo; $('e-google').hidden = !GOOGLE_ID;
   if (!yo) return;
   $('hola').textContent = 'Hola, ' + yo.n;
   $('avatar').textContent = yo.n.trim()[0]?.toUpperCase() || '·';
@@ -186,16 +258,18 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([`importSc
 $('form-entrar').onsubmit = async (e) => {
   e.preventDefault(); $('error').textContent = 'Comprobando…';
   try {
-    yo = await entrar($('clave').value); $('clave').value = ''; $('error').textContent = '';
-    try { sessionStorage.setItem('doodle-lector', JSON.stringify(yo)); } catch { /* sin almacenamiento: se pide otra vez */ }
-    await cargarDatos(); registrar('entrada'); mostrar();
-  } catch (err) { yo = null; $('error').textContent = err.message === 'Contraseña incorrecta' ? err.message : 'No se ha podido comprobar la contraseña'; }
+    const quien = await entrar($('clave').value); $('clave').value = ''; $('error').textContent = '';
+    await dentro(quien);
+  } catch (err) { yo = null; $('error').textContent = /^(Contraseña incorrecta|Esa contraseña)/.test(err.message) ? err.message : 'No se ha podido comprobar la contraseña'; }
 };
+$('a-volver').onclick = () => { G = null; yo = null; $('alta').hidden = true; mostrar(); };
 $('salir').onclick = async () => { await subir(true); yo = D = A = null; lectura++; try { sessionStorage.removeItem('doodle-lector'); } catch { /* nada */ } $('hojas').innerHTML = ''; $('lector').hidden = true; mostrar(); };
 for (const b of document.querySelectorAll('#pestanas button')) b.onclick = () => pestana(b.dataset.p);
 try { yo = JSON.parse(sessionStorage.getItem('doodle-lector')); } catch { yo = null; }
-if (yo && !('nk' in yo)) yo = null; // sesión de una versión anterior: se vuelve a pedir la contraseña
+if (yo && (!('nk' in yo) || yo.antiguo)) yo = null; // sesión de una versión anterior o a medio pasar: se vuelve a pedir
 (yo ? cargarDatos() : Promise.resolve()).then(mostrar);
+botonGoogle('e-google');
+if (codigoAlta && GOOGLE_ID) $('e-alta').hidden = false;
 
 // Solo lectura. shortcut: frena descargas, copias y capturas casuales; una foto al móvil o las herramientas
 // del navegador siguen pudiendo (sin marca de agua, a petición: leer es más cómodo).
