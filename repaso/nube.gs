@@ -8,7 +8,9 @@
 // - Hoja «registro»: fecha, nombre y qué abre cada lector.
 // - Hoja «usuarios»: quien se registra con Google (correo, nombre, su secreto, su llave cifrada con su contraseña y
 //   su estado: vacío si es nuevo, «conocido» o «vetado»). Entran sin esperar; en Doodle (Ajustes → Lectores) ves
-//   quién es cada uno y puedes vetarlo.
+//   quién es cada uno y puedes vetarlo. Su llave no se publica: solo se entrega a quien sabe su contraseña (manda
+//   un verificador que sale de ella; aquí se guarda solo su huella) y los fallos están limitados, así que no se
+//   puede probar contraseñas sin conexión.
 // Solo guardan y apuntan los lectores de repaso/llaves.json (su huella en «v») y los de «usuarios»: quitar a
 // alguien en Doodle le cierra también esto, a los pocos minutos.
 // Registro con Google: en Configuración del proyecto → Propiedades del script pon CLIENT_ID (el id de cliente OAuth
@@ -20,7 +22,7 @@ const TROZO = 45000; // una celda admite 50 000 caracteres: lo largo se reparte 
 // Todo se guarda con «~» delante para que la hoja no lo tome nunca por un número o una fórmula.
 
 const P = PropertiesService.getScriptProperties();
-const COLS = ['correo', 'nombre', 'secreto', 'llave', 'huella', 'fecha', 'origen', 'estado'];
+const COLS = ['correo', 'nombre', 'secreto', 'llave', 'huella', 'fecha', 'origen', 'estado', 'verificador'];
 
 function doGet(e) {
   if (e.parameter.t === 'llaves') return salida(llavesGoogle());
@@ -38,6 +40,7 @@ function doPost(e) {
   try {
     if (m.t === 'google') return salida(conGoogle(m));
     if (m.t === 'llave') return salida(guardarLlave(m));
+    if (m.t === 'entrar') return salida(entrarConClave(m));
     if (m.t === 'admin') return salida(admin(m));
     if (!valido(m.id)) return salida({ error: 'lector no válido' });
     if (m.t === 'log') {
@@ -79,10 +82,23 @@ function sal() {
   if (!s) { s = Utilities.base64Encode(Utilities.getUuid() + Utilities.getUuid()).slice(0, 24); P.setProperty('SAL', s); }
   return s;
 }
-// las llaves de quien se registró con Google (cada una se abre solo con la contraseña de su dueño)
+// lo público del registro con Google: la sal para derivar de la contraseña y las huellas de los lectores de antes
+// que ya se pasaron (su contraseña antigua deja de valer). Las llaves no.
 function llavesGoogle() {
   const h = usuarios(), filas = h.getLastRow() > 1 ? h.getRange(2, 1, h.getLastRow() - 1, COLS.length).getValues() : [];
-  return { sal: sal(), iter: 200000, llaves: filas.filter((f) => celda(f[7]) !== 'vetado').map((f) => celda(f[3])).filter(Boolean), migradas: filas.filter((f) => celda(f[6]) === 'migrado').map((f) => celda(f[4])) };
+  return { sal: sal(), iter: ITER, migradas: filas.filter((f) => celda(f[6]) === 'migrado').map((f) => celda(f[4])) };
+}
+const ITER = 300000;
+// entrar con contraseña: devuelve su llave (cifrada con esa contraseña) si el verificador coincide. Como mucho
+// 30 fallos cada 10 minutos entre todos: probar contraseñas a ciegas no sale a cuenta.
+function entrarConClave(m) {
+  const v = String(m.v || ''), cache = CacheService.getScriptCache(), fallos = +(cache.get('fallos') || 0);
+  if (!/^[0-9a-f]{64}$/.test(v)) return { error: 'petición no válida' };
+  if (fallos >= 30) return { error: 'Demasiados intentos fallidos. Espera unos minutos o entra con Google.' };
+  const h = usuarios(), f = buscar(h, 9, sha(v));
+  const fila = f ? h.getRange(f, 1, 1, COLS.length).getValues()[0] : null;
+  if (!fila || celda(fila[7]) === 'vetado' || !celda(fila[3])) { cache.put('fallos', String(fallos + 1), 600); return { error: 'Contraseña incorrecta' }; }
+  return { llave: celda(fila[3]) };
 }
 // comprueba con Google el token de «Iniciar sesión con Google»
 function cuentaGoogle(token) {
@@ -90,7 +106,8 @@ function cuentaGoogle(token) {
   const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + token, { muteHttpExceptions: true });
   if (r.getResponseCode() !== 200) return null;
   const t = JSON.parse(r.getContentText());
-  return t.aud === P.getProperty('CLIENT_ID') && String(t.email_verified) === 'true' ? String(t.email).toLowerCase() : null;
+  const emisor = t.iss === 'accounts.google.com' || t.iss === 'https://accounts.google.com';
+  return emisor && t.aud === P.getProperty('CLIENT_ID') && String(t.email_verified) === 'true' && +t.exp * 1000 > Date.now() ? String(t.email).toLowerCase() : null;
 }
 // entra con Google: si ya tiene cuenta, recibe su nombre y su llave; si no, se crea (con el código del enlace, o
 // conservando el secreto de un lector de antes, para no perder sus notas) y después pone nombre y contraseña
@@ -101,7 +118,8 @@ function conGoogle(m) {
   const h = usuarios(), f = buscar(h, 1, correo);
   if (f) {
     const v = h.getRange(f, 1, 1, COLS.length).getValues()[0];
-    return celda(v[7]) === 'vetado' ? { error: 'No tienes acceso.' } : { existe: true, n: celda(v[1]), k, s: celda(v[2]), llave: !!celda(v[3]) };
+    // «llave»: ya eligió contraseña (con el sistema nuevo); si no, se le pide
+    return celda(v[7]) === 'vetado' ? { error: 'No tienes acceso.' } : { existe: true, n: celda(v[1]), k, s: celda(v[2]), llave: !!celda(v[3]) && !!celda(v[8]) };
   }
   let s, n = '', origen = 'google';
   if (m.antiguo) {
@@ -112,16 +130,20 @@ function conGoogle(m) {
     if (!m.codigo || String(m.codigo) !== P.getProperty('INVITACION')) return { error: 'Para registrarte necesitas el enlace de invitación.' };
     s = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Utilities.getUuid() + Date.now()));
   }
-  h.appendRow(['~' + correo, '~' + n, '~' + s, '', '~' + sha(sha(s + ':id')), new Date(), '~' + origen, origen === 'migrado' ? '~conocido' : '']);
+  h.appendRow(['~' + correo, '~' + n, '~' + s, '', '~' + sha(sha(s + ':id')), new Date(), '~' + origen, origen === 'migrado' ? '~conocido' : '', '']);
   return { existe: false, n, k, s, llave: false };
 }
 // guarda su nombre y su llave (cifrada en su navegador con la contraseña que ha elegido)
 function guardarLlave(m) {
   const correo = cuentaGoogle(m.token);
   if (!correo) return { error: 'No se ha podido comprobar tu cuenta de Google.' };
-  if (typeof m.llave !== 'string' || !/^[A-Za-z0-9+/=]{40,2000}$/.test(m.llave)) return { error: 'petición no válida' };
-  const h = usuarios(), f = buscar(h, 1, correo);
+  if (typeof m.llave !== 'string' || !/^[A-Za-z0-9+/=]{40,2000}$/.test(m.llave) || !/^[0-9a-f]{64}$/.test(String(m.v))) return { error: 'petición no válida' };
+  const h = usuarios(), f = buscar(h, 1, correo), otra = buscar(h, 9, sha(m.v));
   if (!f) return { error: 'Primero entra con Google.' };
+  if (celda(h.getRange(f, 8).getValue()) === 'vetado') return { error: 'No tienes acceso.' };
+  // para entrar solo se usa la contraseña: no puede coincidir con la de otra persona
+  if (otra && otra !== f) return { error: 'Esa contraseña no se puede usar: elige otra.' };
+  h.getRange(f, 9).setValue('~' + sha(m.v));
   if (m.n) h.getRange(f, 2).setValue('~' + texto(m.n, 40));
   h.getRange(f, 4).setValue('~' + m.llave);
   return { ok: true };

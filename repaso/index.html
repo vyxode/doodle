@@ -55,6 +55,25 @@
   .nube.ok { color: var(--ok); } .nube.mal { color: var(--rojo); } .nube.va .ico { animation: latir 1s ease-in-out infinite; }
   .cab #salir { margin-left: auto; }
   .docs-ayuda { margin: 6px 0 -4px; color: var(--suave); font-size: 14px; }
+  /* secciones: resúmenes y programación */
+  .secciones { display: flex; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; width: fit-content; max-width: 100%; }
+  .secciones button { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; color: var(--suave); font: 500 14.5px var(--f-texto); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  .secciones button .ico { width: 17px; height: 17px; }
+  .secciones button[aria-pressed="true"] { background: var(--panel-2); color: var(--texto); box-shadow: 0 1px 2px var(--sombra); }
+  .prog-cab { display: grid; gap: 12px; }
+  .prog-cab h2 { margin: 0; font: 700 22px/1.2 var(--f-titulo); }
+  .prog-cab p { margin: 4px 0 0; }
+  .prog-tema h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--suave); margin: 18px 0 8px; }
+  .prog-lista { display: grid; gap: 6px; }
+  .prog-ej { display: flex; align-items: center; gap: 12px; text-align: left; width: 100%; padding: 12px 14px; background: var(--panel); border: 1px solid var(--linea); border-radius: 10px; color: var(--texto); font: inherit; cursor: pointer; transition: border-color .15s; }
+  .prog-ej:hover { border-color: var(--acento); }
+  .prog-n { flex: none; min-width: 34px; font: 600 13px var(--f-code); color: var(--suave); }
+  .prog-t { flex: 1; min-width: 0; }
+  .prog-ir { color: var(--tenue); font-size: 20px; }
+  .prog-barra { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .prog-lab { display: grid; gap: 10px; padding: 18px; background: var(--panel); border: 1px solid var(--linea); border-radius: 14px; }
+  .prog-enun { margin: 0; line-height: 1.6; font-size: 15.5px; }
+  .prog-trabajo .hz-cs { min-height: 620px; }
   /* resúmenes para elegir */
   .pub-docs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
   .doc { display: flex; gap: 12px; align-items: center; text-align: left; font: inherit; color: var(--texto); background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 14px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; }
@@ -246,6 +265,11 @@
   <section id="dentro" class="lector modo-marcar" hidden>
     <div class="cab"><span class="avatar" id="avatar" aria-hidden="true"></span><b id="hola"></b><span class="nube" id="nube" role="status"></span>
       <button class="boton mini" type="button" id="salir" data-ico="salir">Salir</button></div>
+    <nav class="secciones" aria-label="Secciones">
+      <button type="button" data-s="resumenes" aria-pressed="true"><span data-ico="libro"></span>Resúmenes</button>
+      <button type="button" data-s="prog" aria-pressed="false"><span data-ico="codigo"></span>Programación</button>
+    </nav>
+    <div id="s-resumenes">
     <p class="docs-ayuda">Elige un resumen para leerlo, subrayarlo o estudiar con test, tarjetas y huecos.</p>
     <div class="pub-docs" id="docs"></div>
     <div id="lector" hidden>
@@ -280,6 +304,8 @@
       <div class="pestana" id="p-huecos" hidden></div>
       <div class="pestana" id="p-notas" hidden></div>
     </div>
+    </div>
+    <div id="s-prog" hidden></div>
   </section>
 </main>
 <!-- en pantallas táctiles, para confirmar lo seleccionado (con ratón se subraya al soltar) -->
@@ -299,11 +325,20 @@
   </div>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
+<link rel="stylesheet" href="../css/codemirror.css">
 <script src="../js/repaso.js"></script>
+<script src="../js/csharp.js"></script>
+<script src="../js/pruebas.js"></script>
+<script src="../js/ejercicios.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="iconos.js"></script>
 <script src="publico.js"></script>
 <script src="marcas.js"></script>
 <script src="estudio.js"></script>
+<script type="module" src="programacion.js"></script>
 </body>
 </html>

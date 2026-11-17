@@ -10,31 +10,34 @@ const bytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)), b64 = (u)
 const abrir = (clave, datos) => { const x = datos instanceof Uint8Array ? datos : new Uint8Array(datos); return crypto.subtle.decrypt({ name: 'AES-GCM', iv: x.subarray(0, 12) }, clave, x.subarray(12)); };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 let yo = null; // { n: nombre, k: clave de los PDF, s: su secreto, nk: clave de sus datos, id: dónde se guardan }
-let D = null; // sus datos: { ts, docs: { [f]: { marcas: [] } }, fallos: { [módulo]: { 'p:3': 1 } }, notas: [], borradas: { [marca]: 1 } }
+let D = null; // sus datos: { ts, docs: { [f]: { marcas: [] } }, fallos: { [módulo]: { 'p:3': 1 } }, notas: [], borradas: { [marca]: 1 }, prog: { [ejercicio]: { c: código, ok, u } } }
 let A = null; // el resumen abierto: { r, mod, pags: [texto por página], hojas: [div por página] }
 
 const registrar = (que) => NUBE && yo.id && fetch(NUBE, { method: 'POST', body: JSON.stringify({ t: 'log', id: yo.id, n: yo.n, que }) }).catch(() => {});
 const huella = async (txt) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)))].map((x) => x.toString(16).padStart(2, '0')).join('');
 
-// Dos sitios con llaves: llaves.json (las que das en Doodle) y la hoja de nube.gs (quien se registra con Google,
-// cada uno con su contraseña). Con una sola contraseña se prueban todas.
+// Dos sitios con llaves: llaves.json (las que das en Doodle; se prueban aquí) y la hoja de nube.gs (quien se registra
+// con Google). Esas no se publican: de la contraseña salen una clave (abre su llave) y un verificador, que se manda
+// a nube.gs; si coincide, devuelve su llave. Así nadie puede bajarse las llaves y probar contraseñas sin conexión.
 const GOOGLE_ID = '707295569533-6fs54g7vdcduqpv7hfu93p09qql2kk1k.apps.googleusercontent.com'; // id de cliente OAuth de Google (web); vacío = sin «Iniciar sesión con Google»
 const derivar = async (clave, sal, iter, uso) => crypto.subtle.deriveKey({ name: 'PBKDF2', salt: bytes(sal), iterations: iter, hash: 'SHA-256' },
   await crypto.subtle.importKey('raw', new TextEncoder().encode(clave.trim()), 'PBKDF2', false, ['deriveKey']), { name: 'AES-GCM', length: 256 }, false, [uso]);
+// 512 bits de la contraseña: la primera mitad es la clave AES de su llave; de la segunda sale el verificador
+async function deClave(clave, sal, iter) {
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: bytes(sal), iterations: iter, hash: 'SHA-256' },
+    await crypto.subtle.importKey('raw', new TextEncoder().encode(clave.trim()), 'PBKDF2', false, ['deriveBits']), 512));
+  return { aes: await crypto.subtle.importKey('raw', bits.slice(0, 32), 'AES-GCM', false, ['encrypt', 'decrypt']), v: await huella(b64(bits.slice(32)) + ':verificador') };
+}
 async function todasLasLlaves() {
   const L = await (await fetch('llaves.json', { cache: 'no-cache' })).json();
   const G = NUBE ? await fetch(NUBE + '?t=llaves', { cache: 'no-store' }).then((r) => r.json()).catch(() => null) : null;
-  return { L, G: G && G.sal ? G : { llaves: [], migradas: [] } };
+  return { L, G: G && G.sal ? G : { migradas: [] } };
 }
-async function buscarLlave(clave, { L, G }) {
-  for (const [conj, origen] of [[G, 'google'], [L, 'doodle']]) {
-    if (!conj.llaves.length) continue;
-    const pk = await derivar(clave, conj.sal, conj.iter, 'decrypt');
-    for (const l of conj.llaves) {
-      const llave = await abrir(pk, bytes(l)).then((d) => JSON.parse(new TextDecoder().decode(d)), () => null);
-      if (llave) return { llave, origen };
-    }
-  }
+// las de llaves.json (lectores de antes, contraseñas que diste en Doodle)
+async function llaveDeDoodle(clave, L) {
+  if (!L.llaves.length) return null;
+  const pk = await derivar(clave, L.sal, L.iter, 'decrypt');
+  for (const l of L.llaves) { const llave = await abrir(pk, bytes(l)).then((d) => JSON.parse(new TextDecoder().decode(d)), () => null); if (llave) return llave; }
   return null;
 }
 // la clave y el sitio de sus datos salen de su secreto (aleatorio, el mismo aunque cambie la contraseña);
@@ -45,22 +48,34 @@ async function desdeLlave(llave) {
   return { n: llave.n, k: llave.k, s: llave.s, nk: b64(new Uint8Array(nk)), id: await huella(llave.s + ':id') };
 }
 async function entrar(clave) {
-  const T = await todasLasLlaves(), r = await buscarLlave(clave, T);
-  if (!r) throw new Error('Contraseña incorrecta');
-  const quien = await desdeLlave(r.llave);
-  if (r.origen === 'doodle' && quien.id && T.G.migradas.includes(await huella(quien.id))) throw new Error('Esa contraseña ya no vale: entra con la tuya o con Google');
-  // lector de antes: tiene que poner su contraseña propia y vincular Google (si el registro con Google está activo)
-  return { ...quien, antiguo: r.origen === 'doodle' && !!GOOGLE_ID && !!T.G.sal && !!quien.s };
+  const T = await todasLasLlaves(), vieja = await llaveDeDoodle(clave, T.L);
+  if (vieja) {
+    const quien = await desdeLlave(vieja);
+    if (quien.id && T.G.migradas.includes(await huella(quien.id))) throw new Error('Esa contraseña ya no vale: entra con la tuya o con Google');
+    // lector de antes: tiene que poner su contraseña propia y vincular Google (si el registro con Google está activo)
+    return { ...quien, antiguo: !!GOOGLE_ID && !!T.G.sal && !!quien.s };
+  }
+  if (!T.G.sal) throw new Error('Contraseña incorrecta');
+  const { aes, v } = await deClave(clave, T.G.sal, T.G.iter), r = await (await fetch(NUBE, { method: 'POST', body: JSON.stringify({ t: 'entrar', v }) })).json();
+  if (r.error) throw new Error(r.error);
+  return desdeLlave(JSON.parse(new TextDecoder().decode(await abrir(aes, bytes(r.llave)))));
 }
 
 // ---------- Google: registrarse con el enlace, entrar si se olvida la contraseña y pasar a contraseña propia ----------
 const codigoAlta = (() => { const m = location.hash.match(/alta=([\w-]+)/); if (m) { try { sessionStorage.setItem('doodle-alta', m[1]); } catch { /* nada */ } history.replaceState(null, '', location.pathname); } try { return m?.[1] || sessionStorage.getItem('doodle-alta'); } catch { return m?.[1]; } })();
 let G = null; // { token, n, k, s } mientras elige nombre y contraseña
+// este navegador ya entró con Google: al abrir la página se intenta entrar solo (sin guardar nada secreto)
+const recuerdaGoogle = (si) => { try { if (si !== undefined) localStorage.setItem('doodle-google', si ? '1' : ''); return localStorage.getItem('doodle-google') === '1'; } catch { return false; } };
 const pedir = async (cuerpo) => { const r = await (await fetch(NUBE, { method: 'POST', body: JSON.stringify(cuerpo) })).json(); if (r.error) throw new Error(r.error); return r; };
 function botonGoogle(sitio) {
   if (!GOOGLE_ID || !NUBE) return;
   const oscuro = matchMedia('(prefers-color-scheme: dark)').matches;
-  const pintar = () => { google.accounts.id.initialize({ client_id: GOOGLE_ID, callback: (r) => conGoogle(r.credential) }); google.accounts.id.renderButton($(sitio), { theme: oscuro ? 'filled_black' : 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: Math.min(366, $(sitio).clientWidth || 366), locale: 'es' }); };
+  const pintar = () => {
+    // auto_select: quien ya entró con Google en este navegador entra solo al abrir la página, sin contraseña
+    google.accounts.id.initialize({ client_id: GOOGLE_ID, callback: (r) => conGoogle(r.credential), auto_select: true, cancel_on_tap_outside: true, use_fedcm_for_prompt: true, context: 'signin' });
+    google.accounts.id.renderButton($(sitio), { theme: oscuro ? 'filled_black' : 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: Math.min(366, $(sitio).clientWidth || 366), locale: 'es' });
+    if (sitio === 'e-google' && !yo && (recuerdaGoogle() || codigoAlta)) google.accounts.id.prompt();
+  };
   if (window.google?.accounts) return pintar();
   const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.onload = pintar; document.head.append(sc);
 }
@@ -71,7 +86,8 @@ async function conGoogle(token) {
     const r = await pedir({ t: 'google', token, codigo: codigoAlta, antiguo: yo?.antiguo ? { n: yo.n, s: yo.s } : undefined });
     G = { token, n: r.n || yo?.n || '', k: r.k, s: r.s };
     err.textContent = ''; err.classList.remove('info');
-    if (r.existe && r.llave && !yo?.antiguo) return dentro(await desdeLlave(G)); // ya tenía cuenta: entra (p. ej. si olvidó la contraseña)
+    recuerdaGoogle(true);
+    if (r.existe && r.llave && !yo?.antiguo) return dentro(await desdeLlave(G)); // ya tenía cuenta: entra sin contraseña
     pantallaClave();
   } catch (e) { err.classList.remove('info'); err.textContent = e.message; }
 }
@@ -88,12 +104,12 @@ $('form-alta').onsubmit = async (e) => {
   if (!n) return (err.textContent = 'Escribe tu nombre.');
   err.textContent = ''; $('b-alta').disabled = true; $('b-alta').textContent = 'Guardando…';
   try {
-    const T = await todasLasLlaves(), otra = await buscarLlave(c, T);
-    // para entrar solo se usa la contraseña: no puede abrir la llave de otra persona
-    if (otra && otra.llave.s !== G.s) return (err.textContent = 'Esa contraseña no se puede usar: elige otra.');
-    const iv = crypto.getRandomValues(new Uint8Array(12)), llave = { n, k: G.k, s: G.s };
-    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await derivar(c, T.G.sal, T.G.iter, 'encrypt'), new TextEncoder().encode(JSON.stringify(llave))));
-    await pedir({ t: 'llave', token: G.token, n, llave: b64(new Uint8Array([...iv, ...ct])) });
+    const T = await todasLasLlaves(), vieja = await llaveDeDoodle(c, T.L);
+    // para entrar solo se usa la contraseña: no puede abrir la llave de otra persona (las de nube.gs lo comprueba nube.gs)
+    if (vieja && vieja.s !== G.s) throw new Error('Esa contraseña no se puede usar: elige otra.');
+    const iv = crypto.getRandomValues(new Uint8Array(12)), llave = { n, k: G.k, s: G.s }, { aes, v } = await deClave(c, T.G.sal, T.G.iter);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, new TextEncoder().encode(JSON.stringify(llave))));
+    await pedir({ t: 'llave', token: G.token, n, v, llave: b64(new Uint8Array([...iv, ...ct])) });
     $('a-clave').value = $('a-clave2').value = ''; err.textContent = '';
     try { sessionStorage.removeItem('doodle-alta'); } catch { /* nada */ }
     dentro(await desdeLlave(llave));
@@ -113,7 +129,7 @@ async function dentro(quien) {
 // ---------- sus datos: copia en el navegador y en Apps Script; dos dispositivos se fusionan ----------
 const claveDatos = () => crypto.subtle.importKey('raw', bytes(yo.nk), 'AES-GCM', false, ['encrypt', 'decrypt']);
 const local = { get: () => { try { return localStorage.getItem('doodle-datos-' + yo.id); } catch { return null; } }, set: (v) => { try { localStorage.setItem('doodle-datos-' + yo.id, v); } catch { /* sin almacenamiento */ } } };
-const vacio = () => ({ ts: 0, docs: {}, fallos: {}, notas: [], borradas: {} });
+const vacio = () => ({ ts: 0, docs: {}, fallos: {}, notas: [], borradas: {}, prog: {} });
 async function descifrarDatos(s) { return s ? { ...vacio(), ...JSON.parse(new TextDecoder().decode(await abrir(await claveDatos(), bytes(s)))) } : vacio(); }
 async function cifrarDatos() {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -128,7 +144,10 @@ function juntar(a, b) {
     docs[f] = { marcas: [...m.values()] };
   }
   const notas = [...new Map([...a.notas, ...b.notas].map((n) => [n.f + n.fecha, n])).values()].sort((x, y) => x.fecha - y.fecha);
-  return { ts: Math.max(a.ts, b.ts), docs, fallos: (a.ts >= b.ts ? a : b).fallos, notas, borradas };
+  // ejercicios de programación: el código más reciente de cada uno; superado, si lo está en cualquiera de los dos
+  const prog = { ...a.prog };
+  for (const [k, v] of Object.entries(b.prog || {})) { const x = prog[k]; prog[k] = !x || (v.u || 0) > (x.u || 0) ? { ...v, ok: v.ok || x?.ok } : { ...x, ok: x.ok || v.ok }; }
+  return { ts: Math.max(a.ts, b.ts), docs, fallos: (a.ts >= b.ts ? a : b).fallos, notas, borradas, prog };
 }
 async function deLaNube() {
   if (!NUBE) return vacio();
@@ -194,7 +213,14 @@ function pestana(p) {
   for (const s of document.querySelectorAll('.pestana')) s.hidden = s.id !== 'p-' + p;
   if (p !== 'leer') estudio(p);
 }
-function repintar() { A?.hojas.forEach((_, i) => pintarMarcas(i + 1)); if (A && !$('p-notas').hidden) verNotas(); }
+function repintar() { A?.hojas.forEach((_, i) => pintarMarcas(i + 1)); if (A && !$('p-notas').hidden) verNotas(); if (!$('s-prog').hidden) window.verProgramacion?.(true); }
+// secciones de dentro: resúmenes o programación
+function seccion(s) {
+  for (const b of document.querySelectorAll('.secciones button')) b.setAttribute('aria-pressed', b.dataset.s === s);
+  $('s-resumenes').hidden = s !== 'resumenes'; $('s-prog').hidden = s !== 'prog';
+  if (s === 'prog') window.verProgramacion?.();
+}
+for (const b of document.querySelectorAll('.secciones button')) b.onclick = () => seccion(b.dataset.s);
 // página que se está leyendo, en la barra de herramientas
 let tPag = 0;
 addEventListener('scroll', () => {
@@ -267,11 +293,15 @@ $('form-entrar').onsubmit = async (e) => {
     await dentro(quien);
   } catch (err) {
     yo = null; $('clave').select();
-    $('error').textContent = err.message === 'Contraseña incorrecta' ? 'Contraseña incorrecta. Revisa mayúsculas y espacios' + (GOOGLE_ID ? ', o entra con Google si la has olvidado.' : '.') : /^Esa contraseña/.test(err.message) ? err.message : 'No se ha podido comprobar la contraseña. Revisa tu conexión.';
+    $('error').textContent = err.message === 'Contraseña incorrecta' ? 'Contraseña incorrecta. Revisa mayúsculas y espacios' + (GOOGLE_ID ? ', o entra con Google si la has olvidado.' : '.') : /^(Esa contraseña|Demasiados)/.test(err.message) ? err.message : 'No se ha podido comprobar la contraseña. Revisa tu conexión.';
   } finally { b.disabled = false; b.textContent = 'Entrar'; }
 };
 $('a-volver').onclick = () => { G = null; yo = null; $('alta').hidden = true; mostrar(); };
-$('salir').onclick = async () => { await subir(true); yo = D = A = null; lectura++; try { sessionStorage.removeItem('doodle-lector'); } catch { /* nada */ } $('hojas').innerHTML = ''; $('lector').hidden = true; mostrar(); };
+$('salir').onclick = async () => {
+  await subir(true); yo = D = A = null; lectura++; try { sessionStorage.removeItem('doodle-lector'); } catch { /* nada */ }
+  window.google?.accounts?.id.disableAutoSelect(); recuerdaGoogle(false); // al salir, no vuelve a entrar solo con Google
+  $('hojas').innerHTML = ''; $('s-prog').innerHTML = ''; $('lector').hidden = true; seccion('resumenes'); mostrar();
+};
 for (const b of document.querySelectorAll('#pestanas button')) b.onclick = () => pestana(b.dataset.p);
 try { yo = JSON.parse(sessionStorage.getItem('doodle-lector')); } catch { yo = null; }
 if (yo && (!('nk' in yo) || yo.antiguo)) yo = null; // sesión de una versión anterior o a medio pasar: se vuelve a pedir
@@ -281,7 +311,7 @@ if (codigoAlta && GOOGLE_ID) $('e-alta').hidden = false;
 
 // Solo lectura. shortcut: frena descargas, copias y capturas casuales; una foto al móvil o las herramientas
 // del navegador siguen pudiendo (sin marca de agua, a petición: leer es más cómodo).
-const editable = (t) => t.closest?.('input, textarea');
+const editable = (t) => t.closest?.('input, textarea, .CodeMirror, #s-prog'); // escribir código sí se puede (seleccionar, copiar, pegar)
 const no = (e) => {
   if (editable(e.target)) return;
   if (e.type === 'selectstart' && e.target.closest?.('.textLayer')) return; // seleccionar para subrayar sí
