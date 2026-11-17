@@ -18,7 +18,7 @@ const huella = async (txt) => [...new Uint8Array(await crypto.subtle.digest('SHA
 
 // Dos sitios con llaves: llaves.json (las que das en Doodle) y la hoja de nube.gs (quien se registra con Google,
 // cada uno con su contraseña). Con una sola contraseña se prueban todas.
-const GOOGLE_ID = ''; // id de cliente OAuth de Google (web); vacío = sin «Iniciar sesión con Google»
+const GOOGLE_ID = '707295569533-6fs54g7vdcduqpv7hfu93p09qql2kk1k.apps.googleusercontent.com'; // id de cliente OAuth de Google (web); vacío = sin «Iniciar sesión con Google»
 const derivar = async (clave, sal, iter, uso) => crypto.subtle.deriveKey({ name: 'PBKDF2', salt: bytes(sal), iterations: iter, hash: 'SHA-256' },
   await crypto.subtle.importKey('raw', new TextEncoder().encode(clave.trim()), 'PBKDF2', false, ['deriveKey']), { name: 'AES-GCM', length: 256 }, false, [uso]);
 async function todasLasLlaves() {
