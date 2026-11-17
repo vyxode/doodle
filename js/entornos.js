@@ -860,6 +860,9 @@
       ['Funcionales: alta de objetos, login, buscar por tipo/título', 'Funcionales: pedir objeto, máximo 5 prestados', 'Funcional: enviar la contraseña olvidada por correo', 'Del sistema: un ordenador y una base de datos pequeña', 'No funcional: poca carga, pocos usuarios a la vez']),
   ];
 
+  // resumen en PDF: se sube cifrado desde Ajustes → Lectores de los resúmenes
+  window.RESUMENES[M] = [{ t: 'Resumen del Tema 4: requisitos y UML', f: 'entornos/Resumen_Entornos_Tema4.pdf' }];
+
   // examen real: posiciones de sus 8 preguntas en REPASO
   (window.EXAMENES_REALES ||= {})[M] = [{ t: 'Examen 04 (real)', p: [10, 11, 12, 13, 14, 15, 16, 17] }];
 })();

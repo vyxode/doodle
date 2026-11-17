@@ -854,7 +854,8 @@ function vistaAjustes() {
 // Con eso se rehace repaso/llaves.json, lo único que lee la página pública: una llave por lector y, en v, la
 // huella de cada lector válido, con la que repaso/nube.gs decide quién puede guardar.
 const LECT = 'data/lectores.enc', LLAVES = 'repaso/llaves.json';
-const u8 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)), a64 = (u) => btoa(String.fromCharCode(...u));
+// a64 a trozos: con un PDF entero, String.fromCharCode(...u) desborda la pila
+const u8 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)), a64 = (u) => { let t = ''; for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(t); };
 async function claveLector(pass, sal, iter, uso) {
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: sal, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, [uso]);
@@ -894,10 +895,21 @@ async function guardarLectores(lectores) {
   if (!sha) throw new Error('GitHub no dejó guardar la lista; pulsa de nuevo Gestionar lectores.');
   S.lect = { k, lectores, sha };
 }
-async function lectores(fn) {
+// Sube un PDF de resumen cifrado con la clave de los lectores (iv + AES-GCM, como lo abre repaso/publico.js).
+async function subirResumen(f, archivo) {
+  const datos = new Uint8Array(await archivo.arrayBuffer());
+  if (new TextDecoder().decode(datos.subarray(0, 5)) !== '%PDF-') throw new Error('Ese archivo no es un PDF.');
+  const k = await crypto.subtle.importKey('raw', u8(S.lect.k), 'AES-GCM', false, ['encrypt']), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, datos)), todo = new Uint8Array(12 + ct.length);
+  todo.set(iv); todo.set(ct, 12);
+  const ruta = '/contents/repaso/' + f + '.enc', antes = await gh(ruta), sha = antes.ok ? (await antes.json()).sha : null;
+  const r = await gh(ruta, { method: 'PUT', body: JSON.stringify({ message: 'Doodle: resumen ' + f.split('/').pop(), content: a64(todo), ...(sha ? { sha } : {}) }) });
+  if (!r.ok) throw new Error('GitHub respondió ' + r.status + ' al subir el resumen.');
+}
+async function lectores(fn, hecho = '') {
   const msg = () => document.getElementById('lect-estado');
   if (msg()) msg().textContent = 'Guardando en GitHub…';
-  try { await fn(); render(); } catch (e) { if (msg()) msg().textContent = e.message; }
+  try { await fn(); render(); if (hecho && msg()) msg().textContent = hecho; } catch (e) { if (msg()) msg().textContent = e.message; }
 }
 function seccionLectores() {
   const L = S.lect, url = location.origin + location.pathname.replace(/[^/]*$/, '') + 'repaso/';
@@ -912,7 +924,10 @@ function seccionLectores() {
     <button type="button" class="boton mini" data-acc="lect-clave" data-v="${i}">Nueva contraseña</button>
     <button type="button" class="boton mini peligro" data-acc="lect-quitar" data-v="${i}">Quitar</button></div></div>`).join('')}</div>
     <form id="f-lect" class="rejilla-form"><label class="campo"><span>Nombre</span><input type="text" id="l-nombre" maxlength="40" required></label>
-    <div class="campo campo-boton"><button class="boton principal">Añadir con contraseña nueva</button></div></form>`;
+    <div class="campo campo-boton"><button class="boton principal">Añadir con contraseña nueva</button></div></form>
+    <h3 class="ex-titulo">Resúmenes</h3><p class="suave">Elige el PDF de cada resumen: se cifra aquí con la clave de los lectores y se sube; si ya estaba, se sustituye.</p>
+    <div class="lista">${Object.entries(window.RESUMENES || {}).flatMap(([m, rs]) => rs.map((r) => `<label class="nota-fila"><span class="nf-nombre">${esc(r.t)}<small>${esc(m)} · <span class="mono">${esc(r.f)}</span></small></span>
+      <input type="file" accept="application/pdf" data-acc="subir-resumen" data-v="${esc(r.f)}" aria-label="PDF de ${esc(r.t)}"></label>`)).join('')}</div>`;
   return `<section class="bloque"><header><h2>Lectores de los resúmenes</h2>${L && L.lectores ? `<span class="suave">${L.lectores.length}</span>` : ''}</header>
     <div class="panel corte"><p>Cada persona lee los resúmenes en <span class="mono">${esc(url)}</span> con su propia contraseña; con «Nueva contraseña» conserva sus notas y con «Quitar» ya no puede entrar ni guardar. Los cambios tardan unos minutos en publicarse.</p>
     ${cuerpo}<p class="suave" id="lect-estado" role="status"></p></div></section>`;
@@ -1840,6 +1855,7 @@ document.addEventListener('change', async (ev) => {
   if (el.dataset.ex) return anotarExamen(el);
   if (acc === 'ej-hecho') { const ej = el.closest('.ej'); cambiar('ej', ej.dataset.id, { hecho: el.checked }); render(); }
   else if (acc === 'lab-hecho') cambiar('ej', el.dataset.id, { hecho: el.checked });
+  else if (acc === 'subir-resumen' && el.files[0]) lectores(() => subirResumen(el.dataset.v, el.files[0]), 'Resumen subido. En unos minutos los lectores lo verán.');
   else if (el.id === 'w-tipo') { cambiar('trabajos', S.montado, { tipo: el.value }); render(true); }
   else if (el.id === 'w-titulo') cambiar('trabajos', S.montado, { titulo: el.value.trim() || 'Sin nombre' });
   else if (el.id === 't-privada') cambiar('marcas', el.dataset.clave, { nota: el.value });

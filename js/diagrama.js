@@ -221,7 +221,7 @@ function dibujarArista(d, e, c, sel) {
 function limites(d) {
   if (!d.nodos.length) return { x: 0, y: 0, w: 400, h: 300 };
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const n of d.nodos) { const t = tam(n); x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y - 20); x1 = Math.max(x1, n.x + t.w + (n.tipo === 'isa' ? 50 : 0)); y1 = Math.max(y1, n.y + t.h); }
+  for (const n of d.nodos) { const t = tam(n); x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y - 20); x1 = Math.max(x1, n.x + t.w + (n.tipo === 'isa' ? 50 : n.tipo === 'decision' && n.texto ? 8 + Math.max(...lineas(n.texto).map((l) => anchoTexto(l))) : 0)); y1 = Math.max(y1, n.y + t.h); }
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 const ordenNodos = (d) => [...d.nodos].sort((a, b) => (FORMAS[b.tipo].caja ? 1 : 0) - (FORMAS[a.tipo].caja ? 1 : 0));

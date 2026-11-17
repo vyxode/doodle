@@ -109,6 +109,7 @@ function mostrar() {
     b.innerHTML = `${ico('archivo')}<span><small>${esc(mod)}</small>${esc(r.t)}</span>`;
     b.onclick = () => { for (const x of $('docs').children) x.setAttribute('aria-pressed', x === b); leer(r, mod); };
     $('docs').append(b);
+    fetch(r.f + '.enc', { method: 'HEAD', cache: 'no-cache' }).then((res) => { if (!res.ok) b.remove(); }, () => {}); // aún sin subir: no se enseña
   }
 }
 function pestana(p) {
