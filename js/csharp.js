@@ -2084,6 +2084,7 @@ S('Replace', (a) => a.length === 2 && ((isStr(a[0]) && isStr(a[1])) || (a[0] ===
 S('Split', function (a, e) {
   if (a.length === 0) return 'string[]';
   if (a.every((t) => t === 'char')) return 'string[]';
+  if (a.length >= 2 && a.slice(0, -1).every((t) => t === 'char') && a[a.length - 1] === 'StringSplitOptions') return 'string[]';
   if (a.length === 1 && a[0] === 'char[]') return 'string[]';
   if (a.length === 2 && (a[0] === 'char[]' || a[0] === 'string[]') && a[1] === 'StringSplitOptions') return 'string[]';
   if (a.length === 1 && a[0] === 'string') throw new CompileError("En tu versión de C#, Split necesita un char entre comillas simples: Split(' '), no Split(\" \")", e.line, 'CS1503');
@@ -2091,7 +2092,7 @@ S('Split', function (a, e) {
 }, function (x, t) {
   const s = this.self; let seps, opt = 0, strs = false;
   if (x.length === 0) seps = null;
-  else if (t[0] === 'char') seps = x.map((c) => String.fromCharCode(c));
+  else if (t[0] === 'char') { if (t[t.length - 1] === 'StringSplitOptions') opt = x[x.length - 1]; seps = x.slice(0, t[t.length - 1] === 'StringSplitOptions' ? -1 : undefined).map((c) => String.fromCharCode(c)); }
   else { strs = t[0] === 'string[]'; seps = x[0] ? x[0].d.map((c) => strs ? c : String.fromCharCode(c)) : null; if (x.length === 2) opt = x[1]; }
   let parts;
   if (!seps || !seps.length) parts = s.split(/\s/);

@@ -124,7 +124,7 @@ function mediaCurso(c) {
 }
 function catalogo() {
   const out = [], leidos = !S.demo && S.temas && S.temas.ejercicios.length ? S.temas : null;
-  for (const m of window.EJERCICIOS || []) if (!(leidos && m.modulo === 'Programación')) for (const e of m.ejercicios) out.push({ ...e, modulo: m.modulo, lenguaje: e.lenguaje || m.lenguaje });
+  for (const m of window.EJERCICIOS || []) if (!(leidos && m.modulo === 'Programación' && !m.siempre)) for (const e of m.ejercicios) out.push({ ...e, modulo: m.modulo, lenguaje: e.lenguaje || m.lenguaje });
   if (leidos) for (const e of leidos.ejercicios) out.push({ ...e, modulo: 'Programación', lenguaje: 'csharp' });
   for (const [id, e] of Object.entries(S.prog.ejPropios)) if (!e.borrado) out.push({ ...e, id, propio: true });
   return out;

@@ -172,6 +172,7 @@ await promisify(execFile)('python3', ['-c', 'import xml.dom.minidom as m; m.pars
   assert.equal(sal('using System;\nclass P { static int F(int a, int b = 10, char c = \'*\') { return a + b; } static void D(out int x) { x = 4; } static void Main() { D(out int y); Console.Write("" + F(1) + F(1, c: \'-\', b: 2) + y); } }'), '1134');
   const r5 = globalThis.window.CSharp.run('using System;\nclass P { static int Main(string[] args) { Console.Write(args.Length); Environment.Exit(3); return 0; } }', [], 1, ['a', 'b']);
   assert.equal(r5.exit, 3); assert.equal(r5.segs[0].s, '2');
+  assert.equal(sal(main('string[] p = " hola  que tal ".Split(\' \', StringSplitOptions.RemoveEmptyEntries); Array.Reverse(p); Console.Write(string.Join("-", p));')), 'tal-que-hola');
 }
 
 // --- E/R → relacional ---

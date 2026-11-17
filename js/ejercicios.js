@@ -1,6 +1,161 @@
 // Catálogo de ejercicios. Añade temas o módulos nuevos aquí (o desde la app con "Nuevo ejercicio").
 // lenguaje "csharp" muestra el editor con el simulador.
 window.EJERCICIOS = [
+ // Banco de ejercicios para preparar el examen (temas 1 a 5). «siempre»: sale también cuando los temas se leen de Aules
+ {
+  "modulo": "Programación",
+  "lenguaje": "csharp",
+  "siempre": true,
+  "ejercicios": [
+   {
+    "id": "banco-1.1",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 1: Toma de contacto con C#",
+    "n": "1.1",
+    "texto": "Conversor de segundos: pide una cantidad total de segundos (entero) y muestra a cuántas horas, minutos y segundos equivale, usando divisiones enteras y restos."
+   },
+   {
+    "id": "banco-1.2",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 1: Toma de contacto con C#",
+    "n": "1.2",
+    "texto": "Precio con IVA y descuento: pide el precio base de un producto y un porcentaje de descuento. Aplica el descuento, súmale un 21 % de IVA y muestra el precio final en una sola línea usando marcadores de posición ({0})."
+   },
+   {
+    "id": "banco-1.3",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 1: Toma de contacto con C#",
+    "n": "1.3",
+    "texto": "Evaluación de expresiones: sin ejecutarlo, piensa qué mostrará 15 + 20 / 3 * 2 - 10 % 4 según la precedencia de operadores de C#. Después compruébalo con un programa que lo escriba."
+   },
+   {
+    "id": "banco-2.1",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 2: Estructuras de control",
+    "n": "2.1",
+    "texto": "Validador de contraseña con intentos: pide un nombre y, con un bucle, una clave numérica (por ejemplo 4589, o una aleatoria con Random rd = new Random(); rd.Next(0, 10)). Hay 5 intentos como máximo: si se fallan todos, muestra «Cuenta de {Nombre} Bloqueada»; si se acierta, «Estás iniciando sesión en la cuenta de {Nombre}». Puedes concatenar con +."
+   },
+   {
+    "id": "banco-2.2",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 2: Estructuras de control",
+    "n": "2.2",
+    "texto": "Calculadora por menú: pide dos números enteros y muestra un menú con las opciones de texto «Sumar», «Restar», «Multiplicar» y «Dividir». Controla con excepciones la lectura de los números para que las operaciones se puedan hacer correctamente."
+   },
+   {
+    "id": "banco-2.3",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 2: Estructuras de control",
+    "n": "2.3",
+    "texto": "Descomposición en factores primos: pide un entero positivo y muestra su descomposición en factores primos (por ejemplo, 60 → 2 * 2 * 3 * 5)."
+   },
+   {
+    "id": "banco-2.4",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 2: Estructuras de control",
+    "n": "2.4",
+    "texto": "Lectura segura con excepciones: pide enteros sin parar hasta que se escriba 0 y calcula la suma total. Si se escribe texto o un número demasiado grande, el programa no se cierra: captura la excepción, avisa por consola y sigue pidiendo."
+   },
+   {
+    "id": "banco-3.1",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 3: Tipos de datos básicos",
+    "n": "3.1",
+    "texto": "Formateo y geometría: pide el radio de una esfera (puede ser decimal) y calcula su volumen, V = 4/3 · π · r³. Muestra el resultado exacto, después con 2 decimales (\"0.00\") y por último truncado a entero."
+   },
+   {
+    "id": "banco-3.2",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 3: Tipos de datos básicos",
+    "n": "3.2",
+    "texto": "Analizador de caracteres con booleanos: pide un carácter y declara tres variables esMayuscula, esDigito y esVocal, dándoles su valor directamente con comparaciones lógicas (sin if). Muestra el valor de los tres booleanos."
+   },
+   {
+    "id": "banco-4.1",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 4: Arrays, estructuras y cadenas",
+    "n": "4.1",
+    "texto": "División de arrays: genera un array de 12 enteros aleatorios entre 1 y 50. A partir de él crea dos arrays nuevos, uno solo con los pares y otro solo con los impares, del tamaño justo para los que hayan salido, y ordénalos de menor a mayor con Array.Sort."
+   },
+   {
+    "id": "banco-4.2",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 4: Arrays, estructuras y cadenas",
+    "n": "4.2",
+    "texto": "Cifrado César: pide una frase y un desplazamiento N. Desplaza cada letra minúscula N posiciones en el abecedario (después de la z se vuelve a la a); los espacios y signos se quedan igual. Ejemplo: «hola» con N = 5 → «mtqf»."
+   },
+   {
+    "id": "banco-4.3",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 4: Arrays, estructuras y cadenas",
+    "n": "4.3",
+    "texto": "Invertir el orden de las palabras: pide una frase con varios espacios entre palabras y muéstralas en orden inverso, separadas por un único guion y sin espacios repetidos. Ejemplo: \"  hola  que tal \" → \"tal-que-hola\"."
+   },
+   {
+    "id": "banco-4.4",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 4: Arrays, estructuras y cadenas",
+    "n": "4.4",
+    "texto": "Detector de palíndromos: pide una frase, pásala a minúsculas, quítale todos los espacios y comprueba recorriendo sus posiciones si se lee igual de izquierda a derecha que de derecha a izquierda."
+   },
+   {
+    "id": "banco-4.5",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 4: Arrays, estructuras y cadenas",
+    "n": "4.5",
+    "texto": "Matriz y máximos por fila: declara un array bidimensional de enteros de 3 × 4, rellénalo con aleatorios entre 10 y 99, muéstralo en filas y columnas e indica el mayor de cada fila."
+   },
+   {
+    "id": "banco-5.1",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 5: Introducción a las funciones",
+    "n": "5.1",
+    "texto": "Ordenar tres valores: crea la función OrdenarTres, que reciba tres enteros por referencia y los deje ordenados (el primero el menor, el segundo el intermedio y el tercero el mayor). Muestra los valores en Main antes y después de llamarla."
+   },
+   {
+    "id": "banco-5.2",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 5: Introducción a las funciones",
+    "n": "5.2",
+    "texto": "Estadísticas de un array: crea tres funciones que reciban un array de enteros y devuelvan el máximo (ObtenerMaximo), el mínimo (ObtenerMinimo) y la media con decimales (CalcularMedia). Úsalas para mostrar un resumen."
+   },
+   {
+    "id": "banco-5.3",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 5: Introducción a las funciones",
+    "n": "5.3",
+    "texto": "Marco de texto: crea la función MostrarCajaTexto, que reciba un texto, un carácter para el borde y un margen lateral (en espacios), y escriba el texto dentro de un recuadro hecho con ese carácter. Ejemplo: «HOLA», '*' y margen 2."
+   },
+   {
+    "id": "banco-5.4",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 5: Introducción a las funciones",
+    "n": "5.4",
+    "texto": "Gestión de inventario: define el struct Producto con codigo (string), nombre (string) y precio (double) y crea un array para 50 productos. Haz un menú con una función para cada opción: añadir un producto (comprobando que hay hueco), buscar productos cuyo nombre contenga un texto (sin distinguir mayúsculas) y borrar uno por su posición desplazando el resto a la izquierda."
+   },
+   {
+    "id": "banco-5.5",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 5: Introducción a las funciones",
+    "n": "5.5",
+    "texto": "Suma de cifras (recursividad): crea la función recursiva SumarCifras, que reciba un entero positivo y devuelva la suma de sus dígitos (425 → 11). Sin bucles y sin pasar el número a texto."
+   },
+   {
+    "id": "banco-5.6",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 5: Introducción a las funciones",
+    "n": "5.6",
+    "texto": "Contar apariciones (recursividad): crea la función recursiva ContarApariciones, que reciba un array de enteros, el número buscado y la posición desde la que empezar, y devuelva cuántas veces aparece. Sin bucles."
+   },
+   {
+    "id": "banco-5.7",
+    "tema": "Banco de ejercicios para el examen",
+    "grupo": "Tema 5: Introducción a las funciones",
+    "n": "5.7",
+    "texto": "Palíndromo recursivo: crea la función recursiva EsPalindromoRecursivo, que reciba una cadena (sin espacios y en minúsculas) y devuelva true si se lee igual en los dos sentidos. Sin bucles ni arrays auxiliares."
+   }
+  ]
+ },
  {
   "modulo": "Programación",
   "lenguaje": "csharp",
