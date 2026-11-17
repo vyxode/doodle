@@ -69,7 +69,7 @@ const recuerdaGoogle = (si) => { try { if (si !== undefined) localStorage.setIte
 const pedir = async (cuerpo) => { const r = await (await fetch(NUBE, { method: 'POST', body: JSON.stringify(cuerpo) })).json(); if (r.error) throw new Error(r.error); return r; };
 function botonGoogle(sitio) {
   if (!GOOGLE_ID || !NUBE) return;
-  const oscuro = matchMedia('(prefers-color-scheme: dark)').matches;
+  const oscuro = (document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark'; // el tema elegido, no solo el del sistema
   const pintar = () => {
     // auto_select: quien ya entró con Google en este navegador entra solo al abrir la página, sin contraseña
     google.accounts.id.initialize({ client_id: GOOGLE_ID, callback: (r) => conGoogle(r.credential), auto_select: true, cancel_on_tap_outside: true, use_fedcm_for_prompt: true, context: 'signin' });

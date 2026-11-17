@@ -25,7 +25,8 @@ function ejercicio(id) {
   const L = ejercicios(), i = L.findIndex((e) => e.id === id), e = L[i], pruebas = (window.PRUEBAS_CS || {})[id];
   $('s-prog').innerHTML = `<div class="prog-barra"><button type="button" class="boton mini" data-prog="lista">← Todos los ejercicios</button>
       <span class="suave">${i + 1} de ${L.length}</span>
-      ${L[i + 1] ? `<button type="button" class="boton mini" data-ej="${esc(L[i + 1].id)}">Siguiente: ${esc(L[i + 1].n)} →</button>` : '<span></span>'}</div>
+      <span class="fila-botones">${L[i - 1] ? `<button type="button" class="boton mini" data-ej="${esc(L[i - 1].id)}" aria-label="Ejercicio anterior, ${esc(L[i - 1].n)}">‹ ${esc(L[i - 1].n)}</button>` : ''}
+      ${L[i + 1] ? `<button type="button" class="boton mini" data-ej="${esc(L[i + 1].id)}">Siguiente: ${esc(L[i + 1].n)} →</button>` : ''}</span></div>
     <article class="prog-lab"><div class="prog-info"></div><div class="prog-trabajo"></div></article>`;
   montarLado($('s-prog').querySelector('.prog-info'), `<span class="antetitulo">${esc(e.grupo)}</span>
       <h2><span class="prog-n">${esc(e.n)}</span>${esc(titulo(e))}</h2><span class="prog-estado">${prog()[id]?.ok ? SUPERADO : ''}</span>
