@@ -742,7 +742,8 @@ input.hueco.mal { border-bottom-color: var(--rojo); background: var(--rojo-fondo
 .ex-fijo { display: grid; gap: 6px; justify-items: start; padding: 14px; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .ex-fijo:hover { background: var(--hover); }
 .ex-nivel { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--panel-2); }
-.nivel-facil { color: var(--ok); } .nivel-dificil { color: var(--rojo); }
+.nivel-facil { color: var(--ok); } .nivel-dificil { color: var(--rojo); } .nivel-real { font-weight: 700; }
+.hueco-es { margin-top: 0; }
 
 /* examen de prueba */
 .ex-cfg { max-width: 640px; padding: 16px; margin-top: 0; }

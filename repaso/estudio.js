@@ -6,6 +6,11 @@ let E = null, T = null, H = null; // examen, tarjetas y huecos en curso
 
 const banco = (tipo) => (window[BANCOS[tipo]]?.[A.mod] || []).map((q, i) => (q && i >= (A.r.desde?.[tipo] || 0) ? tipo + ':' + i : null)).filter(Boolean);
 const item = (id) => window[BANCOS[id[0]]][A.mod][+id.slice(2)];
+// inglés con traducción (Entornos): un botón cambia a español y se recuerda en este navegador
+let ES = (() => { try { return localStorage.getItem('doodle-es') === 'true'; } catch { return false; } })();
+const tx = (x, k) => (ES && x.es && x.es[k] != null ? x.es[k] : x[k]);
+const textoHueco = (x) => (typeof x === 'string' ? x : x.t);
+const botonEs = () => (['p', 't', 'h'].some((t) => banco(t).some((id) => item(id).es)) ? `<div class="pub-fila"><button type="button" class="boton mini" data-acc="idioma" aria-pressed="${ES}">${ES ? 'Ver en inglés' : 'Ver en español'}</button></div>` : '');
 const fallos = () => (D.fallos[A.mod] ||= {});
 const fallado = (id, si) => { if (si) fallos()[id] = 1; else delete fallos()[id]; guardar(); };
 const barajar = (l) => l.map((x) => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
@@ -36,7 +41,7 @@ function estudio(p) {
   if (!A.pags.length) { $('p-' + p).innerHTML = `<div class="vacio">${ico('libro')}Espera a que cargue el resumen…</div>`; return; }
   const tipo = { examen: 'p', tarjetas: 't', huecos: 'h' }[p];
   if (!banco(tipo).length) { $('p-' + p).innerHTML = `<div class="vacio">${ico(p)}Este resumen aún no tiene de esto.</div>`; return; }
-  $('p-' + p).innerHTML = { examen: vistaExamen, tarjetas: vistaTarjetas, huecos: vistaHuecos }[p]();
+  $('p-' + p).innerHTML = botonEs() + { examen: vistaExamen, tarjetas: vistaTarjetas, huecos: vistaHuecos }[p]();
 }
 let exN = 10;
 const inicio = (tipo, icono, titulo, texto, acc, extra = '') => {
@@ -60,10 +65,10 @@ function vistaExamen() {
   return (fin ? anillo(ok, E.qs.length, 'Aciertos', `${mal ? `<button type="button" class="boton principal" data-acc="ex-empezar" data-fallos="1">${ico('repetir')}Repetir lo fallado</button>` : ''}<button type="button" class="boton" data-acc="ex-otro">${ico('azar')}Otro examen</button>`) : barra(resp.length, E.qs.length, ` · ${ok} bien · ${resp.length - ok} mal`))
     + E.qs.map((q, n) => {
       const x = item(q.id);
-      return `<div class="pregunta ${E.ultima === n ? 'recien' : ''}" id="q${n}"><p class="repaso-p"><span class="num">${n + 1}</span><span>${esc(x.p)}</span></p><div class="repaso-ops">${q.orden.map((i, k) => {
+      return `<div class="pregunta ${E.ultima === n ? 'recien' : ''}" id="q${n}"><p class="repaso-p"><span class="num">${n + 1}</span><span>${esc(tx(x, 'p'))}</span></p><div class="repaso-ops">${q.orden.map((i, k) => {
         const cls = q.r == null ? '' : i === x.c ? 'bien' : i === q.r ? 'mal' : '';
-        return `<button type="button" class="repaso-op ${cls}" data-acc="ex-resp" data-q="${n}" data-v="${i}" ${q.r != null ? 'disabled' : ''}><span class="letra">${cls === 'bien' ? ico('bien') : cls === 'mal' ? ico('cerrar') : LETRAS[k]}</span>${esc(x.o[i])}</button>`;
-      }).join('')}</div>${q.r == null ? '' : `<div class="explica ${q.r === x.c ? 'ok' : 'mal'}">${ico('idea')}<span><b>${q.r === x.c ? 'Correcto.' : 'No.'}</b> ${esc(x.x)}</span></div><div>${verPagina(x.p + ' ' + x.o[x.c] + ' ' + x.x)}</div>`}</div>`;
+        return `<button type="button" class="repaso-op ${cls}" data-acc="ex-resp" data-q="${n}" data-v="${i}" ${q.r != null ? 'disabled' : ''}><span class="letra">${cls === 'bien' ? ico('bien') : cls === 'mal' ? ico('cerrar') : LETRAS[k]}</span>${esc(tx(x, 'o')[i])}</button>`;
+      }).join('')}</div>${q.r == null ? '' : `<div class="explica ${q.r === x.c ? 'ok' : 'mal'}">${ico('idea')}<span><b>${q.r === x.c ? 'Correcto.' : 'No.'}</b> ${esc(tx(x, 'x'))}</span></div><div>${verPagina(x.p + ' ' + x.o[x.c] + ' ' + x.x)}</div>`}</div>`;
     }).join('');
 }
 
@@ -73,8 +78,8 @@ function vistaTarjetas() {
   if (!T.cola.length) return anillo(T.bien, T.total, 'Las sabías', `<button type="button" class="boton principal" data-acc="t-otra">${ico('repetir')}Volver a empezar</button>`);
   const x = item(T.cola[0]);
   return barra(T.total - T.cola.length, T.total, ` · ${T.bien} sabidas`) + `<div class="escena"><div class="carta ${T.ver ? 'vuelta' : ''}" data-acc="t-ver" role="button" tabindex="0" aria-label="Dar la vuelta">
-    <div class="cara"><span>${esc(x.f)}</span><small>${ico('girar')}Toca para ver la respuesta</small></div>
-    <div class="cara atras"><span>${esc(x.b)}</span></div></div></div>
+    <div class="cara"><span>${esc(tx(x, 'f'))}</span><small>${ico('girar')}Toca para ver la respuesta</small></div>
+    <div class="cara atras"><span>${esc(tx(x, 'b'))}</span></div></div></div>
     <div class="botones-carta" ${T.ver ? '' : 'hidden'}><button type="button" class="boton si" data-acc="t-resp" data-v="1">${ico('bien')}La sabía</button><button type="button" class="boton no" data-acc="t-resp" data-v="0">${ico('cerrar')}No la sabía</button>${verPagina(x.f + ' ' + x.b)}</div>`;
 }
 
@@ -83,14 +88,14 @@ const correcto = (sol, v) => sol.split('|').some((a) => normal(a).replace(/\s+/g
 function vistaHuecos() {
   if (!H) return inicio('h', 'huecos', 'Completar huecos', 'Escribe la palabra que falta y pulsa Enter: se corrige al momento y te enseña la solución.', 'h-empezar');
   if (!H.cola.length) return anillo(H.bien, H.total, 'Frases perfectas', `<button type="button" class="boton principal" data-acc="h-otra">${ico('repetir')}Volver a empezar</button>`);
-  const x = item(H.cola[0]), partes = x.split(/\[([^\]]+)\]/), ok = H.ok; // impares = huecos
+  const x = item(H.cola[0]), partes = textoHueco(x).split(/\[([^\]]+)\]/), ok = H.ok; // impares = huecos
   return barra(H.total - H.cola.length, H.total, ` · ${H.bien} perfectas`) + `<form id="f-hueco" class="pregunta ${ok ? 'recien' : ''}" autocomplete="off">
     <p class="repaso-p hueco-texto">${partes.map((s, i) => {
       if (i % 2 === 0) return esc(s);
       const n = (i - 1) / 2;
       return `<input type="text" class="hueco ${ok ? (ok[n] ? 'bien' : 'mal') : ''}" id="h${n}" size="12" spellcheck="false" aria-label="Hueco ${n + 1}" value="${esc(H.val?.[n] || '')}" ${ok ? 'readonly' : ''}>${ok && !ok[n] ? `<small class="hueco-sol">${esc(s.split('|')[0])}</small>` : ''}`;
-    }).join('')}</p>
-    ${ok ? `<div class="explica ${ok.every(Boolean) ? 'ok' : 'mal'}">${ico(ok.every(Boolean) ? 'bien' : 'idea')}<b>${ok.every(Boolean) ? '¡Todo bien!' : 'En verde, la solución de lo que falló.'}</b></div><div class="pub-fila"><button type="button" class="boton principal" data-acc="h-sig" id="h-sig">${ico('ir')}Siguiente</button>${verPagina(x.replace(/[[\]|]/g, ' '))}</div>`
+    }).join('')}</p>${ES && x.es ? `<p class="suave" lang="es">${esc(x.es)}</p>` : ''}
+    ${ok ? `<div class="explica ${ok.every(Boolean) ? 'ok' : 'mal'}">${ico(ok.every(Boolean) ? 'bien' : 'idea')}<b>${ok.every(Boolean) ? '¡Todo bien!' : 'En verde, la solución de lo que falló.'}</b></div><div class="pub-fila"><button type="button" class="boton principal" data-acc="h-sig" id="h-sig">${ico('ir')}Siguiente</button>${verPagina(textoHueco(x).replace(/[[\]|]/g, ' '))}</div>`
     : `<div class="pub-fila"><button class="boton principal">${ico('bien')}Comprobar</button></div>`}</form>`;
 }
 
@@ -101,6 +106,7 @@ $('lector').addEventListener('click', (e) => {
   if (!b) return;
   if (b.dataset.ir) return irPagina(+b.dataset.ir);
   const acc = b.dataset.acc, sf = !!b.dataset.fallos;
+  if (acc === 'idioma') { ES = !ES; try { localStorage.setItem('doodle-es', ES); } catch { /* sin almacenamiento */ } }
   if (acc === 'ex-n') { exN = +b.dataset.v; b.parentElement.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', x === b)); return; }
   if (acc === 'ex-empezar') E = { qs: cola('p', sf).slice(0, sf ? undefined : exN).map((id) => ({ id, orden: barajar(item(id).o.map((_, i) => i)), r: null })) };
   if (acc === 'ex-resp') {
@@ -128,7 +134,7 @@ $('lector').addEventListener('click', (e) => {
 $('lector').addEventListener('submit', (e) => {
   if (e.target.id !== 'f-hueco') return;
   e.preventDefault();
-  const id = H.cola[0], sols = item(id).match(/\[[^\]]+\]/g).map((s) => s.slice(1, -1));
+  const id = H.cola[0], sols = textoHueco(item(id)).match(/\[[^\]]+\]/g).map((s) => s.slice(1, -1));
   H.val = sols.map((_, n) => $('h' + n).value);
   H.ok = sols.map((s, n) => correcto(s, H.val[n]));
   const todo = H.ok.every(Boolean); H.bien += todo; fallado(id, !todo);
