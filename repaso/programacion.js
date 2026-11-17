@@ -1,7 +1,7 @@
 // Programación para cada lector: el banco de ejercicios para el examen (los de js/ejercicios.js con «siempre»),
 // con el mismo laboratorio de C# que Doodle (Ejecutar y Comprobar). El código y lo superado de cada uno se guarda
 // con sus datos (D.prog), cifrado como el resto. Usa lo de publico.js: $, esc, ico, D, guardar.
-import { montarCsharp } from '../js/laboratorio.js';
+import { montarCsharp, montarLado, ejemploPrueba } from '../js/laboratorio.js';
 
 const ejercicios = () => (window.EJERCICIOS || []).filter((m) => m.siempre && m.lenguaje === 'csharp').flatMap((m) => m.ejercicios);
 const prog = () => (D.prog ||= {});
@@ -26,10 +26,10 @@ function ejercicio(id) {
   $('s-prog').innerHTML = `<div class="prog-barra"><button type="button" class="boton mini" data-prog="lista">← Todos los ejercicios</button>
       <span class="suave">${i + 1} de ${L.length}</span>
       ${L[i + 1] ? `<button type="button" class="boton mini" data-ej="${esc(L[i + 1].id)}">Siguiente: ${esc(L[i + 1].n)} →</button>` : '<span></span>'}</div>
-    <article class="prog-lab"><div class="prog-info"><span class="antetitulo">${esc(e.grupo)}</span>
+    <article class="prog-lab"><div class="prog-info"></div><div class="prog-trabajo"></div></article>`;
+  montarLado($('s-prog').querySelector('.prog-info'), `<span class="antetitulo">${esc(e.grupo)}</span>
       <h2><span class="prog-n">${esc(e.n)}</span>${esc(titulo(e))}</h2><span class="prog-estado">${prog()[id]?.ok ? SUPERADO : ''}</span>
-      <p class="prog-enun">${esc(resto(e))}</p>${pruebas ? '' : '<p class="suave">Este no tiene «Comprobar» (su resultado es aleatorio o depende de un menú): pruébalo tú con «Ejecutar».</p>'}</div>
-      <div class="prog-trabajo"></div></article>`;
+      <p class="prog-enun">${esc(resto(e))}</p>${pruebas ? ejemploPrueba(pruebas) : '<p class="suave">Este no tiene «Comprobar» (su resultado es aleatorio o depende de un menú): pruébalo tú con «Ejecutar».</p>'}`, { tema: (e.grupo.match(/Tema\s*(\d+)/) || [])[1] });
   const h = montarCsharp($('s-prog').querySelector('.prog-trabajo'), { codigo: prog()[id]?.c }, ({ codigo }) => { prog()[id] = { ...prog()[id], c: codigo, u: Date.now() }; guardar(); }, pruebas,
     () => { prog()[id] = { ...prog()[id], ok: true, u: Date.now() }; guardar(); $('s-prog').querySelector('.prog-estado').innerHTML = SUPERADO; }, () => 'Guardado');
   scrollTo({ top: 0 });

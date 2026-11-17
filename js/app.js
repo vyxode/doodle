@@ -7,7 +7,7 @@ import { descargarAules, raizAules, nombreModulo } from './aules.js';
 import { crearEditor, montarSql, montarWeb, montarKanban, montarJava, cargarScript, comprobarCaso, conMainDePrueba, montarPracticaSql, EJ_SQL } from './herramientas.js';
 const EJ_SQL_N = EJ_SQL.length;
 import { montarDiagrama, svgExportable, tam } from './diagrama.js';
-import { montarCsharp as labCsharp, PLANTILLA } from './laboratorio.js';
+import { montarCsharp as labCsharp, PLANTILLA, montarLado, ejemploPrueba } from './laboratorio.js';
 import { leerTemas } from './temas.js';
 
 const D = 86400;
@@ -1403,15 +1403,17 @@ function abrirLab(id) {
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos - 1] || {}).id || '')}" ${pos > 0 ? '' : 'disabled'} aria-label="Ejercicio anterior">‹</button>
         <button type="button" class="boton mini" data-acc="lab-ir" data-v="${esc((lista[pos + 1] || {}).id || '')}" ${pos < lista.length - 1 ? '' : 'disabled'} aria-label="Ejercicio siguiente">›</button>
         <button type="button" class="boton mini" data-acc="lab-amplio" aria-pressed="false">Ampliar código</button>
-        ${e.lenguaje === 'csharp' ? '<button type="button" class="boton mini" data-acc="chuleta">Chuleta</button>' : ''}
         <button type="button" class="boton mini" data-acc="pomodoro" data-v="${esc(e.modulo)}">Concentrarme</button>
         <label class="casilla"><input type="checkbox" data-acc="lab-hecho" data-id="${esc(id)}" ${g.hecho ? 'checked' : ''}> Hecho</label>
       </div>
     </header>
     <div class="lab-cuerpo">
-      <section class="lab-enun"><span class="antetitulo">${esc(e.grupo || e.modulo)}</span><p class="pre">${esc(e.texto)}</p>${e.ejemplo ? `<pre class="consola">${esc(e.ejemplo)}</pre>` : ''}${ayudaLab(e, todos)}</section>
+      <section class="lab-enun"></section>
       <section class="lab-trabajo" id="lab-trabajo"></section>
     </div>`;
+  const enun = `<span class="antetitulo">${esc(e.grupo || e.modulo)}</span><p class="pre">${esc(e.texto)}</p>${e.ejemplo ? `<pre class="consola">${esc(e.ejemplo)}</pre>` : ''}${e.lenguaje === 'csharp' && !e.ejemplo ? ejemploPrueba((window.PRUEBAS_CS || {})[id]) : ''}${ayudaLab(e, todos)}`;
+  if (e.lenguaje === 'csharp') montarLado(capa.querySelector('.lab-enun'), enun, { tema: ((e.grupo || e.tema || '').match(/Tema\s*(\d+)/) || [])[1] });
+  else capa.querySelector('.lab-enun').innerHTML = enun;
   document.body.classList.add('con-lab');
   capa.hidden = false;
   ampliarLab(LS.get('doodle-lab-amplio') === true);

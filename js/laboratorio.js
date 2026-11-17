@@ -28,9 +28,9 @@ function simular(req) {
 export const PLANTILLA = 'using System;\n\nclass Program {\n\tpublic static void Main() {\n\t\t\n\t}\n}\n';
 export function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar, estadoGuardado = () => 'Guardado') {
   cont.innerHTML = `<div class="hz hz-cs">
-    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button>${pruebas ? `<button type="button" class="boton" data-cs="comprobar">Comprobar (${pruebas.length} prueba${pruebas.length === 1 ? '' : 's'})</button>` : ''}<label class="cs-args" hidden><span class="suave">Argumentos</span><input type="text" placeholder="p. ej. 3 4" autocomplete="off" spellcheck="false" aria-label="Argumentos de la línea de comandos (args)"></label><span class="suave atajo">Ctrl + Intro ejecuta. Admite lo visto hasta el tema 5.</span><span class="estado-guardado" aria-live="polite"></span></div>
-    <div class="editor"></div>
-    <div class="consola" tabindex="-1" aria-label="Consola del programa"><span class="vacia">Pulsa Ejecutar para lanzar el programa.</span></div>
+    <div class="barra-lab"><button type="button" class="boton principal" data-cs="ejecutar">▶ Ejecutar</button>${pruebas ? `<button type="button" class="boton" data-cs="comprobar">Comprobar (${pruebas.length} prueba${pruebas.length === 1 ? '' : 's'})</button>` : ''}<label class="cs-args" hidden><span class="suave">Argumentos</span><input type="text" placeholder="p. ej. 3 4" autocomplete="off" spellcheck="false" aria-label="Argumentos de la línea de comandos (args)"></label><button type="button" class="boton mini sutil" data-cs="reiniciar" title="Borra tu código y vuelve a la plantilla">Empezar de cero</button></div>
+    <div class="editor"><div class="cod-cab"><span class="cod-fichero">Program.cs</span><span class="atajo"><kbd>Ctrl</kbd> + <kbd>Intro</kbd> ejecuta</span><span class="estado-guardado" aria-live="polite"></span></div></div>
+    <div class="consola-caja"><div class="con-cab"><span>Consola</span><button type="button" data-cs="limpiar">Limpiar</button></div><div class="consola" tabindex="-1" aria-label="Consola del programa"><span class="vacia">Pulsa Ejecutar para lanzar el programa.</span></div></div>
     <div class="cs-aviso" aria-live="polite"></div></div>`;
   const estado = cont.querySelector('.estado-guardado'), btn = cont.querySelector('[data-cs]'), consola = cont.querySelector('.consola'), lugar = cont.querySelector('.cs-aviso');
   let entradas = [], semilla = 1, ocupado = false;
@@ -74,6 +74,15 @@ export function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar, estadoG
     lugar.append(aviso);
   }
   btn.addEventListener('click', () => lanzar([]));
+  const vaciar = () => { consola.innerHTML = '<span class="vacia">Pulsa Ejecutar para lanzar el programa.</span>'; lugar.textContent = ''; ed.limpiar(); };
+  cont.querySelector('[data-cs=limpiar]').addEventListener('click', vaciar);
+  // borrar el código pide una segunda pulsación (sin ventanas de confirmación)
+  const br = cont.querySelector('[data-cs=reiniciar]'); let armado = 0;
+  br.addEventListener('click', () => {
+    if (!armado) { br.textContent = '¿Seguro? Pulsa otra vez'; br.classList.add('peligro'); armado = setTimeout(() => { armado = 0; br.textContent = 'Empezar de cero'; br.classList.remove('peligro'); }, 3000); return; }
+    clearTimeout(armado); armado = 0; br.textContent = 'Empezar de cero'; br.classList.remove('peligro');
+    ed.set(PLANTILLA); verArgs(PLANTILLA); alCambiar({ codigo: PLANTILLA }); estado.textContent = estadoGuardado(); vaciar(); ed.foco();
+  });
   const bc = cont.querySelector('[data-cs=comprobar]');
   if (bc) bc.addEventListener('click', async () => {
     bc.disabled = true; lugar.textContent = '';
@@ -89,4 +98,65 @@ export function montarCsharp(cont, datos, alCambiar, pruebas, alAprobar, estadoG
     if (todo && alAprobar) alAprobar();
   });
   return { foco: () => ed.foco(), get: () => ed.get(), poner: (v) => { ed.set(v); verArgs(v); alCambiar({ codigo: v }); } };
+}
+
+// ---------- a la izquierda del editor: enunciado y chuleta de C# en pestañas (Doodle y Repaso) ----------
+const TOK = /(\/\/[^\n]*)|(\$?@?"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|\b(\d+(?:\.\d+)?)\b|\b(using|class|static|void|public|private|int|double|float|string|char|bool|long|decimal|var|if|else|switch|case|default|break|continue|for|foreach|in|while|do|return|new|true|false|null|const|ref|out|struct|enum|try|catch|finally|throw|params)\b|\b(Console|Convert|Math|Random|String|Array|Char|Int32|Double|DateTime|Exception|FormatException|StringSplitOptions)\b/g;
+export function resaltar(src) {
+  let out = '', i = 0;
+  for (const m of String(src).matchAll(TOK)) {
+    out += esc(src.slice(i, m.index)) + `<span class="sx-${m[1] ? 'com' : m[2] ? 'str' : m[3] ? 'num' : m[4] ? 'kw' : 'ty'}">${esc(m[0])}</span>`;
+    i = m.index + m[0].length;
+  }
+  return out + esc(src.slice(i));
+}
+const conCodigo = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+const sinAcentos = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const numTema = (s) => (String(s || '').match(/Tema\s*(\d+)/i) || [])[1] || '';
+
+// La primera prueba de «Comprobar», contada como ejemplo para probarlo a mano.
+export function ejemploPrueba(pruebas) {
+  const p = (pruebas || [])[0]; if (!p) return '';
+  const como = p.codigo ? `Se llama así: <code>${esc(p.codigo)}</code>` : p.args ? `Con los argumentos <code>${esc(p.args.join(' ') || '(ninguno)')}</code>` : (p.e || []).length ? `Si escribes ${p.e.map((x) => `<kbd>${esc(x)}</kbd>`).join(' ⏎ ')}` : 'Sin escribir nada';
+  const debe = [...(p.n || []).map((v) => String([].concat(v)[0]).replace('.', ',')), ...(p.t || []).map((t) => [].concat(t)[0])];
+  return `<div class="lab-prueba"><b>Para probarlo</b><p>${como}${debe.length ? `, debería mostrar ${debe.map((x) => `<code>${esc(x)}</code>`).join(', ')}${p.orden && debe.length > 1 ? ', en ese orden' : ''}` : ''}.</p></div>`;
+}
+
+export function montarLado(cont, enunciado, { tema = '' } = {}) {
+  const hay = Array.isArray(window.CHULETA) && window.CHULETA.length;
+  cont.innerHTML = `${hay ? `<div class="lado-tabs" role="tablist" aria-label="Enunciado o chuleta">
+      <button type="button" role="tab" data-lado="enun" aria-selected="true">Enunciado</button><button type="button" role="tab" data-lado="chuleta" aria-selected="false">Chuleta de C#</button></div>` : ''}
+    <div class="lado-enun">${enunciado}</div>
+    ${hay ? `<div class="lado-chuleta" hidden><input type="search" class="chu-q" placeholder="Busca: switch, Substring, ref…" autocomplete="off" aria-label="Buscar en la chuleta">
+      <div class="chu-temas" role="group" aria-label="Tema"><span>Tema</span>${['', ...window.CHULETA.map((tm) => numTema(tm.tema))].map((n) => `<button type="button" data-t="${n}" aria-pressed="false">${n || 'Todos'}</button>`).join('')}</div>
+      <div class="chu-lista"></div></div>` : ''}`;
+  if (!hay) return { ver() {} };
+  const q = cont.querySelector('.chu-q'), lista = cont.querySelector('.chu-lista');
+  let t = window.CHULETA.some((tm) => numTema(tm.tema) === String(tema)) ? String(tema) : '';
+  const pintar = () => {
+    for (const b of cont.querySelectorAll('.chu-temas button')) b.setAttribute('aria-pressed', b.dataset.t === t);
+    const k = sinAcentos(q.value).split(/\s+/).filter(Boolean), abierta = k.length > 0;
+    const temas = window.CHULETA.filter((tm) => !t || numTema(tm.tema) === t).map((tm) => ({ tema: tm.tema, fichas: tm.fichas.filter((f) => { const x = sinAcentos([tm.tema, f.t, f.d, f.c].join(' ')); return k.every((p) => x.includes(p)); }) })).filter((tm) => tm.fichas.length);
+    lista.innerHTML = temas.length ? temas.map((tm) => `<section><h4>${esc(tm.tema)}</h4>${tm.fichas.map((f, i) => `<details class="chu-ficha" ${abierta ? 'open' : ''}><summary>${esc(f.t)}</summary><p>${conCodigo(f.d)}</p>
+        ${f.c ? `<div class="chu-cod"><pre>${resaltar(f.c)}</pre><button type="button" class="chu-copiar" data-i="${esc(tm.tema)}|${i}">Copiar</button></div>` : ''}</details>`).join('')}</section>`).join('')
+      : `<p class="suave">Nada coincide${t ? ' en este tema. Prueba en «Todos»' : '. Prueba con otra palabra'}.</p>`;
+  };
+  const ver = (lado) => {
+    for (const b of cont.querySelectorAll('.lado-tabs button')) b.setAttribute('aria-selected', b.dataset.lado === lado);
+    cont.querySelector('.lado-enun').hidden = lado !== 'enun'; cont.querySelector('.lado-chuleta').hidden = lado !== 'chuleta';
+    cont.classList.toggle('con-chuleta', lado === 'chuleta');
+    if (lado === 'chuleta') { if (!lista.innerHTML) pintar(); q.focus({ preventScroll: true }); }
+  };
+  cont.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button'); if (!b || !cont.contains(b)) return;
+    if (b.dataset.lado) ver(b.dataset.lado);
+    else if (b.dataset.t !== undefined) { t = b.dataset.t; pintar(); }
+    else if (b.classList.contains('chu-copiar')) {
+      const [tm, i] = b.dataset.i.split('|'), f = window.CHULETA.find((x) => x.tema === tm).fichas[+i];
+      (navigator.clipboard ? navigator.clipboard.writeText(f.c) : Promise.reject()).then(() => { b.textContent = 'Copiado ✓'; }, () => { b.textContent = 'No se pudo copiar'; })
+        .finally(() => setTimeout(() => { b.textContent = 'Copiar'; }, 1600));
+    }
+  });
+  q.addEventListener('input', pintar);
+  return { ver };
 }
