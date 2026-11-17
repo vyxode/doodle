@@ -1,7 +1,7 @@
-// Editor de diagramas tipo draw.io: E/R (Chen extendido), modelo relacional, UML de clases y casos de uso.
+// Editor de diagramas tipo draw.io: E/R (Chen extendido), modelo relacional, UML de clases, casos de uso y actividades.
 // El diagrama es un objeto JSON { notacion, nodos, aristas, vista } que guarda Doodle; se exporta a PNG, SVG y .drawio.
 
-export const NOTACIONES = { er: 'E/R (Chen)', relacional: 'Relacional', uml: 'UML clases', casos: 'Casos de uso' };
+export const NOTACIONES = { er: 'E/R (Chen)', relacional: 'Relacional', uml: 'UML clases', casos: 'Casos de uso', actividad: 'Actividades' };
 const FORMAS = {
   entidad: { n: 'Entidad', not: ['er'], w: 120, h: 50 },
   debil: { n: 'Entidad débil', not: ['er'], w: 130, h: 54 },
@@ -16,11 +16,24 @@ const FORMAS = {
   actor: { n: 'Actor', not: ['casos'], w: 70, h: 92 },
   caso: { n: 'Caso de uso', not: ['casos'], w: 150, h: 56 },
   sistema: { n: 'Sistema', not: ['casos'], w: 420, h: 320, caja: true },
-  nota: { n: 'Nota', not: ['er', 'relacional', 'uml', 'casos'], w: 140, h: 40 },
+  // diagramas de actividades (UML): inicio, acción, decisión/unión, fork/join y final
+  inicio: { n: 'Inicio', not: ['actividad'], w: 30, h: 30, fijo: true },
+  accion: { n: 'Acción', not: ['actividad'], w: 140, h: 46 },
+  decision: { n: 'Decisión / unión', not: ['actividad'], w: 46, h: 46, fijo: true },
+  barra: { n: 'Fork / join', not: ['actividad'], w: 140, h: 8, fijo: true },
+  fin: { n: 'Final', not: ['actividad'], w: 32, h: 32, fijo: true },
+  nota: { n: 'Nota', not: ['er', 'relacional', 'uml', 'casos', 'actividad'], w: 140, h: 40 },
 };
-const TEXTO_INICIAL = { entidad: 'ENTIDAD', debil: 'DÉBIL', relacion: 'relación', 'relacion-debil': 'relación', atributo: 'atributo', isa: 'ES', agregacion: '', tabla: 'TABLA', clase: 'Clase', interfaz: 'Interfaz', actor: 'Actor', caso: 'Caso de uso', sistema: 'Sistema', nota: 'Nota' };
-export const ESTILOS = { linea: 'Línea', doble: 'Doble (participación total)', flecha: 'Flecha', fk: 'Clave ajena →', herencia: 'Herencia (UML)', discontinua: 'Discontinua «include/extend»', composicion: 'Composición (UML)', agregacionUml: 'Agregación (UML)' };
-const ESTILO_DEFECTO = { er: 'linea', relacional: 'fk', uml: 'linea', casos: 'linea' };
+const TEXTO_INICIAL = { entidad: 'ENTIDAD', debil: 'DÉBIL', relacion: 'relación', 'relacion-debil': 'relación', atributo: 'atributo', isa: 'ES', agregacion: '', tabla: 'TABLA', clase: 'Clase', interfaz: 'Interfaz', actor: 'Actor', caso: 'Caso de uso', sistema: 'Sistema', nota: 'Nota', inicio: '', accion: 'Acción', decision: '', barra: '', fin: '' };
+export const ESTILOS = { linea: 'Línea', doble: 'Doble (participación total)', flecha: 'Flecha', fk: 'Clave ajena →', herencia: 'Herencia (UML)', discontinua: 'Discontinua «include/extend»', composicion: 'Composición (UML)', agregacionUml: 'Agregación (UML)', punteada: 'Discontinua sin flecha (nota)' };
+const ESTILO_DEFECTO = { er: 'linea', relacional: 'fk', uml: 'linea', casos: 'linea', actividad: 'flecha' };
+// Estilo al unir dos elementos: en casos de uso, entre casos «include» y entre actores generalización; las notas, con línea discontinua.
+export function estiloAlUnir(notacion, A, B) {
+  if (A.tipo === 'nota' || B.tipo === 'nota') return { estilo: 'punteada' };
+  if (notacion === 'casos' && A.tipo === 'caso' && B.tipo === 'caso') return { estilo: 'discontinua', etiqueta: '«include»' };
+  if (notacion === 'casos' && A.tipo === 'actor' && B.tipo === 'actor') return { estilo: 'herencia' };
+  return { estilo: ESTILO_DEFECTO[notacion] || 'linea' };
+}
 const FUENTE = "14px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"; // comillas simples: va dentro de style="…"
 const COLORES_APP = { trazo: 'var(--texto)', relleno: 'var(--panel-2)', texto: 'var(--texto)', suave: 'var(--suave)', acento: 'var(--rojo)', fondoEt: 'var(--panel)' };
 const COLORES_PAPEL = { trazo: '#111111', relleno: '#FFFFFF', texto: '#111111', suave: '#555555', acento: '#D90F1C', fondoEt: '#FFFFFF' };
@@ -54,6 +67,7 @@ export function columna(l) {
 export function tam(n) {
   const f = FORMAS[n.tipo];
   if (f.caja) return { w: n.w || f.w, h: n.h || f.h };
+  if (f.fijo) return { w: n.tipo === 'barra' ? n.w || f.w : f.w, h: f.h };
   if (n.tipo === 'tabla') {
     const cols = lineas(n.columnas || '').filter((l) => l.trim());
     const w = Math.max(f.w, anchoTexto(n.texto, true) + 30, ...cols.map((c) => anchoTexto(columna(c).texto + (columna(c).fk ? ' (FK)' : '')) + 40));
@@ -77,8 +91,8 @@ function borde(n, px, py) {
   if (!dx && !dy) return c;
   const a = t.w / 2, b = t.h / 2;
   let k;
-  if (n.tipo === 'atributo' || n.tipo === 'caso') k = 1 / Math.sqrt((dx * dx) / (a * a) + (dy * dy) / (b * b));
-  else if (n.tipo === 'relacion' || n.tipo === 'relacion-debil') k = 1 / (Math.abs(dx) / a + Math.abs(dy) / b);
+  if (['atributo', 'caso', 'inicio', 'fin'].includes(n.tipo)) k = 1 / Math.sqrt((dx * dx) / (a * a) + (dy * dy) / (b * b));
+  else if (['relacion', 'relacion-debil', 'decision'].includes(n.tipo)) k = 1 / (Math.abs(dx) / a + Math.abs(dy) / b);
   else k = Math.min(dx ? a / Math.abs(dx) : Infinity, dy ? b / Math.abs(dy) : Infinity);
   return { x: c.x + dx * k, y: c.y + dy * k };
 }
@@ -121,6 +135,13 @@ function dibujarNodo(n, c, sel) {
     case 'agregacion': s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:none;stroke:${c.trazo};stroke-width:1.4;stroke-dasharray:8 5"/>` + (n.texto ? `<text x="${x + 8}" y="${y + 16}" style="fill:${c.suave};font:12px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">${esc(n.texto)}</text>` : ''); break;
     case 'sistema': s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:none;stroke:${c.trazo};stroke-width:1.6"/><text x="${cx}" y="${y + 20}" text-anchor="middle" style="fill:${c.texto};font:600 ${FUENTE}">${esc(n.texto)}</text>`; break;
     case 'caso': s = `<ellipse cx="${cx}" cy="${cy}" rx="${w / 2}" ry="${h / 2}" style="${st}"/>` + textoCentrado(n.texto, cx, cy, c); break;
+    case 'inicio': s = `<circle cx="${cx}" cy="${cy}" r="${w / 2}" style="fill:${c.trazo};stroke:${c.trazo};stroke-width:1.6"/>`; break;
+    case 'fin': s = `<circle cx="${cx}" cy="${cy}" r="${w / 2}" style="fill:${c.relleno};stroke:${c.trazo};stroke-width:1.8"/><circle cx="${cx}" cy="${cy}" r="${w / 2 - 6}" style="fill:${c.trazo}"/>`; break;
+    case 'accion': s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" style="${st}"/>` + textoCentrado(n.texto, cx, cy, c); break;
+    case 'barra': s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" style="fill:${c.trazo};stroke:${c.trazo}"/>`; break;
+    case 'decision': // la pregunta va al lado del rombo, como en el tema
+      s = `<polygon points="${rombo(0, 0)}" style="${st}"/>` + (n.texto ? lineas(n.texto).map((l, i) => `<text x="${x + w + 8}" y="${cy + (i - (lineas(n.texto).length - 1) / 2) * 18}" dominant-baseline="central" style="fill:${c.texto};font:${FUENTE}">${esc(l)}</text>`).join('') : '');
+      break;
     case 'actor': {
       const hx = cx, top = y + 4;
       s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" style="fill:transparent;stroke:none"/>` +
@@ -188,6 +209,7 @@ function dibujarArista(d, e, c, sel) {
     case 'discontinua': s = linea(p, q, 'stroke-dasharray:7 5') + punta(false, '', 12, 7); break;
     case 'composicion': s = rombo(sel ? c.acento : c.trazo) + linea({ x: p.x + ux * 24, y: p.y + uy * 24 }, q); break;
     case 'agregacionUml': s = rombo(c.relleno) + linea({ x: p.x + ux * 24, y: p.y + uy * 24 }, q); break;
+    case 'punteada': s = linea(p, q, 'stroke-dasharray:5 4'); break;
     default: s = linea(p, q);
   }
   s += etiqueta(e.etiqueta, puntoEnSegmento(p, q, 0.5, 0), c, e.estilo === 'discontinua' ? '' : '600 ');
@@ -222,6 +244,8 @@ export function aDrawio(d, nombre = 'Diagrama') {
     atributo: 'ellipse;', isa: 'triangle;direction=north;fontStyle=1;', agregacion: 'rounded=0;dashed=1;fillColor=none;verticalAlign=top;align=left;spacingLeft=6;',
     tabla: 'rounded=0;verticalAlign=top;align=left;spacingLeft=8;', clase: 'rounded=0;verticalAlign=top;align=left;spacingLeft=8;', interfaz: 'rounded=0;verticalAlign=top;align=left;spacingLeft=8;',
     actor: 'shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;outlineConnect=0;', caso: 'ellipse;', sistema: 'rounded=0;fillColor=none;verticalAlign=top;fontStyle=1;', nota: 'shape=note;size=12;dashed=1;',
+    inicio: 'ellipse;fillColor=#000000;strokeColor=#000000;', fin: 'ellipse;shape=endState;fillColor=#000000;strokeColor=#000000;', accion: 'rounded=1;arcSize=30;',
+    decision: 'rhombus;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;', barra: 'rounded=0;fillColor=#000000;strokeColor=#000000;',
   };
   const valor = (n) => {
     if (n.tipo === 'atributo') return n.clave ? `<u>${hesc(n.texto)}</u>` : hesc(n.texto);
@@ -234,7 +258,7 @@ export function aDrawio(d, nombre = 'Diagrama') {
   const extra = (n) => (n.tipo === 'atributo' ? (n.multivaluado ? 'shape=doubleEllipse;' : '') + (n.derivado ? 'dashed=1;' : '') : '');
   const flecha = {
     linea: 'endArrow=none;', doble: 'shape=link;endArrow=none;', flecha: 'endArrow=block;endFill=1;', fk: 'endArrow=block;endFill=1;', herencia: 'endArrow=block;endFill=0;endSize=14;',
-    discontinua: 'dashed=1;endArrow=open;', composicion: 'startArrow=diamondThin;startFill=1;startSize=16;endArrow=none;', agregacionUml: 'startArrow=diamondThin;startFill=0;startSize=16;endArrow=none;',
+    discontinua: 'dashed=1;endArrow=open;', punteada: 'dashed=1;endArrow=none;', composicion: 'startArrow=diamondThin;startFill=1;startSize=16;endArrow=none;', agregacionUml: 'startArrow=diamondThin;startFill=0;startSize=16;endArrow=none;',
   };
   let celdas = '';
   for (const n of ordenNodos(d)) {
@@ -339,7 +363,10 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
     if (!sel) { insp.innerHTML = `<p class="suave">Selecciona un elemento o una línea para editarlo.</p><p class="suave dg-atajos">Supr borra · Ctrl+D duplica · Ctrl+Z deshace · rueda o pellizco para el zoom</p>`; return; }
     if (sel.tipo === 'arista') {
       const e = d.aristas.find((x) => x.id === sel.id); if (!e) { sel = null; return pintarInsp(); }
+      const rapidos = d.notacion === 'casos' ? `<div class="fila-botones dg-rapidos"><span class="suave">Tipo:</span>${[['comunicacion', 'Comunicación'], ['include', '«include»'], ['extend', '«extend»'], ['generalizacion', 'Generalización']].map(([k, t]) => `<button type="button" class="boton mini" data-dg="rel-${k}">${t}</button>`).join('')}</div>`
+        : d.notacion === 'actividad' ? '<p class="suave dg-pista">Si sale de una decisión, escribe la condición entre corchetes en «Texto en el centro»: [sí], [no]…</p>' : '';
       insp.innerHTML = `<h3>Línea</h3>
+        ${rapidos}
         ${campo('Estilo', `<select data-prop="estilo">${Object.entries(ESTILOS).map(([k, v]) => `<option value="${k}" ${k === (e.estilo || 'linea') ? 'selected' : ''}>${v}</option>`).join('')}</select>`)}
         ${campo('Texto en el centro', `<input type="text" data-prop="etiqueta" value="${esc(e.etiqueta)}" placeholder="«include», rol…">`)}
         ${campo('Junto al origen', `<input type="text" data-prop="etDe" value="${esc(e.etDe)}" placeholder="(1,N)">`)}
@@ -349,13 +376,14 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
     }
     const n = d.nodos.find((x) => x.id === sel.id); if (!n) { sel = null; return pintarInsp(); }
     let props = '';
+    if (n.tipo === 'barra') props = campo('Ancho', `<input type="number" data-prop="w" min="60" max="600" step="20" value="${n.w || 140}">`);
     if (n.tipo === 'atributo') props = casilla('clave', 'Clave (identificador)', n.clave) + casilla('multivaluado', 'Multivaluado', n.multivaluado) + casilla('derivado', 'Derivado', n.derivado);
     if (n.tipo === 'relacion') props = campo('Cardinalidad (tipo)', `<input type="text" data-prop="card" value="${esc(n.card)}" placeholder="1:N, N:M…">`);
     if (n.tipo === 'isa') props = casilla('total', 'Total (si no, parcial)', n.total) + casilla('solapada', 'Solapada (si no, exclusiva)', n.solapada);
     if (n.tipo === 'tabla') props = campo('Columnas (una por línea)', `<textarea data-prop="columnas" rows="6" placeholder="PK id\nnombre\nFK id_cliente">${esc(n.columnas)}</textarea>`) + '<p class="suave dg-pista">PK o # = clave primaria · FK o * = clave ajena</p>';
     if (n.tipo === 'clase' || n.tipo === 'interfaz') props = campo('Atributos', `<textarea data-prop="atributos" rows="4" placeholder="- nombre: String\n- edad: int">${esc(n.atributos)}</textarea>`) + campo('Métodos', `<textarea data-prop="metodos" rows="4" placeholder="+ getNombre(): String">${esc(n.metodos)}</textarea>`) + (n.tipo === 'clase' ? casilla('abstracta', 'Abstracta', n.abstracta) : '');
     insp.innerHTML = `<h3>${FORMAS[n.tipo].n}</h3>
-      ${campo(n.tipo === 'tabla' ? 'Nombre de la tabla' : n.tipo === 'agregacion' ? 'Nombre (opcional)' : 'Texto', `<textarea data-prop="texto" rows="2" class="dg-texto">${esc(n.texto)}</textarea>`)}
+      ${['inicio', 'fin', 'barra'].includes(n.tipo) ? '' : campo(n.tipo === 'tabla' ? 'Nombre de la tabla' : n.tipo === 'agregacion' ? 'Nombre (opcional)' : n.tipo === 'decision' ? 'Pregunta (se escribe al lado, opcional)' : 'Texto', `<textarea data-prop="texto" rows="2" class="dg-texto">${esc(n.texto)}</textarea>`)}
       ${props}
       <div class="fila-botones"><button type="button" class="boton mini" data-dg="duplicar">Duplicar</button><button type="button" class="boton mini peligro" data-dg="borrar">Eliminar</button><button type="button" class="boton mini" data-dg="cerrar-insp">Listo</button></div>`;
   }
@@ -382,7 +410,7 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
   function conectar(de, a) {
     if (!de || !a || de === a) return;
     apuntar();
-    const e = { id: nuevoId(), de, a, estilo: ESTILO_DEFECTO[d.notacion] };
+    const e = { id: nuevoId(), de, a, ...estiloAlUnir(d.notacion, d.nodos.find((x) => x.id === de), d.nodos.find((x) => x.id === a)) };
     d.aristas.push(e); sel = { tipo: 'arista', id: e.id }; pintar(); pintarInsp(); guardar();
   }
   function borrar() {
@@ -518,7 +546,7 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
     const k = ev.target.dataset.prop; if (!k || !sel) return;
     if (!editando) { apuntar(); editando = true; }
     const obj = sel.tipo === 'nodo' ? d.nodos.find((x) => x.id === sel.id) : d.aristas.find((x) => x.id === sel.id);
-    obj[k] = ev.target.type === 'checkbox' ? ev.target.checked : ev.target.value;
+    obj[k] = ev.target.type === 'checkbox' ? ev.target.checked : ev.target.type === 'number' ? Math.max(60, +ev.target.value || 140) : ev.target.value;
     pintar();
     clearTimeout(tTexto); tTexto = setTimeout(() => { editando = false; guardar(); }, 400);
   });
@@ -539,6 +567,11 @@ export function montarDiagrama(cont, datos, alCambiar, opciones = {}) {
     else if (a === 'borrar') borrar();
     else if (a === 'duplicar') duplicar();
     else if (a === 'cerrar-insp') { sel = null; pintar(); pintarInsp(); }
+    else if (a.startsWith('rel-')) { // casos de uso: comunicación, «include», «extend» o generalización de un toque
+      const e = d.aristas.find((x) => x.id === sel.id); apuntar();
+      Object.assign(e, { comunicacion: { estilo: 'linea', etiqueta: '' }, include: { estilo: 'discontinua', etiqueta: '«include»' }, extend: { estilo: 'discontinua', etiqueta: '«extend»' }, generalizacion: { estilo: 'herencia', etiqueta: '' } }[a.slice(4)]);
+      pintar(); pintarInsp(); guardar();
+    }
     else if (a === 'invertir') { const e = d.aristas.find((x) => x.id === sel.id); apuntar(); [e.de, e.a] = [e.a, e.de]; [e.etDe, e.etA] = [e.etA, e.etDe]; pintar(); pintarInsp(); guardar(); }
     else if (a === 'svg') descargar(nombre + '.svg', new Blob([svgExportable(d)], { type: 'image/svg+xml' }));
     else if (a === 'drawio') descargar(nombre + '.drawio', new Blob([aDrawio(d, nombre)], { type: 'application/xml' }));

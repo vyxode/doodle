@@ -425,6 +425,11 @@ body.en-taller .demo-banda { display: none; }
 .taller-cab select { width: auto; }
 .taller-enun { flex: none; max-height: 30vh; overflow: auto; }
 .taller-enun p { max-width: 80ch; }
+.taller-uml { flex: none; max-height: 40vh; overflow: auto; display: grid; gap: .5rem; }
+.taller-uml p { max-width: 80ch; margin: 0; }
+.uml-svg { overflow: auto; }
+.uml-svg svg { max-width: 100%; height: auto; border: 1px solid var(--linea); border-radius: 8px; }
+@media (max-width: 700px) { .taller-uml { max-height: 30vh; } }
 .taller-herr { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; }
 .hz { min-height: 0; min-width: 0; display: grid; gap: 10px; grid-template-rows: auto minmax(0, 1fr); }
 .hz .editor .CodeMirror { height: 100%; }

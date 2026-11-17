@@ -6,7 +6,8 @@ import { cifrar, descifrar } from './cripto.js';
 import { descargarAules, raizAules, nombreModulo } from './aules.js';
 import { crearEditor, montarSql, montarWeb, montarKanban, montarJava, cargarScript, comprobarCaso, conMainDePrueba, montarPracticaSql, EJ_SQL } from './herramientas.js';
 const EJ_SQL_N = EJ_SQL.length;
-import { montarDiagrama, svgExportable } from './diagrama.js';
+import { montarDiagrama, svgExportable, tam } from './diagrama.js';
+import { PRACTICA_UML, comprobarCasos, comprobarActividad, solucionUml } from './uml.js';
 import { leerTemas } from './temas.js';
 
 const D = 86400;
@@ -930,6 +931,8 @@ function herramientaPara(modulo, nombre = '') {
   if (m.includes('entornos')) {
     if (/java|junit|test|prueba|codigo|code/.test(n)) return { tipo: 'java' };
     if (/requisit|requirement|trello|jira|kanban|scrum|backlog|histori|stor/.test(n)) return { tipo: 'kanban' };
+    if (/activit|actividad/.test(n)) return { tipo: 'diagrama', notacion: 'actividad' };
+    if (/use case|caso.? de uso/.test(n)) return { tipo: 'diagrama', notacion: 'casos' };
     if (/uml|clase|class|diagram/.test(n)) return { tipo: 'diagrama', notacion: 'uml' };
     return { tipo: 'notas' };
   }
@@ -1079,7 +1082,7 @@ function vistaTarea(clave) {
           <div class="lineas-velocidad" aria-hidden="true"></div>
           <header><h2>Trabajar en Doodle</h2></header>
           ${tr ? `<p>Ya lo tienes empezado con <b>${esc(HERR[tr.tipo])}</b>. Lo que hagas se guarda solo; cuando acabes, descárgalo y súbelo a Aules.</p><div class="fila-botones"><a class="boton principal" href="#trabajo-${tr.id}">Seguir trabajando</a></div>`
-            : `<p>Se abrirá <b>${esc(HERR[h.tipo])}</b>${h.notacion ? ' (' + esc({ er: 'E/R en notación Chen', relacional: 'modelo relacional', uml: 'UML', casos: 'casos de uso' }[h.notacion]) + ')' : ''}. Si no es la herramienta que necesitas, puedes cambiarla dentro.</p><div class="fila-botones"><button type="button" class="boton principal" data-acc="trabajar" data-v="${esc(clave)}">Empezar a trabajar</button></div>`}
+            : `<p>Se abrirá <b>${esc(HERR[h.tipo])}</b>${h.notacion ? ' (' + esc({ er: 'E/R en notación Chen', relacional: 'modelo relacional', uml: 'UML', casos: 'casos de uso', actividad: 'diagrama de actividades' }[h.notacion]) + ')' : ''}. Si no es la herramienta que necesitas, puedes cambiarla dentro.</p><div class="fila-botones"><button type="button" class="boton principal" data-acc="trabajar" data-v="${esc(clave)}">Empezar a trabajar</button></div>`}
         </section>
         <section class="bloque"><header><h2>Datos</h2></header>
           <dl class="datos-tarea panel corte">${fecha('Entrega', t.entrega)}${fecha('Se abre', t.apertura)}${fecha('Cierre', t.cierre)}${t.hecha ? fecha('Enviada', t.enviada) : ''}
@@ -1106,9 +1109,27 @@ function vistaTrabajo(id) {
       <button type="button" class="boton mini" data-acc="pdf" data-v="${esc(id)}" title="Un PDF con tu nombre, el enunciado y tu trabajo, listo para subir a Aules">PDF</button>
     </header>
     ${t && t.enunciado ? `<aside class="taller-enun panel corte" hidden><p class="pre">${esc(t.enunciado)}</p></aside>` : ''}
+    ${panelUml(w)}
     ${S.aviso ? `<div class="aviso taller-aviso"><span class="pre">${esc(S.aviso)}</span><button type="button" class="boton mini" data-acc="cerrar-aviso">Entendido</button></div>` : ''}
     <div class="taller-herr" id="taller-herr"></div>
   </div>`;
+}
+// Práctica de UML: enunciado (inglés, con traducción), comprobar el diagrama y ver una solución.
+const ejUml = (w) => w.uml && PRACTICA_UML.find((e) => e.id === w.uml);
+function panelUml(w) {
+  const ej = ejUml(w); if (!ej) return '';
+  return `<aside class="taller-uml panel corte" lang="en"><p class="uml-en">${esc(ej.en)}</p><p class="uml-es suave" lang="es" hidden>${esc(ej.tr)}</p>
+    ${ej.nota ? `<p class="suave" lang="es">${esc(ej.nota)}</p>` : ''}
+    <div class="fila-botones" lang="es"><button type="button" class="boton mini principal" data-acc="uml-comprobar">Comprobar</button><button type="button" class="boton mini" data-acc="uml-es" aria-pressed="false">Ver en español</button><button type="button" class="boton mini" data-acc="uml-solucion">Ver una solución</button><span class="suave">${esc(ej.fuente)}</span></div>
+    <div class="uml-res" lang="es" aria-live="polite"></div></aside>`;
+}
+function comprobarUml() {
+  const w = S.prog.trabajos[S.montado], ej = w && ejUml(w), caja = document.querySelector('.uml-res'); if (!ej || !caja) return;
+  const d = (w.datos || {}).diagrama || { nodos: [], aristas: [] };
+  const r = ej.tipo === 'casos' ? comprobarCasos(d, ej, tam) : comprobarActividad(d, ej), mal = r.filter((x) => x.ok === false).length;
+  if (!mal && !w.ok) cambiar('trabajos', S.montado, { ok: true });
+  caja.innerHTML = `<div class="aviso ${mal ? 'error' : 'ok'}"><b>${mal ? `${mal} cosa${mal > 1 ? 's' : ''} por arreglar` : 'Bien hecho: cumple lo que pide el enunciado'}</b>
+    <ul class="pruebas">${r.map((x) => `<li class="${x.ok ? 'ok' : x.ok === false ? 'mal' : ''}">${x.ok ? '✓' : x.ok === false ? '✗' : '💡'} ${esc(x.t)}</li>`).join('')}</ul></div>`;
 }
 function montarTrabajo(id) {
   const w = S.prog.trabajos[id], caja = document.getElementById('taller-herr');
@@ -1155,6 +1176,7 @@ function vistaEjercicios() {
     </form></details>` : ''}
   ${m === 'Programación' && window.CHULETA ? `<section class="bloque"><div class="panel practica-cta"><div><b>Chuleta de C#</b><p class="suave">Todo lo de los temas 1 a 5 con ejemplos y buscador. También está en cada ejercicio de C#.</p></div><button type="button" class="boton" data-acc="chuleta">Abrir</button></div></section>` : ''}
   ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejercicios y ejemplos leídos de tus temas de Aules (${S.temas.ejercicios.length} ejercicios, ${Object.keys(S.temas.ejemplos).length} ejemplos) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
+  ${m === 'Entornos de Desarrollo' ? listaUml() : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}`;
 }
@@ -1374,11 +1396,20 @@ function vistaExamen() {
   </form>`;
 }
 
+function listaUml() {
+  const fila = (ej) => { const w = trabajos().find((x) => x.uml === ej.id);
+    return `<div class="ej ej-t corte"><span class="ej-num">${ej.tipo === 'casos' ? 'Casos de uso' : 'Actividades'}</span><span class="ej-txt"><b lang="en">${esc(ej.titulo)}</b> <span class="suave">${esc(ej.es)}</span></span>
+      ${w && w.ok ? '<span class="chip ok">Comprobado</span>' : '<span></span>'}
+      <div class="ej-acc"><button type="button" class="boton mini ${w ? 'principal' : ''}" data-acc="practicar-uml" data-v="${ej.id}">${w ? 'Seguir' : 'Empezar'}</button></div></div>`; };
+  return `<details class="bloque tema corte" style="--mod:${colorDe('Entornos de Desarrollo')}"><summary><span class="tema-nombre">Práctica de diagramas UML (tema 4)</span><span class="suave num">${PRACTICA_UML.filter((e) => trabajos().some((w) => w.uml === e.id && w.ok)).length} de ${PRACTICA_UML.length} comprobados</span></summary>
+    <p class="suave">Dibuja el diagrama en Doodle y pulsa «Comprobar»: te dice qué actores, casos o flechas faltan. Enunciados en inglés, como en el examen, con traducción.</p>
+    <div class="lista">${PRACTICA_UML.map(fila).join('')}</div></details>`;
+}
 function listaEjercicios(modulo) {
   const color = colorDe(modulo);
   const conTrabajo = (t) => trabajoDeTarea(t.clave);
   const ts = tareas().filter((t) => t.modulo === modulo && t.origen === 'aules');
-  const libres = trabajos().filter((w) => w.modulo === modulo && !w.tarea).sort((a, b) => (b.t || 0) - (a.t || 0));
+  const libres = trabajos().filter((w) => w.modulo === modulo && !w.tarea && !w.uml).sort((a, b) => (b.t || 0) - (a.t || 0));
   let html = '';
   const filaEj = (t) => { const est = estadoTarea(t), w = conTrabajo(t);
     return `<div class="ej ej-t corte s-${situacion(t)}"><span class="ej-num">${t.entrega ? cuando(t.entrega).replace(/ a las .*/, '') : 'Sin fecha'}</span>
@@ -1758,6 +1789,19 @@ document.addEventListener('click', async (ev) => {
     catch (e) { el.textContent = 'No se pudo abrir esta copia'; }
   }
   else if (acc === 'trabajar') trabajarEnTarea(el.dataset.v);
+  else if (acc === 'practicar-uml') { const w = trabajos().find((x) => x.uml === el.dataset.v), ej = PRACTICA_UML.find((e) => e.id === el.dataset.v); if (ej) location.hash = 'trabajo-' + (w ? w.id : crearTrabajo({ titulo: ej.titulo, modulo: 'Entornos de Desarrollo', tipo: 'diagrama', notacion: ej.tipo, uml: ej.id })); }
+  else if (acc === 'uml-comprobar') comprobarUml();
+  else if (acc === 'uml-es') { const on = el.getAttribute('aria-pressed') !== 'true'; el.setAttribute('aria-pressed', String(on)); el.textContent = on ? 'Ver en inglés' : 'Ver en español'; document.querySelector('.uml-en').hidden = on; document.querySelector('.uml-es').hidden = !on; }
+  else if (acc === 'uml-solucion') {
+    const ej = ejUml(S.prog.trabajos[S.montado] || {}); if (!ej) return;
+    // misma capa que la chuleta
+    const capa = document.createElement('div'); capa.className = 'chuleta'; capa.id = 'uml-capa'; capa.setAttribute('role', 'dialog'); capa.setAttribute('aria-label', 'Solución');
+    capa.innerHTML = `<div class="chuleta-caja"><header class="chuleta-cab"><b>Una solución: ${esc(ej.titulo)}</b><button type="button" class="boton mini" data-acc="cerrar-uml">Cerrar</button></header>
+      <p class="suave">La tuya puede ser distinta y estar bien.${ej.tipo === 'casos' ? ' Lo importante: los mismos actores, los casos principales y los «include»/«extend» bien orientados.' : ''}</p><div class="uml-svg">${svgExportable(solucionUml(ej))}</div></div>`;
+    capa.addEventListener('click', (ev) => { if (ev.target === capa) capa.remove(); });
+    document.body.append(capa); capa.querySelector('button').focus();
+  }
+  else if (acc === 'cerrar-uml') document.getElementById('uml-capa')?.remove();
   else if (acc === 'enunciado') { const a = document.querySelector('.taller-enun'), abierto = el.getAttribute('aria-expanded') === 'true'; a.hidden = abierto; el.setAttribute('aria-expanded', String(!abierto)); }
   else if (acc === 'borrar-trabajo') { if (el.dataset.confirmar !== 'si') { el.dataset.confirmar = 'si'; el.textContent = '¿Seguro?'; return; } cambiar('trabajos', el.dataset.v, { borrado: true }); render(); }
   else if (acc === 'filtro-mod') { S.filtro.modulo = el.dataset.v; render(); }
