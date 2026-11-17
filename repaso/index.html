@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>Doodle · Resúmenes</title>
+<title>Doodle · Repaso</title>
 <link rel="stylesheet" href="../css/app.css">
 <style>
   body { background: var(--panel-2); overflow: auto; }
@@ -12,10 +12,38 @@
   .pub h1 { font-family: var(--f-titulo); font-size: 28px; margin: 0; display: flex; align-items: center; gap: 10px; }
   .pub h1 .ico { width: 28px; height: 28px; color: var(--acento); }
   .pub form, .pub-fila { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .pub #form-entrar input { flex: 1 1 220px; }
-  .form-alta { display: grid !important; gap: 10px; max-width: 420px; }
-  .form-alta .campo { display: grid; gap: 4px; }
-  .g-boton { min-height: 44px; margin-top: 12px; }
+  /* ---------- acceso: entrar, registrarse y pasar a contraseña propia ---------- */
+  .pub:has(#dentro[hidden]) > h1 { display: none; }
+  .acceso { width: min(420px, 100%); margin: clamp(8px, 7vh, 72px) auto 0; padding: 28px 26px 22px; display: grid; gap: 16px; background: var(--panel); border: 1px solid var(--linea); border-radius: 16px; box-shadow: 0 10px 40px var(--sombra); animation: entrar .25s ease; }
+  .acceso[hidden] { display: none; }
+  .marca { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--suave); font-size: 14px; }
+  .marca i { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font: 700 16px/1 var(--f-titulo); font-style: normal; color: var(--fondo); background: var(--texto); }
+  .acceso h2 { font: 700 28px/1.15 var(--f-titulo); letter-spacing: -0.02em; margin: 2px 0 0; }
+  .acceso .sub { margin: -8px 0 0; color: var(--suave); line-height: 1.5; }
+  .acceso form { display: grid; gap: 12px; }
+  .acceso .campo { display: grid; gap: 6px; font-size: 13.5px; font-weight: 500; }
+  .acceso input:not([type=checkbox]) { width: 100%; height: 44px; font-size: 16px; padding: 0 12px; box-sizing: border-box; }
+  .clave-caja { position: relative; }
+  .clave-caja input { padding-right: 46px !important; }
+  .ver-clave { position: absolute; right: 4px; top: 4px; width: 36px; height: 36px; border: 0; background: transparent; color: var(--suave); border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
+  .ver-clave:hover { background: var(--hover); color: var(--texto); }
+  .acceso .boton.principal { height: 44px; justify-content: center; font-size: 15px; width: 100%; }
+  .acceso .boton.principal[disabled] { opacity: .7; cursor: progress; }
+  .separa { display: flex; align-items: center; gap: 12px; color: var(--tenue); font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; }
+  .separa::before, .separa::after { content: ""; flex: 1; height: 1px; background: var(--linea); }
+  .g-boton { min-height: 44px; display: flex; justify-content: center; }
+  .invitado { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: var(--ok-fondo); color: var(--texto); font-size: 14px; line-height: 1.45; }
+  .invitado[hidden] { display: none; }
+  .acceso .error-txt:empty { display: none; }
+  .acceso .error-txt { padding: 10px 12px; border-radius: 8px; background: var(--rojo-fondo); }
+  .acceso .error-txt.info { color: var(--suave); background: var(--panel-2); }
+  .pie-acceso { display: grid; gap: 4px; font-size: 13px; color: var(--suave); text-align: center; line-height: 1.5; }
+  .pie-acceso a { color: inherit; }
+  .pasos { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--acento); }
+  .requisito { font-size: 12.5px; color: var(--suave); font-weight: 400; }
+  .requisito.ok { color: var(--ok); }
+  .enlace-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--suave); text-decoration: underline; cursor: pointer; justify-self: center; }
+  @media (prefers-reduced-motion: reduce) { .acceso { animation: none; } }
   .ico { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
   .boton { display: inline-flex; align-items: center; gap: 6px; }
   /* cabecera: quién lee y si está guardado */
@@ -26,6 +54,7 @@
   .nube .ico { width: 15px; height: 15px; }
   .nube.ok { color: var(--ok); } .nube.mal { color: var(--rojo); } .nube.va .ico { animation: latir 1s ease-in-out infinite; }
   .cab #salir { margin-left: auto; }
+  .docs-ayuda { margin: 6px 0 -4px; color: var(--suave); font-size: 14px; }
   /* resúmenes para elegir */
   .pub-docs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
   .doc { display: flex; gap: 12px; align-items: center; text-align: left; font: inherit; color: var(--texto); background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 14px; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; }
@@ -172,37 +201,52 @@
 </head>
 <body>
 <main class="pub">
-  <h1><span data-ico="libro"></span>Resúmenes</h1>
-  <section id="entrada" class="panel">
-    <p class="suave">Solo lectura. Entra con tu contraseña personal; queda registrado quién entra.</p>
+  <h1><span data-ico="libro"></span>Repaso</h1>
+  <section id="entrada" class="acceso" aria-labelledby="t-entrada">
+    <div class="marca"><i aria-hidden="true">D</i>Doodle</div>
+    <h2 id="t-entrada">Repaso</h2>
+    <p class="sub">Resúmenes, test, tarjetas y huecos de clase. Entra con tu contraseña.</p>
+    <p class="invitado" id="e-alta" hidden><span aria-hidden="true">👋</span><span><b>Te han invitado.</b> Pulsa «Continuar con Google» y elige tu nombre y tu contraseña. Luego entrarás solo con la contraseña.</span></p>
     <form id="form-entrar">
-      <input type="password" id="clave" autocomplete="current-password" placeholder="Contraseña" aria-label="Contraseña" required>
-      <button class="boton principal" type="submit">Entrar</button>
+      <label class="campo">Contraseña
+        <span class="clave-caja"><input type="password" id="clave" autocomplete="current-password" required autofocus><button type="button" class="ver-clave" data-ver="clave" aria-label="Mostrar contraseña" aria-pressed="false">👁</button></span>
+      </label>
+      <button class="boton principal" type="submit" id="b-entrar">Entrar</button>
     </form>
-    <div id="e-google" class="g-boton" hidden></div>
-    <p class="suave" id="e-alta" hidden>¿Primera vez? Pulsa «Continuar con Google» y luego elige tu nombre y tu contraseña. Después, para entrar solo necesitas tu contraseña.</p>
     <p class="error-txt" id="error" role="alert"></p>
+    <div class="separa" id="e-o" hidden>o</div>
+    <div id="e-google" class="g-boton" hidden></div>
+    <div class="pie-acceso"><span id="e-olvido" hidden>¿Has olvidado la contraseña? Entra con Google.</span><span>Solo lectura · queda registrado quién entra · <a href="privacidad.html">Privacidad</a></span></div>
   </section>
-  <section id="alta" class="panel" hidden>
-    <h2 style="margin:0 0 6px">Tu contraseña</h2>
-    <p class="suave">Con ella entrarás a partir de ahora, sin Google. Que sea solo tuya (al menos 8 caracteres).</p>
-    <form id="form-alta" class="form-alta">
-      <label class="campo"><span>Tu nombre</span><input type="text" id="a-nombre" maxlength="40" autocomplete="name"></label>
-      <label class="campo"><span>Contraseña</span><input type="password" id="a-clave" autocomplete="new-password" minlength="8" required></label>
-      <label class="campo"><span>Repite la contraseña</span><input type="password" id="a-clave2" autocomplete="new-password" minlength="8" required></label>
-      <div class="pub-fila"><button class="boton principal" type="submit">Guardar y entrar</button><button class="boton" type="button" id="a-volver">Cancelar</button></div>
+  <section id="alta" class="acceso" aria-labelledby="t-alta" hidden>
+    <div class="marca"><i aria-hidden="true">D</i>Doodle · Repaso</div>
+    <span class="pasos" id="a-paso">Último paso</span>
+    <h2 id="t-alta">Elige tu contraseña</h2>
+    <p class="sub">A partir de ahora entrarás solo con ella, sin Google. Que sea tuya y nadie más la sepa.</p>
+    <form id="form-alta">
+      <label class="campo"><span>Tu nombre</span><input type="text" id="a-nombre" maxlength="40" autocomplete="name" placeholder="Como te conoce el grupo"></label>
+      <label class="campo">Contraseña
+        <span class="clave-caja"><input type="password" id="a-clave" autocomplete="new-password" minlength="8" required><button type="button" class="ver-clave" data-ver="a-clave" aria-label="Mostrar contraseña" aria-pressed="false">👁</button></span>
+        <span class="requisito" id="a-req">Al menos 8 caracteres</span>
+      </label>
+      <label class="campo">Repite la contraseña<input type="password" id="a-clave2" autocomplete="new-password" minlength="8" required></label>
+      <button class="boton principal" type="submit" id="b-alta">Guardar y entrar</button>
+      <button class="enlace-btn" type="button" id="a-volver">Cancelar</button>
     </form>
     <p class="error-txt" id="a-error" role="alert"></p>
   </section>
-  <section id="migrar" class="panel" hidden>
-    <h2 style="margin:0 0 6px">Un paso antes de entrar</h2>
-    <p class="suave">Ahora cada uno tiene su propia contraseña. Vincula tu cuenta de Google y elige la tuya: tus notas y subrayados se conservan. La contraseña que te dieron dejará de funcionar.</p>
+  <section id="migrar" class="acceso" aria-labelledby="t-migrar" hidden>
+    <div class="marca"><i aria-hidden="true">D</i>Doodle · Repaso</div>
+    <span class="pasos">Paso 1 de 2</span>
+    <h2 id="t-migrar">Ahora cada uno tiene su contraseña</h2>
+    <p class="sub">Vincula tu cuenta de Google y después elige tu contraseña. Tus notas y subrayados se conservan; la contraseña que te dieron dejará de funcionar.</p>
     <div id="m-google" class="g-boton"></div>
     <p class="error-txt" id="m-error" role="alert"></p>
   </section>
   <section id="dentro" class="lector modo-marcar" hidden>
     <div class="cab"><span class="avatar" id="avatar" aria-hidden="true"></span><b id="hola"></b><span class="nube" id="nube" role="status"></span>
       <button class="boton mini" type="button" id="salir" data-ico="salir">Salir</button></div>
+    <p class="docs-ayuda">Elige un resumen para leerlo, subrayarlo o estudiar con test, tarjetas y huecos.</p>
     <div class="pub-docs" id="docs"></div>
     <div id="lector" hidden>
       <nav class="pestanas" id="pestanas" aria-label="Qué hacer con el resumen">

@@ -6,25 +6,26 @@
 // - Hoja «datos»: lo de cada lector, ya cifrado en su navegador con el secreto de su llave (aquí no se puede leer).
 //   La fila se busca por un id que solo sale de ese secreto.
 // - Hoja «registro»: fecha, nombre y qué abre cada lector.
-// - Hoja «usuarios»: quien se registra con Google (correo, nombre, su secreto y su llave cifrada con su contraseña).
-//   Para quitar a alguien, borra su fila.
+// - Hoja «usuarios»: quien se registra con Google (correo, nombre, su secreto, su llave cifrada con su contraseña y
+//   su estado: vacío si es nuevo, «conocido» o «vetado»). Entran sin esperar; en Doodle (Ajustes → Lectores) ves
+//   quién es cada uno y puedes vetarlo.
 // Solo guardan y apuntan los lectores de repaso/llaves.json (su huella en «v») y los de «usuarios»: quitar a
 // alguien en Doodle le cierra también esto, a los pocos minutos.
 // Registro con Google: en Configuración del proyecto → Propiedades del script pon CLIENT_ID (el id de cliente OAuth
 // de Google, tipo web, con el origen https://vyxode.github.io), INVITACION (el código del enlace para tu grupo)
-// y CLAVE_PDF (la clave de los resúmenes, que se copia en Doodle → Ajustes → Lectores). SAL se crea sola.
+// CLAVE_PDF y ADMIN (las dos se copian en Doodle → Ajustes → Lectores). SAL se crea sola.
 const LLAVES = 'https://vyxode.github.io/doodle/repaso/llaves.json';
 const HOJA = ''; // id de la hoja de cálculo (lo que va tras /d/ en su dirección); vacío si el script está dentro de ella
 const TROZO = 45000; // una celda admite 50 000 caracteres: lo largo se reparte en varias columnas
 // Todo se guarda con «~» delante para que la hoja no lo tome nunca por un número o una fórmula.
 
 const P = PropertiesService.getScriptProperties();
-const COLS = ['correo', 'nombre', 'secreto', 'llave', 'huella', 'fecha', 'origen'];
+const COLS = ['correo', 'nombre', 'secreto', 'llave', 'huella', 'fecha', 'origen', 'estado'];
 
 function doGet(e) {
   if (e.parameter.t === 'llaves') return salida(llavesGoogle());
   const id = String(e.parameter.id || '');
-  if (!/^[0-9a-f]{64}$/.test(id)) return salida({ d: null });
+  if (!/^[0-9a-f]{64}$/.test(id) || !valido(id)) return salida({ d: null });
   const h = hoja('datos', ['id', 'fecha', 'datos']), f = fila(h, id);
   return salida({ d: f ? h.getRange(f, 3, 1, h.getLastColumn() - 2).getValues()[0].map((v) => String(v).slice(1)).join('') || null : null });
 }
@@ -37,6 +38,7 @@ function doPost(e) {
   try {
     if (m.t === 'google') return salida(conGoogle(m));
     if (m.t === 'llave') return salida(guardarLlave(m));
+    if (m.t === 'admin') return salida(admin(m));
     if (!valido(m.id)) return salida({ error: 'lector no válido' });
     if (m.t === 'log') {
       hoja('registro', ['Fecha', 'Nombre', 'Qué']).appendRow([new Date(), texto(m.n, 60), texto(m.que, 120)]);
@@ -62,7 +64,9 @@ function valido(id) {
   let v = cache.get('v');
   if (!v) { v = JSON.stringify(JSON.parse(UrlFetchApp.fetch(LLAVES + '?t=' + Date.now()).getContentText()).v || []); cache.put('v', v, 300); }
   const h = sha(id);
-  return JSON.parse(v).includes(h) || !!buscar(usuarios(), 5, h);
+  if (JSON.parse(v).includes(h)) return true;
+  const u = usuarios(), f = buscar(u, 5, h);
+  return !!f && celda(u.getRange(f, 8).getValue()) !== 'vetado';
 }
 const sha = (t) => Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, t, Utilities.Charset.UTF_8).map((b) => ((b + 256) % 256).toString(16).padStart(2, '0')).join('');
 
@@ -78,7 +82,7 @@ function sal() {
 // las llaves de quien se registró con Google (cada una se abre solo con la contraseña de su dueño)
 function llavesGoogle() {
   const h = usuarios(), filas = h.getLastRow() > 1 ? h.getRange(2, 1, h.getLastRow() - 1, COLS.length).getValues() : [];
-  return { sal: sal(), iter: 200000, llaves: filas.map((f) => celda(f[3])).filter(Boolean), migradas: filas.filter((f) => celda(f[6]) === 'migrado').map((f) => celda(f[4])) };
+  return { sal: sal(), iter: 200000, llaves: filas.filter((f) => celda(f[7]) !== 'vetado').map((f) => celda(f[3])).filter(Boolean), migradas: filas.filter((f) => celda(f[6]) === 'migrado').map((f) => celda(f[4])) };
 }
 // comprueba con Google el token de «Iniciar sesión con Google»
 function cuentaGoogle(token) {
@@ -95,7 +99,10 @@ function conGoogle(m) {
   if (!correo) return { error: 'No se ha podido comprobar tu cuenta de Google.' };
   if (!k) return { error: 'El registro aún no está configurado.' };
   const h = usuarios(), f = buscar(h, 1, correo);
-  if (f) { const v = h.getRange(f, 1, 1, COLS.length).getValues()[0]; return { existe: true, n: celda(v[1]), k, s: celda(v[2]), llave: !!celda(v[3]) }; }
+  if (f) {
+    const v = h.getRange(f, 1, 1, COLS.length).getValues()[0];
+    return celda(v[7]) === 'vetado' ? { error: 'No tienes acceso.' } : { existe: true, n: celda(v[1]), k, s: celda(v[2]), llave: !!celda(v[3]) };
+  }
   let s, n = '', origen = 'google';
   if (m.antiguo) {
     s = String(m.antiguo.s || ''); n = texto(m.antiguo.n || '', 40); origen = 'migrado';
@@ -105,7 +112,7 @@ function conGoogle(m) {
     if (!m.codigo || String(m.codigo) !== P.getProperty('INVITACION')) return { error: 'Para registrarte necesitas el enlace de invitación.' };
     s = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Utilities.getUuid() + Date.now()));
   }
-  h.appendRow(['~' + correo, '~' + n, '~' + s, '', '~' + sha(sha(s + ':id')), new Date(), '~' + origen]);
+  h.appendRow(['~' + correo, '~' + n, '~' + s, '', '~' + sha(sha(s + ':id')), new Date(), '~' + origen, origen === 'migrado' ? '~conocido' : '']);
   return { existe: false, n, k, s, llave: false };
 }
 // guarda su nombre y su llave (cifrada en su navegador con la contraseña que ha elegido)
@@ -118,6 +125,20 @@ function guardarLlave(m) {
   if (m.n) h.getRange(f, 2).setValue('~' + texto(m.n, 40));
   h.getRange(f, 4).setValue('~' + m.llave);
   return { ok: true };
+}
+
+// Doodle (con la clave ADMIN): lista de registrados y cambiar su estado
+function admin(m) {
+  const clave = P.getProperty('ADMIN');
+  if (!clave || String(m.clave) !== clave) return { error: 'Clave de administrador no válida.' };
+  const h = usuarios();
+  if (m.accion === 'estado') {
+    const f = buscar(h, 1, String(m.correo || '').toLowerCase());
+    if (!f || !['', 'conocido', 'vetado'].includes(m.estado)) return { error: 'petición no válida' };
+    h.getRange(f, 8).setValue(m.estado ? '~' + m.estado : '');
+  }
+  const filas = h.getLastRow() > 1 ? h.getRange(2, 1, h.getLastRow() - 1, COLS.length).getValues() : [];
+  return { usuarios: filas.map((f) => ({ correo: celda(f[0]), n: celda(f[1]), fecha: f[5] ? new Date(f[5]).getTime() : 0, origen: celda(f[6]), estado: celda(f[7]), clave: !!celda(f[3]) })) };
 }
 
 function hoja(nombre, cabecera) {

@@ -59,24 +59,26 @@ let G = null; // { token, n, k, s } mientras elige nombre y contraseña
 const pedir = async (cuerpo) => { const r = await (await fetch(NUBE, { method: 'POST', body: JSON.stringify(cuerpo) })).json(); if (r.error) throw new Error(r.error); return r; };
 function botonGoogle(sitio) {
   if (!GOOGLE_ID || !NUBE) return;
-  const pintar = () => { google.accounts.id.initialize({ client_id: GOOGLE_ID, callback: (r) => conGoogle(r.credential) }); google.accounts.id.renderButton($(sitio), { theme: 'outline', size: 'large', text: 'continue_with', locale: 'es' }); };
+  const oscuro = matchMedia('(prefers-color-scheme: dark)').matches;
+  const pintar = () => { google.accounts.id.initialize({ client_id: GOOGLE_ID, callback: (r) => conGoogle(r.credential) }); google.accounts.id.renderButton($(sitio), { theme: oscuro ? 'filled_black' : 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: Math.min(366, $(sitio).clientWidth || 366), locale: 'es' }); };
   if (window.google?.accounts) return pintar();
   const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.onload = pintar; document.head.append(sc);
 }
 async function conGoogle(token) {
   const err = yo?.antiguo ? $('m-error') : $('error');
-  err.textContent = 'Comprobando con Google…';
+  err.textContent = 'Comprobando con Google…'; err.classList.add('info');
   try {
     const r = await pedir({ t: 'google', token, codigo: codigoAlta, antiguo: yo?.antiguo ? { n: yo.n, s: yo.s } : undefined });
     G = { token, n: r.n || yo?.n || '', k: r.k, s: r.s };
-    err.textContent = '';
+    err.textContent = ''; err.classList.remove('info');
     if (r.existe && r.llave && !yo?.antiguo) return dentro(await desdeLlave(G)); // ya tenía cuenta: entra (p. ej. si olvidó la contraseña)
     pantallaClave();
-  } catch (e) { err.textContent = e.message; }
+  } catch (e) { err.classList.remove('info'); err.textContent = e.message; }
 }
 function pantallaClave() {
   $('entrada').hidden = true; $('migrar').hidden = true; $('alta').hidden = false;
-  $('a-nombre').value = G.n; $('a-nombre').closest('label').hidden = !!yo?.antiguo; $('a-clave').focus();
+  $('a-nombre').value = G.n; $('a-nombre').closest('label').hidden = !!yo?.antiguo; $('a-paso').textContent = yo?.antiguo ? 'Paso 2 de 2' : 'Último paso';
+  ($('a-nombre').closest('label').hidden || G.n ? $('a-clave') : $('a-nombre')).focus();
 }
 $('form-alta').onsubmit = async (e) => {
   e.preventDefault();
@@ -84,7 +86,7 @@ $('form-alta').onsubmit = async (e) => {
   if (c.trim().length < 8) return (err.textContent = 'La contraseña tiene que tener al menos 8 caracteres.');
   if (c !== c2) return (err.textContent = 'Las dos contraseñas no coinciden.');
   if (!n) return (err.textContent = 'Escribe tu nombre.');
-  err.textContent = 'Guardando…';
+  err.textContent = ''; $('b-alta').disabled = true; $('b-alta').textContent = 'Guardando…';
   try {
     const T = await todasLasLlaves(), otra = await buscarLlave(c, T);
     // para entrar solo se usa la contraseña: no puede abrir la llave de otra persona
@@ -95,8 +97,11 @@ $('form-alta').onsubmit = async (e) => {
     $('a-clave').value = $('a-clave2').value = ''; err.textContent = '';
     try { sessionStorage.removeItem('doodle-alta'); } catch { /* nada */ }
     dentro(await desdeLlave(llave));
-  } catch (e2) { err.textContent = e2.message; }
+  } catch (e2) { err.textContent = e2.message; } finally { $('b-alta').disabled = false; $('b-alta').textContent = 'Guardar y entrar'; }
 };
+// requisito de longitud en vivo y botón para ver la contraseña
+$('a-clave').addEventListener('input', (e) => { const ok = e.target.value.trim().length >= 8; $('a-req').classList.toggle('ok', ok); $('a-req').textContent = ok ? '✓ Longitud correcta' : 'Al menos 8 caracteres'; });
+for (const b of document.querySelectorAll('[data-ver]')) b.onclick = () => { const i = $(b.dataset.ver), ver = i.type === 'password'; i.type = ver ? 'text' : 'password'; b.setAttribute('aria-pressed', ver); b.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña'); i.focus(); };
 async function dentro(quien) {
   yo = quien; G = null;
   try { sessionStorage.setItem('doodle-lector', JSON.stringify(yo)); } catch { /* sin almacenamiento: se pide otra vez */ }
@@ -170,7 +175,7 @@ function nube(t, estado = /^Guardando/.test(t) ? 'va' : t === 'Guardado' ? 'ok' 
 
 // ---------- pantalla ----------
 function mostrar() {
-  $('entrada').hidden = !!yo; $('dentro').hidden = !yo; $('e-google').hidden = !GOOGLE_ID;
+  $('entrada').hidden = !!yo; $('dentro').hidden = !yo; $('e-google').hidden = $('e-o').hidden = $('e-olvido').hidden = !GOOGLE_ID;
   if (!yo) return;
   $('hola').textContent = 'Hola, ' + yo.n;
   $('avatar').textContent = yo.n.trim()[0]?.toUpperCase() || '·';
@@ -256,11 +261,14 @@ async function leer(r, mod, volverA) {
 pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([`importScripts('${PDFJS}pdf.worker.min.js')`], { type: 'text/javascript' }));
 
 $('form-entrar').onsubmit = async (e) => {
-  e.preventDefault(); $('error').textContent = 'Comprobando…';
+  e.preventDefault(); const b = $('b-entrar'); $('error').textContent = ''; b.disabled = true; b.textContent = 'Entrando…';
   try {
-    const quien = await entrar($('clave').value); $('clave').value = ''; $('error').textContent = '';
+    const quien = await entrar($('clave').value); $('clave').value = '';
     await dentro(quien);
-  } catch (err) { yo = null; $('error').textContent = /^(Contraseña incorrecta|Esa contraseña)/.test(err.message) ? err.message : 'No se ha podido comprobar la contraseña'; }
+  } catch (err) {
+    yo = null; $('clave').select();
+    $('error').textContent = err.message === 'Contraseña incorrecta' ? 'Contraseña incorrecta. Revisa mayúsculas y espacios' + (GOOGLE_ID ? ', o entra con Google si la has olvidado.' : '.') : /^Esa contraseña/.test(err.message) ? err.message : 'No se ha podido comprobar la contraseña. Revisa tu conexión.';
+  } finally { b.disabled = false; b.textContent = 'Entrar'; }
 };
 $('a-volver').onclick = () => { G = null; yo = null; $('alta').hidden = true; mostrar(); };
 $('salir').onclick = async () => { await subir(true); yo = D = A = null; lectura++; try { sessionStorage.removeItem('doodle-lector'); } catch { /* nada */ } $('hojas').innerHTML = ''; $('lector').hidden = true; mostrar(); };

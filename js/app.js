@@ -867,7 +867,8 @@ const huella = async (txt) => [...new Uint8Array(await crypto.subtle.digest('SHA
 async function cargarLectores() {
   const { sha, sobre } = await leerArchivo(LECT);
   S.lect = sobre ? { ...(await descifrar(S.pass, sobre).catch(() => { throw new Error('La lista de lectores usa otra contraseña.'); })), sha } : { nuevo: true };
-  if (S.lect.lectores?.some((p) => !p.s)) await guardarLectores(S.lect.lectores); // lista de antes de los secretos: se ponen al día
+  if (S.lect.lectores && (!S.lect.admin || S.lect.lectores.some((p) => !p.s))) await guardarLectores(S.lect.lectores); // lista de antes de los secretos o sin clave de administrador: se pone al día
+  if (S.lect.admin) cargarRegistrados();
 }
 // La primera vez, la clave de los PDF sale de tu propia llave de lector.
 async function iniciarLectores(pass) {
@@ -881,7 +882,7 @@ async function iniciarLectores(pass) {
 }
 // shortcut: quitar a alguien no cambia la clave de los PDF; quien la haya sacado a mano de su navegador podría seguir leyendo. Si pasa, volver a cifrar los PDF con una clave nueva.
 async function guardarLectores(lectores) {
-  const k = S.lect.k, sal = crypto.getRandomValues(new Uint8Array(16)), iter = 200000, llaves = [], v = [];
+  const k = S.lect.k, admin = S.lect.admin || claveNueva() + claveNueva(), sal = crypto.getRandomValues(new Uint8Array(16)), iter = 200000, llaves = [], v = [];
   for (const p of lectores) {
     p.s ||= a64(crypto.getRandomValues(new Uint8Array(32)));
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -890,9 +891,30 @@ async function guardarLectores(lectores) {
     v.push(await huella(await huella(p.s + ':id'))); // huella de su id (el id solo lo sabe él): repaso/publico.js lo calcula igual
   }
   if (!await escribirArchivo(LLAVES, { sal: a64(sal), iter, llaves, v: v.sort() }, (await leerArchivo(LLAVES)).sha)) throw new Error('GitHub no dejó guardar las llaves; vuelve a intentarlo.');
-  const sha = await escribirArchivo(LECT, await cifrar(S.pass, { k, lectores }), S.lect.sha);
+  const sha = await escribirArchivo(LECT, await cifrar(S.pass, { k, lectores, admin }), S.lect.sha);
   if (!sha) throw new Error('GitHub no dejó guardar la lista; pulsa de nuevo Gestionar lectores.');
-  S.lect = { k, lectores, sha };
+  S.lect = { k, lectores, sha, admin };
+}
+// Quien se registra con Google en la página de lectores entra sin esperar; aquí ves quién es y puedes vetarlo.
+// shortcut: la misma URL que NUBE en repaso/publico.js; si se cambia la implementación, cambiar las dos
+const NUBE_LECTORES = 'https://script.google.com/macros/s/AKfycbzj2gsQfRnNVXM5x4KDJvWXMyJwpRK-82KHzD5t9xKy_hOGThiUhHnkAuIu1TNf186VOg/exec';
+async function cargarRegistrados(cambio) {
+  try {
+    const r = await (await fetch(NUBE_LECTORES, { method: 'POST', body: JSON.stringify({ t: 'admin', clave: S.lect.admin, accion: cambio ? 'estado' : 'lista', ...cambio }) })).json();
+    S.registrados = r.error ? { error: r.error } : r.usuarios.sort((a, b) => b.fecha - a.fecha);
+  } catch (e) { S.registrados = { error: 'No se ha podido conectar con la hoja de los lectores.' }; }
+  if (location.hash === '#ajustes') render();
+}
+function listaRegistrados() {
+  const R = S.registrados;
+  if (!R) return '<p class="suave">Cargando registrados…</p>';
+  if (R.error) return `<p class="suave">${esc(R.error)} Para verlos, pon en las propiedades del Apps Script de <span class="mono">repaso/nube.gs</span> la propiedad <span class="mono">ADMIN</span> con esta clave: <button type="button" class="boton mini" data-acc="copiar-config" data-v="${esc(S.lect.admin)}">Copiar ADMIN</button> <button type="button" class="enlace" data-acc="registrados">Volver a mirar</button></p>`;
+  if (!R.length) return '<p class="suave">Aún no se ha registrado nadie con Google. Pasa el enlace de invitación a tu grupo.</p>';
+  const chip = { '': ['info', 'Nuevo'], conocido: ['ok', 'Lo conoces'], vetado: ['mal', 'Vetado'] };
+  return `<div class="lista">${R.map((u) => `<div class="nota-fila"><span class="nf-nombre">${esc(u.n || '(sin nombre aún)')}<small>${esc(u.correo)} · ${u.fecha ? esc(fCorta(Math.floor(u.fecha / 1000))) : ''}${u.origen === 'migrado' ? ' · lector de antes' : ''}</small></span>
+    <span class="chip ${(chip[u.estado] || chip[''])[0]}">${(chip[u.estado] || chip[''])[1]}</span>
+    <div class="fila-botones">${u.estado === 'vetado' ? `<button type="button" class="boton mini" data-acc="registrado" data-v="${esc(u.correo)}" data-e="">Quitar veto</button>`
+      : `${u.estado ? '' : `<button type="button" class="boton mini" data-acc="registrado" data-v="${esc(u.correo)}" data-e="conocido">Lo conozco</button>`}<button type="button" class="boton mini peligro" data-acc="registrado" data-v="${esc(u.correo)}" data-e="vetado">Vetar</button>`}</div></div>`).join('')}</div>`;
 }
 // Sube un PDF de resumen cifrado con la clave de los lectores (iv + AES-GCM, como lo abre repaso/publico.js).
 async function subirResumen(f, archivo) {
@@ -925,6 +947,9 @@ function seccionLectores() {
     <form id="f-lect" class="rejilla-form"><label class="campo"><span>Nombre</span><input type="text" id="l-nombre" maxlength="40" required></label>
     <div class="campo campo-boton"><button class="boton principal">Añadir con contraseña nueva</button></div></form>
     <p class="suave">Registro con Google: copia esta clave en la propiedad <span class="mono">CLAVE_PDF</span> del Apps Script de <span class="mono">repaso/nube.gs</span>. <button type="button" class="boton mini" data-acc="copiar-config" data-v="${esc(L.k)}">Copiar CLAVE_PDF</button></p>
+    <h3 class="ex-titulo">Registrados con Google${Array.isArray(S.registrados) && S.registrados.some((u) => !u.estado) ? ` · <span class="chip info">${S.registrados.filter((u) => !u.estado).length} nuevos</span>` : ''}</h3>
+    <p class="suave">Entran sin esperar. Si no sabes quién es alguien, vétalo: deja de poder entrar con su contraseña y con Google.</p>
+    ${listaRegistrados()}
     <h3 class="ex-titulo">Resúmenes</h3><p class="suave">Elige el PDF de cada resumen: se cifra aquí con la clave de los lectores y se sube; si ya estaba, se sustituye.</p>
     <div class="lista">${Object.entries(window.RESUMENES || {}).flatMap(([m, rs]) => rs.map((r) => `<label class="nota-fila"><span class="nf-nombre">${esc(r.t)}<small>${esc(m)} · <span class="mono">${esc(r.f)}</span></small></span>
       <input type="file" accept="application/pdf" data-acc="subir-resumen" data-v="${esc(r.f)}" aria-label="PDF de ${esc(r.t)}"></label>`)).join('')}</div>`;
@@ -1770,6 +1795,8 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'rep-resp') responderRepaso(+el.dataset.v);
   else if (acc === 'rep-sig') siguienteRepaso();
   else if (acc === 'pdf') exportarPdf(el.dataset.v);
+  else if (acc === 'registrados') { S.registrados = null; render(); cargarRegistrados(); }
+  else if (acc === 'registrado') { el.disabled = true; cargarRegistrados({ correo: el.dataset.v, estado: el.dataset.e }); } // vetar se deshace con «Quitar veto»
   else if (acc === 'cerrar-aviso') { S.aviso = ''; el.closest('.aviso').remove(); }
   else if (acc === 'archivo') { const f = archivosPorId.get(el.dataset.v); if (f) abrirArchivo(f); }
   else if (acc === 'cerrar-visor') cerrarVisor();
