@@ -196,7 +196,7 @@ function nube(t, estado = /^Guardando/.test(t) ? 'va' : t === 'Guardado' ? 'ok' 
 function mostrar() {
   $('entrada').hidden = !!yo; $('dentro').hidden = !yo; $('e-google').hidden = $('e-o').hidden = $('e-olvido').hidden = !GOOGLE_ID;
   if (!yo) return;
-  $('hola').textContent = 'Hola, ' + yo.n;
+  $('hola').textContent = yo.n; $('avatar').parentNode.title = yo.n;
   $('avatar').textContent = yo.n.trim()[0]?.toUpperCase() || '·';
   $('docs').innerHTML = '';
   for (const [mod, lista] of Object.entries(window.RESUMENES || {})) for (const r of lista) {
@@ -214,6 +214,20 @@ function pestana(p) {
   if (p !== 'leer') estudio(p);
 }
 function repintar() { A?.hojas.forEach((_, i) => pintarMarcas(i + 1)); if (A && !$('p-notas').hidden) verNotas(); if (!$('s-prog').hidden) window.verProgramacion?.(true); }
+// claro u oscuro: por defecto, el del sistema; lo que elija se recuerda en este navegador (el <head> lo aplica antes de pintar)
+const oscuroSistema = matchMedia('(prefers-color-scheme: dark)');
+const temaActual = () => document.documentElement.dataset.theme || (oscuroSistema.matches ? 'dark' : 'light');
+function pintarTema() {
+  const o = temaActual() === 'dark';
+  for (const b of document.querySelectorAll('.cambia-tema')) { b.innerHTML = ico(o ? 'sol' : 'luna'); b.title = o ? 'Modo claro' : 'Modo oscuro'; b.setAttribute('aria-label', b.title); }
+}
+for (const b of document.querySelectorAll('.cambia-tema')) b.onclick = () => {
+  const t = temaActual() === 'dark' ? 'light' : 'dark', poner = () => { document.documentElement.dataset.theme = t; pintarTema(); };
+  try { localStorage.setItem('repaso-tema', t); } catch {}
+  document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches ? document.startViewTransition(poner) : poner();
+};
+oscuroSistema.addEventListener('change', pintarTema);
+pintarTema();
 // secciones de dentro: resúmenes o programación
 function seccion(s) {
   for (const b of document.querySelectorAll('.secciones button')) b.setAttribute('aria-pressed', b.dataset.s === s);

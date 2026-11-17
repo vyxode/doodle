@@ -8,24 +8,30 @@ const prog = () => (D.prog ||= {});
 const titulo = (e) => e.texto.split(':')[0];
 let abierto = null; // id del ejercicio abierto
 
+const resto = (e) => e.texto.slice(e.texto.indexOf(':') + 1).trim();
+const SUPERADO = '<span class="chip ok">✓ Superado</span>';
+
 function lista() {
   const L = ejercicios(), hechos = L.filter((e) => prog()[e.id]?.ok).length, temas = [...new Set(L.map((e) => e.grupo))];
-  const estado = (e) => (prog()[e.id]?.ok ? '<span class="chip ok">✓ Superado</span>' : prog()[e.id]?.c ? '<span class="chip">Empezado</span>' : '');
+  const estado = (e) => (prog()[e.id]?.ok ? SUPERADO : prog()[e.id]?.c ? '<span class="chip">Empezado</span>' : '');
+  let i = 0;
   return `<div class="prog-cab"><div><h2>Banco de ejercicios para el examen</h2><p class="suave">C# de los temas 1 a 5. Escribe el programa, pruébalo con «Ejecutar» y pulsa «Comprobar» para corregirlo. Se guarda solo.</p></div>
-    <div class="progreso"><span>${hechos} de ${L.length} superados</span><div class="barra-p"><i style="width:${L.length ? (hechos / L.length) * 100 : 0}%"></i></div></div></div>
-    ${temas.map((t) => `<section class="prog-tema"><h3>${esc(t)}</h3><div class="prog-lista">${L.filter((e) => e.grupo === t).map((e) => `
-      <button type="button" class="prog-ej" data-ej="${esc(e.id)}"><span class="prog-n">${esc(e.n)}</span><span class="prog-t">${esc(titulo(e))}</span>${estado(e)}<span class="prog-ir" aria-hidden="true">›</span></button>`).join('')}</div></section>`).join('')}`;
+    <div class="anillo peq" style="--p:${L.length ? (hechos / L.length) * 100 : 0};--c:var(--acento)" role="img" aria-label="${hechos} de ${L.length} superados"><b>${hechos}/${L.length}<small>superados</small></b></div></div>
+    ${temas.map((t) => { const del = L.filter((e) => e.grupo === t); return `<section class="prog-tema"><h3>${esc(t)}<small>${del.filter((e) => prog()[e.id]?.ok).length} de ${del.length}</small></h3><div class="prog-lista">${del.map((e) => `
+      <button type="button" class="prog-ej${prog()[e.id]?.ok ? ' hecho' : ''}" data-ej="${esc(e.id)}" style="--i:${i++}"><span class="prog-n">${esc(e.n)}</span><span class="prog-t">${esc(titulo(e))}</span>${estado(e)}<span class="prog-ir" aria-hidden="true">›</span></button>`).join('')}</div></section>`; }).join('')}`;
 }
 
 function ejercicio(id) {
   const L = ejercicios(), i = L.findIndex((e) => e.id === id), e = L[i], pruebas = (window.PRUEBAS_CS || {})[id];
   $('s-prog').innerHTML = `<div class="prog-barra"><button type="button" class="boton mini" data-prog="lista">← Todos los ejercicios</button>
-      ${L[i + 1] ? `<button type="button" class="boton mini" data-ej="${esc(L[i + 1].id)}">Siguiente: ${esc(L[i + 1].n)} →</button>` : ''}</div>
-    <article class="prog-lab"><span class="antetitulo">${esc(e.grupo)} · Ejercicio ${esc(e.n)}</span>
-      <p class="prog-enun">${esc(e.texto)}</p>${pruebas ? '' : '<p class="suave">Este no tiene «Comprobar» (su resultado es aleatorio o depende de un menú): pruébalo tú con «Ejecutar».</p>'}
+      <span class="suave">${i + 1} de ${L.length}</span>
+      ${L[i + 1] ? `<button type="button" class="boton mini" data-ej="${esc(L[i + 1].id)}">Siguiente: ${esc(L[i + 1].n)} →</button>` : '<span></span>'}</div>
+    <article class="prog-lab"><div class="prog-info"><span class="antetitulo">${esc(e.grupo)}</span>
+      <h2><span class="prog-n">${esc(e.n)}</span>${esc(titulo(e))}</h2><span class="prog-estado">${prog()[id]?.ok ? SUPERADO : ''}</span>
+      <p class="prog-enun">${esc(resto(e))}</p>${pruebas ? '' : '<p class="suave">Este no tiene «Comprobar» (su resultado es aleatorio o depende de un menú): pruébalo tú con «Ejecutar».</p>'}</div>
       <div class="prog-trabajo"></div></article>`;
   const h = montarCsharp($('s-prog').querySelector('.prog-trabajo'), { codigo: prog()[id]?.c }, ({ codigo }) => { prog()[id] = { ...prog()[id], c: codigo, u: Date.now() }; guardar(); }, pruebas,
-    () => { prog()[id] = { ...prog()[id], ok: true, u: Date.now() }; guardar(); }, () => 'Guardado');
+    () => { prog()[id] = { ...prog()[id], ok: true, u: Date.now() }; guardar(); $('s-prog').querySelector('.prog-estado').innerHTML = SUPERADO; }, () => 'Guardado');
   scrollTo({ top: 0 });
   h.foco();
 }

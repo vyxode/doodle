@@ -15,8 +15,9 @@ async function cargarModo(modo) { if (window.CodeMirror && MODOS[modo]) for (con
 // Editor de código: CodeMirror si cargó; si no, un textarea con tabulador.
 export function crearEditor(caja, valor, { modo = 'text/plain', alCambiar = () => {}, alEjecutar = () => {}, etiqueta = 'Editor', numeros = true } = {}) {
   if (window.CodeMirror) {
+    const tab = matchMedia('(max-width: 600px)').matches ? 2 : 4; // en el móvil, sangría más estrecha para que quepa el código
     const cm = window.CodeMirror(caja, {
-      value: valor, mode: modo, lineNumbers: numeros, indentUnit: 4, tabSize: 4, indentWithTabs: true, lineWrapping: modo === 'text/plain',
+      value: valor, mode: modo, lineNumbers: numeros, indentUnit: tab, tabSize: tab, indentWithTabs: true, lineWrapping: modo === 'text/plain',
       matchBrackets: true, autoCloseBrackets: modo !== 'text/plain', screenReaderLabel: etiqueta,
       extraKeys: { 'Ctrl-Enter': () => alEjecutar(), 'Cmd-Enter': () => alEjecutar() },
     });
