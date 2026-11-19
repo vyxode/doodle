@@ -5,6 +5,7 @@
 import { svgExportable, montarDiagrama, tam } from './diagrama.js';
 import { LECCIONES } from './bbddlec.js';
 import { EJERCICIOS_BD } from './bbddej.js';
+import { anotar, practicar, resumenPractica } from './bbddpra.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 // nombres comparables: sin tildes, en mayúsculas, con _ y sin plural (CLIENTES = CLIENTE)
@@ -55,12 +56,13 @@ export const figura = (sp, pie = '') => `<figure class="bd-fig">${svgExportable(
 export const esquema = (t) => `<pre class="bd-esq">${esc(t.trim()).replace(/^(\s*)(PK|FK|UK|VNN)(\s*:)/gm, '$1<b class="bd-$2">$2</b>$3').replace(/^([A-ZÁÉÍÓÚÑ_0-9]+)(?= ?\()/gm, '<b>$1</b>')}</pre>`;
 
 // preguntas de opción múltiple: { p, o: [...], ok: índice, x: explicación }
-export const preguntas = (lista) => `<div class="bd-quiz">${lista.map((q, i) => `<fieldset class="bd-q" data-q="${i}"><legend>${esc(q.p)}</legend>${q.o.map((o, j) => `<button type="button" class="bd-op" data-j="${j}">${esc(o)}</button>`).join('')}<p class="bd-x" hidden></p></fieldset>`).join('')}</div>`;
-export function cablearPreguntas(cont, lista, alTerminar) {
+export const preguntas = (lista) => `<div class="bd-quiz">${lista.map((q, i) => `<fieldset class="bd-q" data-q="${i}"><legend>${esc(q.p)}</legend>${q.o.map((o, j) => `<button type="button" class="bd-op" data-j="${j}">${o.includes('\n') ? `<pre>${esc(o)}</pre>` : esc(o)}</button>`).join('')}<p class="bd-x" hidden></p></fieldset>`).join('')}</div>`;
+export function cablearPreguntas(cont, lista, alTerminar, alResponder) {
   cont.querySelectorAll('.bd-q').forEach((f) => f.addEventListener('click', (ev) => {
     const b = ev.target.closest('.bd-op'); if (!b || f.dataset.hecha) return;
     const q = lista[+f.dataset.q], bien = +b.dataset.j === q.ok;
     f.dataset.hecha = bien ? 'bien' : 'mal';
+    if (q.tag && alResponder) alResponder([q.tag], bien);
     f.querySelectorAll('.bd-op').forEach((x) => { x.disabled = true; if (+x.dataset.j === q.ok) x.classList.add('ok'); });
     if (!bien) b.classList.add('mal');
     const x = f.querySelector('.bd-x'); x.hidden = false; x.innerHTML = `<b>${bien ? 'Bien.' : 'No es esa.'}</b> ${esc(q.x)}`;
@@ -90,24 +92,25 @@ export function revisarEr(d, sol) {
   const tiene = (n) => u.ents.find((e) => e.n === n || alias(n).map(norm).includes(e.n));
   const pistas = [];
   const faltan = s.ents.filter((e) => !tiene(e.n));
-  if (faltan.length) pistas.push(['mal', `Te ${faltan.length === 1 ? 'falta 1 entidad' : `faltan ${faltan.length} entidades`} (o tienen otro nombre).`]);
+  if (faltan.length) pistas.push(['mal', `Te ${faltan.length === 1 ? 'falta 1 entidad' : `faltan ${faltan.length} entidades`} (o tienen otro nombre).`, ['entidades']]);
   const nombres = new Set(s.ents.flatMap((e) => [e.n, ...alias(e.n).map(norm)]));
-  for (const e of u.ents.filter((x) => !nombres.has(x.n))) pistas.push(['mal', `${e.texto} no está en la solución como entidad: ¿es un atributo o una relación?`]);
-  for (const e of s.ents.filter((x) => x.t === 'debil')) { const v = tiene(e.n); if (v && v.t !== 'debil') pistas.push(['mal', `${v.texto} debería ser una entidad débil.`]); }
-  if (s.isa && !u.isa) pistas.push(['mal', 'Falta una jerarquía (triángulo): hay entidades que son un tipo de otra.']);
-  if (s.ents.some((e) => e.t === 'agregacion') && !u.ents.some((e) => e.t === 'agregacion')) pistas.push(['mal', 'Falta una agregación (caja discontinua): hay una relación que se relaciona con otra entidad.']);
+  for (const e of u.ents.filter((x) => !nombres.has(x.n))) pistas.push(['mal', `${e.texto} no está en la solución como entidad: ¿es un atributo o una relación?`, ['entidades']]);
+  for (const e of s.ents.filter((x) => x.t === 'debil')) { const v = tiene(e.n); if (v && v.t !== 'debil') pistas.push(['mal', `${v.texto} debería ser una entidad débil.`, ['debil']]); }
+  if (s.isa && !u.isa) pistas.push(['mal', 'Falta una jerarquía (triángulo): hay entidades que son un tipo de otra.', ['jerarquia']]);
+  if (s.ents.some((e) => e.t === 'agregacion') && !u.ents.some((e) => e.t === 'agregacion')) pistas.push(['mal', 'Falta una agregación (caja discontinua): hay una relación que se relaciona con otra entidad.', ['agregacion']]);
   const canon = (n) => { const v = tiene(n); return v ? v.n : '¿' + n; };
   for (const r of s.rels) {
     const clave = r.lados.map((l) => canon(l.ent)).sort().join('|');
     const v = u.rels.find((x) => x.lados.map((l) => l.ent).sort().join('|') === clave);
     const quien = [...new Set(r.lados.map((l) => tiene(l.ent)?.texto || '?'))].join(', ');
-    if (!v) { if (!clave.includes('¿')) pistas.push(['mal', `Falta una relación entre ${quien}${r.lados.length > 2 ? ' (las tres juntas)' : r.lados.length === 2 && r.lados[0].ent === r.lados[1].ent ? ' (reflexiva)' : ''}.`]); continue; }
-    if (v.lados.some((l) => !l.max)) { pistas.push(['mal', `${v.n || 'La relación'} (${quien}): pon el par (mín, máx) junto a cada entidad.`]); continue; }
+    const tipo = [r.lados.length > 2 ? 'ternaria' : r.lados[0].ent === r.lados[1]?.ent ? 'reflexiva' : r.lados.every((l) => l.max === 'N') ? 'NM' : r.lados.every((l) => l.max === '1') ? '11' : '1N'];
+    if (!v) { if (!clave.includes('¿')) pistas.push(['mal', `Falta una relación entre ${quien}${r.lados.length > 2 ? ' (las tres juntas)' : r.lados.length === 2 && r.lados[0].ent === r.lados[1].ent ? ' (reflexiva)' : ''}.`, tipo]); continue; }
+    if (v.lados.some((l) => !l.max)) { pistas.push(['mal', `${v.n || 'La relación'} (${quien}): pon el par (mín, máx) junto a cada entidad.`, ['card']]); continue; }
     const maxS = r.lados.map((l) => canon(l.ent) + l.max).sort().join(), maxU = v.lados.map((l) => l.ent + l.max).sort().join();
     const minS = r.lados.map((l) => canon(l.ent) + (l.min === '0' ? 0 : 1)).sort().join(), minU = v.lados.map((l) => l.ent + (l.min === '0' ? 0 : 1)).sort().join();
-    if (maxS !== maxU) pistas.push(['mal', `${v.n} (${quien}): revisa los máximos. Lee cada lado con «cada … se relaciona con … como mucho».`]);
-    else if (minS !== minU && r.lados.length === 2) pistas.push(['medio', `${v.n} (${quien}): los máximos están bien; revisa algún mínimo (¿es obligatorio u opcional?).`]);
-    else pistas.push(['bien', `${v.n} (${quien}): bien.`]);
+    if (maxS !== maxU) pistas.push(['mal', `${v.n} (${quien}): revisa los máximos. Lee cada lado con «cada … se relaciona con … como mucho».`, ['card', ...tipo]]);
+    else if (minS !== minU && r.lados.length === 2) pistas.push(['medio', `${v.n} (${quien}): los máximos están bien; revisa algún mínimo (¿es obligatorio u opcional?).`, ['minimos']]);
+    else pistas.push(['bien', `${v.n} (${quien}): bien.`, ['card', ...tipo]]);
   }
   if (!pistas.some((p) => p[0] !== 'bien')) pistas.unshift(['bien', 'Coincide con la solución en entidades, relaciones y cardinalidades.']);
   return pistas;
@@ -137,7 +140,7 @@ function compararEsquema(u, s, sol) {
   // las tablas de relaciones se llaman como cada uno quiera: se emparejan por sus claves ajenas
   for (const p of pares) if (!p[1] && !ents.has(p[0].k)) { const v = u.find((x) => !usadas.has(x) && x.fk.length && refs(x) === refs(p[0])); if (v) { usadas.add(v); p[1] = v; } }
   for (const [t, v] of pares) {
-    if (!v) { pistas.push(['mal', ents.has(t.k) ? `Falta la tabla de la entidad ${t.n}.` : 'Falta una tabla que no sale de una entidad: ¿una N:M, una ternaria, un multivaluado o una 1:1 sin nulos?']); continue; }
+    if (!v) { pistas.push(['mal', ents.has(t.k) ? `Falta la tabla de la entidad ${t.n}.` : 'Falta una tabla que no sale de una entidad: ¿una N:M, una ternaria, un multivaluado o una 1:1 sin nulos?', [ents.has(t.k) ? 'entidades' : 'NM']]); continue; }
     const fallos = [];
     const pkS = (t.pk[0] || []).length, pkU = (v.pk[0] || []).length;
     if (!pkU) fallos.push('no tiene PK');
@@ -160,9 +163,11 @@ function compararEsquema(u, s, sol) {
       }
     }
     if (t.uk.length > v.uk.length && !fallos.some((f) => f.includes('UK'))) fallos.push('le falta una clave alternativa (UK)');
-    pistas.push(fallos.length ? ['mal', `${v.n}: ${fallos.join('; ')}.`] : ['bien', `${v.n}: bien.`]);
+    // qué se ha fallado, para practicarlo luego (js/bbddpra.js)
+    const tags = [...new Set(fallos.map((f) => (/VNN/.test(f) ? 'vnn' : /UK/.test(f) ? 'uk' : /PK|compuesta/.test(f) ? 'pk' : 'fk')))];
+    pistas.push(fallos.length ? ['mal', `${v.n}: ${fallos.join('; ')}.`, tags] : ['bien', `${v.n}: bien.`, ['pk', ...(t.fk.length ? ['fk'] : [])]]);
   }
-  for (const v of u.filter((x) => !usadas.has(x))) pistas.push(['mal', `${v.n} no está en la solución: ¿es una 1:N que debería ir como clave ajena, o tiene otro nombre?`]);
+  for (const v of u.filter((x) => !usadas.has(x))) pistas.push(['mal', `${v.n} no está en la solución: ¿es una 1:N que debería ir como clave ajena, o tiene otro nombre?`, ['fk']]);
   return pistas;
 }
 export function revisarEsquema(texto, sol) {
@@ -182,6 +187,7 @@ function indice(cont, ctx) {
   cont.innerHTML = `<header class="bd-hero"><div><h2>Bases de datos: del E/R a las tablas</h2>
       <p class="suave">Lecciones con diagramas que cambian al tocar y un banco de ejercicios para hacer tú el E/R y el modelo relacional. Notación de clase: Chen, el par (mín, máx) junto a la entidad que se cuenta y el esquema con PK, FK, UK y VNN.</p></div>
       <div class="bd-cuenta"><b>${hechas}/${LECCIONES.length}</b><small>lecciones</small><b>${resueltos}/${EJERCICIOS_BD.length}</b><small>ejercicios</small></div></header>
+    ${resumenPractica(ctx)}
     <section class="bd-bloque"><h3>Lecciones</h3><div class="bd-lecciones">${LECCIONES.map((l, i) => `<button type="button" class="bd-lec ${ctx.leer('L-' + l.id)?.visto ? 'vista' : ''}" data-ir="l-${l.id}">
       <span class="bd-lec-n">${i + 1}</span><span><b>${esc(l.t)}</b><small>${esc(l.d)}</small></span>${ctx.leer('L-' + l.id)?.visto ? '<span class="chip ok">✓</span>' : ''}</button>`).join('')}</div></section>
     <section class="bd-bloque"><h3>Banco de ejercicios</h3><p class="suave">Lee el enunciado, dibuja el E/R en el editor, escribe las tablas y pulsa «Revisar». La solución está oculta hasta que la pidas.</p>
@@ -196,7 +202,7 @@ function leccion(cont, ctx, l) {
       ${sig ? `<button type="button" class="boton mini" data-ir="l-${sig.id}">${esc(sig.t)} →</button>` : '<span></span>'}</nav>
     <header class="bd-cab"><h2>${esc(l.t)}</h2><p class="suave">${esc(l.d)}</p></header><div class="bd-cuerpo"></div>`;
   cont.onclick = (ev) => { const b = ev.target.closest('[data-ir]'); if (b && cont.contains(b) && !b.closest('.bd-cuerpo')) ctx.ir(b.dataset.ir); };
-  l.montar(cont.querySelector('.bd-cuerpo'), { ...ctx, terminar: (bien, total) => ctx.guardar('L-' + l.id, { ...ctx.leer('L-' + l.id), visto: true, bien, total }) });
+  l.montar(cont.querySelector('.bd-cuerpo'), { ...ctx, anotar: (tags, bien) => anotar(ctx, tags, bien), terminar: (bien, total) => ctx.guardar('L-' + l.id, { ...ctx.leer('L-' + l.id), visto: true, bien, total }) });
   if (!ctx.leer('L-' + l.id)?.visto) ctx.guardar('L-' + l.id, { visto: true });
 }
 
@@ -227,14 +233,15 @@ function ejercicio(cont, ctx, e) {
     cont.querySelectorAll('.bd-panel').forEach((p) => (p.hidden = p.dataset.p !== t));
     if (t === 'sol') solucion();
   };
+  const apuntar = (p) => { for (const [c, , tags] of p) if (tags) anotar(ctx, tags, c === 'bien'); };
   const marcarOk = () => { const v = yo(); if (v.okEr && v.okRel && !v.ok) poner({ ok: true }); };
   let armado = 0, t;
   cont.onclick = (ev) => {
     const b = ev.target.closest('button'); if (!b || !cont.contains(b)) return;
     if (b.dataset.ir !== undefined && b.closest('.bd-migas')) return ctx.ir(b.dataset.ir);
     if (b.dataset.tab) return tab(b.dataset.tab);
-    if (b.dataset.a === 'rev-er') { const p = revisarEr(yo().er, e); cont.querySelector('[data-r=er]').innerHTML = listaPistas(p); poner({ okEr: p.every((x) => x[0] === 'bien') }); marcarOk(); }
-    if (b.dataset.a === 'rev-rel') { clearTimeout(t); poner({ rel: cont.querySelector('.bd-rel').value }); const p = revisarEsquema(yo().rel, e); cont.querySelector('[data-r=rel]').innerHTML = listaPistas(p); poner({ okRel: p.every((x) => x[0] === 'bien') }); marcarOk(); }
+    if (b.dataset.a === 'rev-er') { const p = revisarEr(yo().er, e); cont.querySelector('[data-r=er]').innerHTML = listaPistas(p); apuntar(p); poner({ okEr: p.every((x) => x[0] === 'bien') }); marcarOk(); }
+    if (b.dataset.a === 'rev-rel') { clearTimeout(t); poner({ rel: cont.querySelector('.bd-rel').value }); const p = revisarEsquema(yo().rel, e); cont.querySelector('[data-r=rel]').innerHTML = listaPistas(p); apuntar(p); poner({ okRel: p.every((x) => x[0] === 'bien') }); marcarOk(); }
     if (b.dataset.a === 'ver-sol') {
       if (!armado) { b.textContent = '¿Seguro? Pulsa otra vez'; armado = setTimeout(() => { armado = 0; b.textContent = 'Ver la solución'; }, 3000); return; }
       clearTimeout(armado); poner({ sol: true }); solucion();
@@ -252,5 +259,6 @@ export function montarBbdd(cont, ctx) {
   const l = sub.startsWith('l-') && LECCIONES.find((x) => x.id === sub.slice(2)), e = sub.startsWith('e-') && EJERCICIOS_BD.find((x) => x.id === sub.slice(2));
   if (l) return leccion(cont, ctx, l);
   if (e) return ejercicio(cont, ctx, e);
+  if (sub === 'p') return practicar(cont, ctx);
   return indice(cont, ctx);
 }

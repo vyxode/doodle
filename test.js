@@ -24,6 +24,12 @@ import { createRequire } from 'node:module';
     if (/VNN/.test(e.rel)) assert.ok(!bien(B.revisarEsquema(e.rel.replace(/\n   VNN: [^\n]+/, ''), e)), e.id + ': detecta un VNN que falta');
   }
   assert.equal(B.norm('Profesores'), B.norm('PROFESOR'));
+  // práctica a medida: cada generador da preguntas válidas y lo más fallado sale más
+  const P = await import('./js/bbddpra.js');
+  for (const k of Object.keys(P.TAGS)) for (let i = 0; i < 50; i++) { const q = P.pregunta(k); assert.ok(q.o.length >= 2 && new Set(q.o).size === q.o.length && q.ok >= 0 && q.ok < q.o.length, k); }
+  const veces = { vnn: 0, card: 0 };
+  for (let i = 0; i < 3000; i++) { const k = P.elegirTag({ vnn: { r: 1, n: 3 }, card: { r: 0, n: 3 } }); if (k in veces) veces[k]++; }
+  assert.ok(veces.vnn > veces.card * 4, 'lo fallado sale más');
 }
 
 // --- cifrado ---

@@ -2,7 +2,7 @@
 // Ejemplos propios; reglas y notación, las de clase.
 import { figura, esquema, preguntas, cablearPreguntas, sel, esc } from './bbdd.js';
 
-const cuanto = (min, max) => ({ '01': 'cero o una', '0N': 'cero o muchas', '11': 'exactamente una', '1N': 'una o muchas' })[`${min}${max}`];
+export const cuanto = (min, max) => ({ '01': 'cero o una', '0N': 'cero o muchas', '11': 'exactamente una', '1N': 'una o muchas' })[`${min}${max}`];
 const clave = (n) => 'cod_' + String(n).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_');
 const M = (n) => String(n).toUpperCase();
 
@@ -37,7 +37,7 @@ export function binaria(A, R, B, amin, amax, bmin, bmax) {
   const tipo = amax === 'N' && bmax === 'N' ? 'N:M' : amax === '1' && bmax === '1' ? '1:1' : `1:N · el lado «1» es ${amax === '1' ? B : A} y el lado «N» es ${amax === '1' ? A : B}`;
   return { txt, regla, perd, tipo };
 }
-const spBinaria = (A, R, B, amin, amax, bmin, bmax) => ({
+export const spBinaria = (A, R, B, amin, amax, bmin, bmax) => ({
   e: { [A]: { x: 0, y: 100, a: ['#' + clave(A), 'nombre'] }, [B]: { x: 430, y: 100, a: ['#' + clave(B), 'nombre'] } },
   r: [{ n: R, x: 215, y: 90, con: [[A, `(${bmin},${amax === 'N' && bmax === 'N' ? 'N' : bmax})`], [B, `(${amin},${amax === 'N' && bmax === 'N' ? 'M' : amax})`]] }],
 });
@@ -91,6 +91,8 @@ function cardinalidades(c, ctx) {
     const [A, R, B, ...ok] = caso, ks = ['amin', 'amax', 'bmin', 'bmax'];
     let bien = 0;
     ks.forEach((k, i) => { const s = reto.querySelector('.r-' + k), x = s.value === ok[i]; s.classList.toggle('ok', x); s.classList.toggle('mal', !x); bien += x; });
+    ctx.anotar(['card'], reto.querySelector('.r-amax').value === ok[1] && reto.querySelector('.r-bmax').value === ok[3]);
+    ctx.anotar(['minimos'], reto.querySelector('.r-amin').value === ok[0] && reto.querySelector('.r-bmin').value === ok[2]);
     reto.querySelector('.bd-res').innerHTML = (bien === 4 ? '<p class="bd-bien">¡Las cuatro bien!</p>' : `<p class="bd-mal">${bien} de 4. Lee la frase desde cada lado: «cada ${A}…» y «cada ${B}…».</p>`) + figura(spBinaria(A, R, B, ...ok.slice(0, 4)));
     if (bien === 4) ctx.terminar(1, 1);
   });
@@ -229,47 +231,47 @@ function avanzadas(c, ctx) {
   });
   ternaria();
   const q = [
-    { p: 'Un ALUMNO hace prácticas en una EMPRESA y algunas de esas prácticas tienen un TUTOR de empresa asignado. ¿Qué uses?', o: ['Ternaria ALUMNO-EMPRESA-TUTOR', 'Agregación de «hace prácticas» unida a TUTOR', 'Dos 1:N independientes'], ok: 1, x: 'Las prácticas existen aunque no tengan tutor: la pareja alumno-empresa existe sola, así que es agregación.' },
-    { p: 'Ternaria con ENTRENADOR (1,1), EQUIPO (0,N) y TEMPORADA (0,N). ¿Cuál es la PK?', o: ['(cod_entrenador, cod_equipo, anio)', '(cod_equipo, anio)', 'cod_entrenador'], ok: 1, x: 'Es 1:N:N: las claves de los lados N forman la PK y la del lado 1 lleva VNN.' },
-    { p: 'Jerarquía parcial y solapada. ¿Qué estrategia NO vale?', o: ['Supertipo y subtipos', 'Tabla única con indicadores', 'Solo los subtipos'], ok: 2, x: 'Solo subtipos exige total y disjunta.' },
+    { tag: 'agregacion', p: 'Un ALUMNO hace prácticas en una EMPRESA y algunas de esas prácticas tienen un TUTOR de empresa asignado. ¿Qué uses?', o: ['Ternaria ALUMNO-EMPRESA-TUTOR', 'Agregación de «hace prácticas» unida a TUTOR', 'Dos 1:N independientes'], ok: 1, x: 'Las prácticas existen aunque no tengan tutor: la pareja alumno-empresa existe sola, así que es agregación.' },
+    { tag: 'ternaria', p: 'Ternaria con ENTRENADOR (1,1), EQUIPO (0,N) y TEMPORADA (0,N). ¿Cuál es la PK?', o: ['(cod_entrenador, cod_equipo, anio)', '(cod_equipo, anio)', 'cod_entrenador'], ok: 1, x: 'Es 1:N:N: las claves de los lados N forman la PK y la del lado 1 lleva VNN.' },
+    { tag: 'jerarquia', p: 'Jerarquía parcial y solapada. ¿Qué estrategia NO vale?', o: ['Supertipo y subtipos', 'Tabla única con indicadores', 'Solo los subtipos'], ok: 2, x: 'Solo subtipos exige total y disjunta.' },
   ];
   c.insertAdjacentHTML('beforeend', `<h3>Ponte a prueba</h3>${preguntas(q)}`);
-  cablearPreguntas(c, q, ctx.terminar);
+  cablearPreguntas(c, q, ctx.terminar, ctx.anotar);
 }
 
 // ---------- 4. las 9 reglas de paso a tablas ----------
 const REGLAS = [
   { t: 'Entidad fuerte', r: 'Cada entidad fuerte es una tabla. Sus atributos simples son columnas, su identificador es la PK y otros identificadores son UK con VNN.',
     sp: { e: { SOCIO: { x: 0, y: 100, a: ['#num_socio', 'dni', 'nombre'] } } }, rel: 'SOCIO (num_socio, dni, nombre)\n   PK:  num_socio\n   UK:  dni\n   VNN: dni',
-    q: { p: 'dni también identifica a cada socio. ¿Cómo queda?', o: ['Solo PK: num_socio', 'UK: dni y VNN: dni', 'PK: (num_socio, dni)'], ok: 1, x: 'Una clave candidata que no es la PK es UK, y obligatoria: sin valor no identificaría a nadie.' } },
+    q: { tag: 'uk', p: 'dni también identifica a cada socio. ¿Cómo queda?', o: ['Solo PK: num_socio', 'UK: dni y VNN: dni', 'PK: (num_socio, dni)'], ok: 1, x: 'Una clave candidata que no es la PK es UK, y obligatoria: sin valor no identificaría a nadie.' } },
   { t: 'Entidad débil', r: 'Por identificación: PK compuesta (clave del propietario + discriminador), y la del propietario es FK. Por existencia: PK propia y FK obligatoria (VNN) al propietario.',
     sp: { e: { EDIFICIO: { x: 0, y: 100, a: ['#cod_edif'] }, PLANTA: { x: 440, y: 100, d: true, a: ['%num_planta', 'superficie'] } }, r: [{ n: 'tiene (ID)', d: true, x: 215, y: 90, con: [['EDIFICIO', '(1,1)'], ['PLANTA', '(1,N)']] }] },
     rel: 'EDIFICIO (cod_edif, nombre)\n   PK:  cod_edif\n\nPLANTA (cod_edif, num_planta, superficie)\n   PK:  (cod_edif, num_planta)\n   FK:  cod_edif → EDIFICIO',
-    q: { p: 'La planta 2 existe en muchos edificios. ¿Cuál es la PK de PLANTA?', o: ['num_planta', '(cod_edif, num_planta)', 'cod_edif'], ok: 1, x: 'El discriminador solo distingue dentro de su edificio: se le añade la clave del propietario.' } },
+    q: { tag: 'debil', p: 'La planta 2 existe en muchos edificios. ¿Cuál es la PK de PLANTA?', o: ['num_planta', '(cod_edif, num_planta)', 'cod_edif'], ok: 1, x: 'El discriminador solo distingue dentro de su edificio: se le añade la clave del propietario.' } },
   { t: 'Compuestos y multivaluados', r: 'El compuesto se despliega en sus partes. El multivaluado sale a una tabla nueva con la clave de la entidad y el propio valor como PK.',
     sp: { e: { CLIENTE: { x: 160, y: 100, a: ['#cod_cliente', 'nombre', '*email'] } } }, rel: 'CLIENTE (cod_cliente, nombre)\n   PK:  cod_cliente\n\nEMAIL (cod_cliente, email)\n   PK:  (cod_cliente, email)\n   FK:  cod_cliente → CLIENTE',
-    q: { p: 'Un cliente puede tener varios email. ¿Por qué no una columna email en CLIENTE?', o: ['Porque una celda guarda un solo valor', 'Porque email no es clave', 'Sí se puede, separándolos con comas'], ok: 0, x: 'Cada celda guarda un valor atómico: los valores repetidos van en otra tabla.' } },
+    q: { tag: 'atributos', p: 'Un cliente puede tener varios email. ¿Por qué no una columna email en CLIENTE?', o: ['Porque una celda guarda un solo valor', 'Porque email no es clave', 'Sí se puede, separándolos con comas'], ok: 0, x: 'Cada celda guarda un valor atómico: los valores repetidos van en otra tabla.' } },
   { t: 'Relación 1:N', r: 'Sin tabla nueva: la clave del lado 1 viaja como FK al lado N. Si el lado N siempre tiene pareja (mínimo 1 junto al lado 1), la FK lleva VNN. Los atributos de la relación viajan con ella.',
     sp: spBinaria('DEPARTAMENTO', 'trabaja', 'EMPLEADO', '1', 'N', '1', '1'), rel: binaria('DEPARTAMENTO', 'trabaja', 'EMPLEADO', '1', 'N', '1', '1').txt,
-    q: { p: 'Todo empleado está en un departamento. ¿Dónde va la FK y cómo?', o: ['En DEPARTAMENTO, con UK', 'En EMPLEADO, con VNN', 'En una tabla nueva'], ok: 1, x: 'La clave viaja al lado N (EMPLEADO). Como es obligatorio, VNN.' } },
+    q: { tag: 'vnn', p: 'Todo empleado está en un departamento. ¿Dónde va la FK y cómo?', o: ['En DEPARTAMENTO, con UK', 'En EMPLEADO, con VNN', 'En una tabla nueva'], ok: 1, x: 'La clave viaja al lado N (EMPLEADO). Como es obligatorio, VNN.' } },
   { t: 'Relación N:M', r: 'Tabla nueva con las dos claves: juntas son la PK y cada una es FK. Los atributos de la relación van a esta tabla.',
     sp: { ...spBinaria('ALUMNO', 'cursa', 'CURSO', '1', 'N', '0', 'N'), r: [{ ...spBinaria('ALUMNO', 'cursa', 'CURSO', '1', 'N', '0', 'N').r[0], a: ['nota'] }] }, rel: 'ALUMNO (cod_alumno, nombre)\n   PK:  cod_alumno\n\nCURSO (cod_curso, nombre)\n   PK:  cod_curso\n\nCURSA (cod_alumno, cod_curso, nota)\n   PK:  (cod_alumno, cod_curso)\n   FK:  cod_alumno → ALUMNO\n   FK:  cod_curso → CURSO',
-    q: { p: '¿Dónde va la nota?', o: ['En ALUMNO', 'En CURSO', 'En CURSA'], ok: 2, x: 'La nota depende de la pareja alumno-curso, no de uno solo.' } },
+    q: { tag: 'NM', p: '¿Dónde va la nota?', o: ['En ALUMNO', 'En CURSO', 'En CURSA'], ok: 2, x: 'La nota depende de la pareja alumno-curso, no de uno solo.' } },
   { t: 'Relación 1:1', r: 'Opcional en los dos lados: tabla nueva (PK una clave, UK la otra) o FK con UK que admite NULL. Obligatoria en un lado: FK en ese lado con UK y VNN. Obligatoria en los dos: se pueden fundir.',
     sp: spBinaria('PERSONA', 'tiene', 'PASAPORTE', '0', '1', '1', '1'), rel: binaria('PERSONA', 'tiene', 'PASAPORTE', '0', '1', '1', '1').txt,
-    q: { p: 'Sin la UK en la FK de PASAPORTE, ¿qué permitiría la tabla?', o: ['Pasaportes sin persona', 'Una persona con varios pasaportes', 'Nada distinto'], ok: 1, x: 'La UK es lo que convierte la FK en «1:1»: sin ella sería una 1:N.' } },
+    q: { tag: 'uk', p: 'Sin la UK en la FK de PASAPORTE, ¿qué permitiría la tabla?', o: ['Pasaportes sin persona', 'Una persona con varios pasaportes', 'Nada distinto'], ok: 1, x: 'La UK es lo que convierte la FK en «1:1»: sin ella sería una 1:N.' } },
   { t: 'Reflexiva', r: 'Como una binaria con la misma entidad en los dos lados. La clave aparece dos veces, con el nombre de cada rol. 1:N: FK a la propia tabla. N:M: tabla nueva con las dos copias.',
     sp: { e: { TEMA: { x: 0, y: 100, a: ['#cod_tema', 'titulo'] } }, r: [{ n: 'requiere', x: 430, y: 90, con: [['TEMA', '(0,N)', 'previo'], ['TEMA', '(0,M)', 'posterior']] }] },
     rel: 'TEMA (cod_tema, titulo)\n   PK:  cod_tema\n\nREQUIERE (cod_tema, cod_tema_previo)\n   PK:  (cod_tema, cod_tema_previo)\n   FK:  cod_tema → TEMA\n   FK:  cod_tema_previo → TEMA',
-    q: { p: 'Reflexiva 1:N «un tema tiene un tema padre». ¿Cuántas tablas nuevas?', o: ['Ninguna: FK cod_padre en TEMA', 'Una tabla PADRE', 'Dos tablas'], ok: 0, x: 'Una 1:N no crea tabla: la FK va en la propia tabla, con otro nombre.' } },
+    q: { tag: 'reflexiva', p: 'Reflexiva 1:N «un tema tiene un tema padre». ¿Cuántas tablas nuevas?', o: ['Ninguna: FK cod_padre en TEMA', 'Una tabla PADRE', 'Dos tablas'], ok: 0, x: 'Una 1:N no crea tabla: la FK va en la propia tabla, con otro nombre.' } },
   { t: 'Ternaria', r: 'Siempre tabla nueva con las tres claves (cada una FK). La PK depende de las cardinalidades: N:M:P, las tres; 1:N:N, los dos lados N (el 1 con VNN); 1:1:N, el N con un 1 y el otro par como UK.',
     sp: { e: { MEDICO: { x: 0, y: 70, a: ['#cod_medico'] }, PACIENTE: { x: 470, y: 70, a: ['#cod_paciente'] }, FECHA: { x: 240, y: 300, a: ['#dia'], ab: true } }, r: [{ n: 'cita', x: 235, y: 60, con: [['MEDICO', '(1,1)'], ['PACIENTE', '(0,N)'], ['FECHA', '(0,N)']], ab: false }] },
     rel: 'CITA (cod_paciente, dia, cod_medico)\n   PK:  (cod_paciente, dia)\n   FK:  cod_medico → MEDICO\n   FK:  cod_paciente → PACIENTE\n   FK:  dia → FECHA\n   VNN: cod_medico',
-    q: { p: 'Un paciente, en un día, tiene cita con un solo médico. ¿Qué lleva VNN?', o: ['cod_paciente', 'dia', 'cod_medico'], ok: 2, x: 'MEDICO es el lado 1: no está en la PK y no puede faltar.' } },
+    q: { tag: 'ternaria', p: 'Un paciente, en un día, tiene cita con un solo médico. ¿Qué lleva VNN?', o: ['cod_paciente', 'dia', 'cod_medico'], ok: 2, x: 'MEDICO es el lado 1: no está en la PK y no puede faltar.' } },
   { t: 'Jerarquía', r: 'B (por defecto): tabla del supertipo y una por subtipo, cuya PK es la del supertipo y también FK. A: tabla única con tipo o indicadores. C: solo subtipos, únicamente si es total y disjunta.',
     sp: { e: { PERSONA: { x: 220, y: 70, a: ['#dni', 'nombre'] }, ALUMNO: { x: 60, y: 330, a: ['curso'], ab: true }, DOCENTE: { x: 380, y: 330, a: ['materia'], ab: true } }, h: [{ x: 245, y: 190, sup: 'PERSONA', sub: ['ALUMNO', 'DOCENTE'], T: false, S: true }] },
     rel: 'PERSONA (dni, nombre)\n   PK:  dni\n\nALUMNO (dni, curso)\n   PK:  dni\n   FK:  dni → PERSONA\n\nDOCENTE (dni, materia)\n   PK:  dni\n   FK:  dni → PERSONA',
-    q: { p: 'En la opción B, ¿qué es dni en ALUMNO?', o: ['Solo PK', 'Solo FK', 'PK y FK a la vez'], ok: 2, x: 'Cada fila de ALUMNO «es» una persona: misma clave, que además apunta a PERSONA.' } },
+    q: { tag: 'jerarquia', p: 'En la opción B, ¿qué es dni en ALUMNO?', o: ['Solo PK', 'Solo FK', 'PK y FK a la vez'], ok: 2, x: 'Cada fila de ALUMNO «es» una persona: misma clave, que además apunta a PERSONA.' } },
 ];
 function reglas(c, ctx) {
   let i = 0;
@@ -282,7 +284,7 @@ function reglas(c, ctx) {
     const caja = c.querySelector('.bd-regla');
     caja.innerHTML = `<h3>${i + 1}. ${esc(r.t)}</h3><p class="bd-norma">${esc(r.r)}</p><div class="bd-dos">${figura(r.sp)}${esquema(r.rel)}</div>${preguntas([r.q])}
       <div class="bd-acciones">${i ? '<button type="button" class="boton" data-m="-1">← Anterior</button>' : ''}${i < REGLAS.length - 1 ? '<button type="button" class="boton principal" data-m="1">Siguiente regla →</button>' : ''}</div>`;
-    cablearPreguntas(caja, [r.q], (bien) => { if (bien) hechas.add(i); c.querySelector(`.bd-reglas [data-i="${i}"]`).classList.toggle('hecha', hechas.has(i)); if (hechas.size === REGLAS.length) ctx.terminar(hechas.size, REGLAS.length); });
+    cablearPreguntas(caja, [r.q], (bien) => { if (bien) hechas.add(i); c.querySelector(`.bd-reglas [data-i="${i}"]`).classList.toggle('hecha', hechas.has(i)); if (hechas.size === REGLAS.length) ctx.terminar(hechas.size, REGLAS.length); }, ctx.anotar);
   };
   c.addEventListener('click', (ev) => {
     const b = ev.target.closest('[data-i], [data-m]'); if (!b) return;
@@ -334,6 +336,7 @@ function alReves(c, ctx) {
       sr.classList.toggle('ok', okR); sr.classList.toggle('mal', !okR); sf.classList.toggle('ok', okF); sf.classList.toggle('mal', !okF); bien += okR + okF;
       return `<li>${f.t}.${f.col}: cada ${f.t} tiene ${r.falta ? '0' : '1'} o 1 ${f.ref} → junto a ${f.ref} va (${r.falta ? 0 : 1},1). Cada ${f.ref} aparece en ${r.repite ? 'muchas filas' : 'una fila como mucho'} → junto a ${f.t} va (0,${r.repite ? 'N' : 1}).</li>`;
     });
+    ctx.anotar(['inversa'], bien === F.length * 2);
     if (bien === F.length * 2) { hechos.add(k); if (hechos.size === INVERSOS.length) ctx.terminar(hechos.size, INVERSOS.length); }
     c.querySelector('.bd-inv .bd-res').innerHTML = `<p class="${bien === F.length * 2 ? 'bd-bien' : 'bd-mal'}">${bien} de ${F.length * 2} respuestas bien.</p><ul class="bd-lectura">${filas.join('')}</ul>${figura(x.er, 'El E/R del que salen estas tablas. Los mínimos del otro lado (¿todo cliente tiene pedidos?) no se pueden saber por las tablas: se suponen 0.')}${x.nota ? `<p>${esc(x.nota)}</p>` : ''}`;
   });
