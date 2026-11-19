@@ -131,7 +131,7 @@ async function dentro(quien) {
 // ---------- sus datos: copia en el navegador y en Apps Script; dos dispositivos se fusionan ----------
 const claveDatos = () => crypto.subtle.importKey('raw', bytes(yo.nk), 'AES-GCM', false, ['encrypt', 'decrypt']);
 const local = { get: () => { try { return localStorage.getItem('doodle-datos-' + yo.id); } catch { return null; } }, set: (v) => { try { localStorage.setItem('doodle-datos-' + yo.id, v); } catch { /* sin almacenamiento */ } } };
-const vacio = () => ({ ts: 0, docs: {}, fallos: {}, notas: [], borradas: {}, prog: {} });
+const vacio = () => ({ ts: 0, docs: {}, fallos: {}, notas: [], borradas: {}, prog: {}, bbdd: {} });
 async function descifrarDatos(s) { return s ? { ...vacio(), ...JSON.parse(new TextDecoder().decode(await abrir(await claveDatos(), bytes(s)))) } : vacio(); }
 async function cifrarDatos() {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -149,7 +149,10 @@ function juntar(a, b) {
   // ejercicios de programación: el código más reciente de cada uno; superado, si lo está en cualquiera de los dos
   const prog = { ...a.prog };
   for (const [k, v] of Object.entries(b.prog || {})) { const x = prog[k]; prog[k] = !x || (v.u || 0) > (x.u || 0) ? { ...v, ok: v.ok || x?.ok } : { ...x, ok: x.ok || v.ok }; }
-  return { ts: Math.max(a.ts, b.ts), docs, fallos: (a.ts >= b.ts ? a : b).fallos, notas, borradas, prog };
+  // bases de datos: lo más reciente de cada lección o ejercicio
+  const bbdd = { ...a.bbdd };
+  for (const [k, v] of Object.entries(b.bbdd || {})) if (!bbdd[k] || (v.u || 0) > (bbdd[k].u || 0)) bbdd[k] = v;
+  return { ts: Math.max(a.ts, b.ts), docs, fallos: (a.ts >= b.ts ? a : b).fallos, notas, borradas, prog, bbdd };
 }
 async function deLaNube() {
   if (!NUBE) return vacio();
@@ -215,7 +218,7 @@ function pestana(p) {
   for (const s of document.querySelectorAll('.pestana')) s.hidden = s.id !== 'p-' + p;
   if (p !== 'leer') estudio(p);
 }
-function repintar() { A?.hojas.forEach((_, i) => pintarMarcas(i + 1)); if (A && !$('p-notas').hidden) verNotas(); if (!$('s-prog').hidden) window.verProgramacion?.(true); }
+function repintar() { A?.hojas.forEach((_, i) => pintarMarcas(i + 1)); if (A && !$('p-notas').hidden) verNotas(); if (!$('s-prog').hidden) window.verProgramacion?.(true); if (!$('s-bbdd').hidden) window.verBbdd?.(true); }
 // claro u oscuro: por defecto, el del sistema; lo que elija se recuerda en este navegador (el <head> lo aplica antes de pintar)
 const oscuroSistema = matchMedia('(prefers-color-scheme: dark)');
 const temaActual = () => document.documentElement.dataset.theme || (oscuroSistema.matches ? 'dark' : 'light');
@@ -233,8 +236,9 @@ pintarTema();
 // secciones de dentro: resúmenes o programación
 function seccion(s) {
   for (const b of document.querySelectorAll('.secciones button')) b.setAttribute('aria-pressed', b.dataset.s === s);
-  $('s-resumenes').hidden = s !== 'resumenes'; $('s-prog').hidden = s !== 'prog';
+  $('s-resumenes').hidden = s !== 'resumenes'; $('s-prog').hidden = s !== 'prog'; $('s-bbdd').hidden = s !== 'bbdd';
   if (s === 'prog') window.verProgramacion?.();
+  if (s === 'bbdd') window.verBbdd?.();
 }
 for (const b of document.querySelectorAll('.secciones button')) b.onclick = () => seccion(b.dataset.s);
 // página que se está leyendo, en la barra de herramientas
@@ -316,7 +320,7 @@ $('a-volver').onclick = () => { G = null; yo = null; $('alta').hidden = true; mo
 $('salir').onclick = async () => {
   await subir(true); yo = D = A = null; lectura++; try { sessionStorage.removeItem('doodle-lector'); } catch { /* nada */ }
   window.google?.accounts?.id.disableAutoSelect(); recuerdaGoogle(false); // al salir, no vuelve a entrar solo con Google
-  $('hojas').innerHTML = ''; $('s-prog').innerHTML = ''; $('lector').hidden = true; seccion('resumenes'); mostrar();
+  $('hojas').innerHTML = ''; $('s-prog').innerHTML = ''; $('s-bbdd').innerHTML = ''; window.verBbdd?.reiniciar(); $('lector').hidden = true; seccion('resumenes'); mostrar();
 };
 for (const b of document.querySelectorAll('#pestanas button')) b.onclick = () => pestana(b.dataset.p);
 try { yo = JSON.parse(sessionStorage.getItem('doodle-lector')); } catch { yo = null; }
@@ -327,7 +331,7 @@ if (codigoAlta && GOOGLE_ID) $('e-alta').hidden = false;
 
 // Solo lectura. shortcut: frena descargas, copias y capturas casuales; una foto al móvil o las herramientas
 // del navegador siguen pudiendo (sin marca de agua, a petición: leer es más cómodo).
-const editable = (t) => t.closest?.('input, textarea, .CodeMirror, #s-prog'); // escribir código sí se puede (seleccionar, copiar, pegar)
+const editable = (t) => t.closest?.('input, textarea, .CodeMirror, #s-prog, #s-bbdd'); // escribir código sí se puede (seleccionar, copiar, pegar)
 const no = (e) => {
   if (editable(e.target)) return;
   if (e.type === 'selectstart' && e.target.closest?.('.textLayer')) return; // seleccionar para subrayar sí

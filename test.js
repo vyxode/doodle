@@ -13,6 +13,19 @@ import { parsearTema, montarCatalogo, llaves } from './js/temas.js';
 import { mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 
+// --- bases de datos: cada solución del banco pasa su propio corrector y un fallo se detecta ---
+{
+  const B = await import('./js/bbdd.js'), { EJERCICIOS_BD } = await import('./js/bbddej.js');
+  const bien = (p) => p.every((x) => x[0] === 'bien');
+  for (const e of EJERCICIOS_BD) {
+    assert.ok(bien(B.revisarEr(B.chen(e.er), e)), e.id + ': su E/R');
+    assert.ok(bien(B.revisarEsquema(e.rel, e)), e.id + ': sus tablas');
+    for (const a of e.alt || []) assert.ok(bien(B.revisarEsquema(a, e)), e.id + ': solución alternativa');
+    if (/VNN/.test(e.rel)) assert.ok(!bien(B.revisarEsquema(e.rel.replace(/\n   VNN: [^\n]+/, ''), e)), e.id + ': detecta un VNN que falta');
+  }
+  assert.equal(B.norm('Profesores'), B.norm('PROFESOR'));
+}
+
 // --- cifrado ---
 const sobre = await cifrar('clave', { a: 'ñ€', n: [1, 2] });
 assert.deepEqual(await descifrar('clave', sobre), { a: 'ñ€', n: [1, 2] });

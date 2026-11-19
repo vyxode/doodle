@@ -88,12 +88,14 @@
     .cab { position: static; }
     .cab-in { grid-template-columns: minmax(0, 1fr) auto; }
     .secciones { grid-column: 1 / -1; grid-row: 2; }
-    .secciones button { flex: 1; }
+    .secciones button { flex: 1; white-space: nowrap; padding: 7px 8px; font-size: 13.5px; gap: 6px; }
+    .secciones button .ico { display: none; }
     .quien b, .nube span, #salir .txt { display: none; }
     .nube { padding: 7px; }
     #salir { width: 36px; padding: 0; }
   }
-  #s-resumenes, #s-prog { width: min(980px, calc(100% - 32px)); margin: 28px auto 0; display: grid; gap: 16px; align-content: start; animation: entrar .3s ease-out backwards; }
+  #s-resumenes, #s-prog, #s-bbdd { width: min(980px, calc(100% - 32px)); margin: 28px auto 0; display: grid; gap: 16px; align-content: start; animation: entrar .3s ease-out backwards; }
+  #s-bbdd:has(.bd-editor) { width: min(1280px, calc(100% - 32px)); }
   #s-prog:has(.prog-lab) { width: min(1480px, calc(100% - 32px)); margin-top: 16px; gap: 12px; }
   .hero-s h2, .prog-cab h2 { margin: 0; font: 800 clamp(28px, 4vw, 38px)/1.1 var(--f-titulo); letter-spacing: -0.03em; }
   /* el gesto de la página: el título se subraya con fosforito al entrar */
@@ -341,6 +343,7 @@
       <nav class="secciones" aria-label="Secciones">
         <button type="button" data-s="resumenes" aria-pressed="true"><span data-ico="libro"></span>Resúmenes</button>
         <button type="button" data-s="prog" aria-pressed="false"><span data-ico="codigo"></span>Programación</button>
+        <button type="button" data-s="bbdd" aria-pressed="false"><span data-ico="datos"></span>Bases de datos</button>
       </nav>
       <div class="cab-der">
         <span class="nube" id="nube" role="status"></span>
@@ -386,6 +389,7 @@
     </div>
     </div>
     <div id="s-prog" hidden></div>
+    <div id="s-bbdd" hidden></div>
   </section>
 </main>
 <!-- en pantallas táctiles, para confirmar lo seleccionado (con ratón se subraya al soltar) -->
@@ -420,5 +424,6 @@
 <script src="marcas.js"></script>
 <script src="estudio.js"></script>
 <script type="module" src="programacion.js"></script>
+<script type="module" src="bases.js"></script>
 </body>
 </html>

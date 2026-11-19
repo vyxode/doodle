@@ -99,8 +99,13 @@ function borde(n, px, py) {
 function extremos(d, e) {
   const A = d.nodos.find((n) => n.id === e.de), B = d.nodos.find((n) => n.id === e.a);
   if (!A || !B) return null;
-  const ca = centro(A), cb = centro(B);
-  return { p: borde(A, cb.x, cb.y), q: borde(B, ca.x, ca.y) };
+  const ca = centro(A), cb = centro(B), p = borde(A, cb.x, cb.y), q = borde(B, ca.x, ca.y);
+  // varias líneas entre los mismos dos elementos (relación reflexiva: el rombo unido dos veces a la entidad): en paralelo
+  const par = d.aristas.filter((x) => (x.de === e.de && x.a === e.a) || (x.de === e.a && x.a === e.de));
+  if (par.length < 2) return { p, q };
+  const L = Math.hypot(cb.x - ca.x, cb.y - ca.y) || 1, s = e.de === par[0].de ? 1 : -1, off = (par.indexOf(e) - (par.length - 1) / 2) * 22 * s;
+  const nx = (-(cb.y - ca.y) / L) * off, ny = ((cb.x - ca.x) / L) * off;
+  return { p: { x: p.x + nx, y: p.y + ny }, q: { x: q.x + nx, y: q.y + ny }, lado: Math.sign(off) };
 }
 
 // ---------- dibujo (SVG en texto: el mismo para la pantalla y para exportar) ----------
@@ -128,7 +133,7 @@ function dibujarNodo(n, c, sel) {
     }
     case 'isa': {
       s = `<polygon points="${cx},${y} ${x + w},${y + h} ${x},${y + h}" style="${st}"/>` + textoCentrado(n.texto, cx, y + h * 0.66, c, '600 ');
-      const etq = `(${n.total ? 't' : 'p'}, ${n.solapada ? 's' : 'e'})`;
+      const etq = `(${n.total ? 'T' : 'P'}, ${n.solapada ? 'S' : 'D'})`; // total/parcial, disjunta/solapada, como en clase
       s += `<text x="${x + w + 6}" y="${cy}" dominant-baseline="central" style="fill:${c.suave};font:12px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">${etq}</text>`;
       break;
     }
@@ -212,9 +217,11 @@ function dibujarArista(d, e, c, sel) {
     case 'punteada': s = linea(p, q, 'stroke-dasharray:5 4'); break;
     default: s = linea(p, q);
   }
-  s += etiqueta(e.etiqueta, puntoEnSegmento(p, q, 0.5, 0), c, e.estilo === 'discontinua' ? '' : '600 ');
-  s += etiqueta(e.etDe, puntoEnSegmento(p, q, Math.min(0.3, 34 / L), -12), c);
-  s += etiqueta(e.etA, puntoEnSegmento(p, q, 1 - Math.min(0.3, 34 / L), -12), c);
+  // en líneas paralelas (reflexivas) los textos van hacia fuera, cada uno de su lado
+  const fuera = (t) => (ex.lado ? ex.lado * (Math.abs(uy) * (anchoTexto(t) + 8) / 2 + Math.abs(ux) * 10 + 4) : 0);
+  s += etiqueta(e.etiqueta, puntoEnSegmento(p, q, 0.5, fuera(e.etiqueta || '')), c, e.estilo === 'discontinua' ? '' : '600 ');
+  s += etiqueta(e.etDe, puntoEnSegmento(p, q, Math.min(0.3, 34 / L), fuera(e.etDe || '') || -12), c);
+  s += etiqueta(e.etA, puntoEnSegmento(p, q, 1 - Math.min(0.3, 34 / L), fuera(e.etA || '') || -12), c);
   // trazo ancho invisible para poder tocar la línea con el dedo
   return `<g class="dg-arista" data-arista="${e.id}"><line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" style="stroke:transparent;stroke-width:16"/>${s}</g>`;
 }
@@ -225,10 +232,11 @@ function limites(d) {
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 const ordenNodos = (d) => [...d.nodos].sort((a, b) => (FORMAS[b.tipo].caja ? 1 : 0) - (FORMAS[a.tipo].caja ? 1 : 0));
-export function svgExportable(d) {
-  const b = limites(d), m = 30, c = COLORES_PAPEL;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(b.w + 2 * m)}" height="${Math.ceil(b.h + 2 * m)}" viewBox="${b.x - m} ${b.y - m} ${b.w + 2 * m} ${b.h + 2 * m}">` +
-    `<rect x="${b.x - m}" y="${b.y - m}" width="${b.w + 2 * m}" height="${b.h + 2 * m}" fill="#FFFFFF"/>` +
+// enApp: con los colores del tema (claro u oscuro) y sin fondo, para enseñarlo dentro de la página
+export function svgExportable(d, enApp) {
+  const b = limites(d), m = 30, c = enApp ? COLORES_APP : COLORES_PAPEL;
+  return `<svg xmlns="http://www.w3.org/2000/svg" ${enApp ? 'class="dg-estatico" role="img"' : `width="${Math.ceil(b.w + 2 * m)}" height="${Math.ceil(b.h + 2 * m)}"`} viewBox="${b.x - m} ${b.y - m} ${b.w + 2 * m} ${b.h + 2 * m}">` +
+    (enApp ? '' : `<rect x="${b.x - m}" y="${b.y - m}" width="${b.w + 2 * m}" height="${b.h + 2 * m}" fill="#FFFFFF"/>`) +
     ordenNodos(d).filter((n) => FORMAS[n.tipo].caja).map((n) => dibujarNodo(n, c)).join('') +
     d.aristas.map((e) => dibujarArista(d, e, c)).join('') +
     ordenNodos(d).filter((n) => !FORMAS[n.tipo].caja).map((n) => dibujarNodo(n, c)).join('') + '</svg>';

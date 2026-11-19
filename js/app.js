@@ -9,6 +9,8 @@ const EJ_SQL_N = EJ_SQL.length;
 import { montarDiagrama, svgExportable, tam } from './diagrama.js';
 import { montarCsharp as labCsharp, PLANTILLA, montarLado, ejemploPrueba } from './laboratorio.js';
 import { leerTemas } from './temas.js';
+import { montarBbdd } from './bbdd.js';
+import { EJERCICIOS_BD } from './bbddej.js';
 
 const D = 86400;
 const URGENTE = 3 * D; // a menos de 3 días: en rojo
@@ -29,7 +31,7 @@ const S = {
   filtro: { modulo: '' }, tabModulo: 'todo', mes: null, diaSel: null, recordar: false,
   objetivos: {}, semanaPlan: 0, calVista: 'mes', pomo: null,
 };
-function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {}, marcas: {}, plan: {}, tiempo: {}, repaso: {}, examenes: {} }; }
+function progVacio() { return { ej: {}, tareas: {}, ejPropios: {}, trabajos: {}, marcas: {}, plan: {}, tiempo: {}, repaso: {}, examenes: {}, bbdd: {} }; }
 const guardarCfg = () => LS.set('doodle-cfg', S.cfg);
 const aplicarTema = () => { // sin elegir: sigue al sistema
   const t = { claro: 'light', oscuro: 'dark' }[S.cfg.tema];
@@ -367,9 +369,9 @@ const NAV_MOVIL = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario',
 function render(forzar) {
   const v = location.hash.startsWith('#config-') ? 'inicio' : location.hash.slice(1) || 'inicio';
   // shortcut: con un trabajo abierto, los repintados (sincronizar, etc.) no lo vuelven a montar para no perder deshacer y selección
-  if (v === 'trabajo-' + S.montado && document.getElementById('taller') && !forzar) return pintarEstado();
+  if ((v === 'trabajo-' + S.montado && document.getElementById('taller') || v.startsWith('bbdd-e-') && v === S.montado && document.getElementById('bbdd')) && !forzar) return pintarEstado();
   S.montado = null;
-  const base = v.startsWith('modulo-') || v.startsWith('tarea-') ? 'modulos' : v.startsWith('trabajo-') ? 'ejercicios' : ['repasar', 'examen'].includes(v) ? 'repaso' : v;
+  const base = v.startsWith('modulo-') || v.startsWith('tarea-') ? 'modulos' : v.startsWith('trabajo-') || v === 'bbdd' || v.startsWith('bbdd-') ? 'ejercicios' : ['repasar', 'examen'].includes(v) ? 'repaso' : v;
   const baseMovil = ['notas', 'ajustes', 'repaso'].includes(base) ? 'mas' : base;
   app.innerHTML = `
   <div class="marco">
@@ -389,9 +391,14 @@ function render(forzar) {
   pintarEstado();
   const vista = document.getElementById('vista');
   document.body.classList.toggle('en-taller', v.startsWith('trabajo-'));
-  vista.innerHTML = v.startsWith('modulo-') ? vistaModulo(+v.slice(7)) : v.startsWith('tarea-') ? vistaTarea(v.slice(6)) : v.startsWith('trabajo-') ? vistaTrabajo(v.slice(8))
+  vista.innerHTML = v === 'bbdd' || v.startsWith('bbdd-') ? '<div id="bbdd"></div>' : v.startsWith('modulo-') ? vistaModulo(+v.slice(7)) : v.startsWith('tarea-') ? vistaTarea(v.slice(6)) : v.startsWith('trabajo-') ? vistaTrabajo(v.slice(8))
     : ({ inicio: vistaInicio, modulos: vistaModulos, calendario: vistaCalendario, notas: vistaNotas, ejercicios: vistaEjercicios, ajustes: vistaAjustes, mas: vistaMas, repaso: vistaRepasoSec, repasar: vistaRepaso, examen: vistaExamen }[v] || vistaInicio)();
   if (v.startsWith('trabajo-')) montarTrabajo(v.slice(8));
+  if (v === 'bbdd' || v.startsWith('bbdd-')) {
+    // lecciones y banco de E/R y relacional (js/bbdd.js); lo hecho va con el progreso, cifrado y sincronizado
+    S.montado = v;
+    montarBbdd(document.getElementById('bbdd'), { sub: v.slice(5), leer: (id) => (S.prog.bbdd || {})[id], guardar: (id, x) => { S.prog.bbdd ||= {}; cambiar('bbdd', id, x); }, ir: (sub) => { location.hash = sub ? 'bbdd-' + sub : 'bbdd'; scrollTo(0, 0); } });
+  }
   actualizarContador();
   const sd = document.getElementById('salir-demo');
   if (sd) sd.addEventListener('click', (ev) => { ev.preventDefault(); S.demo = false; S.curso = null; location.hash = ''; pintarBloqueo(); });
@@ -1117,6 +1124,7 @@ function vistaEjercicios() {
     </form></details>` : ''}
   ${m === 'Programación' && window.CHULETA ? `<section class="bloque"><div class="panel practica-cta"><div><b>Chuleta de C#</b><p class="suave">Todo lo de los temas 1 a 5 con ejemplos y buscador. También está en cada ejercicio de C#.</p></div><button type="button" class="boton" data-acc="chuleta">Abrir</button></div></section>` : ''}
   ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejercicios y ejemplos leídos de tus temas de Aules (${S.temas.ejercicios.length} ejercicios, ${Object.keys(S.temas.ejemplos).length} ejemplos) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
+  ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>E/R y modelo relacional</b><p class="suave">5 lecciones interactivas y ${EJERCICIOS_BD.length} ejercicios para hacer el E/R en el editor y pasarlo a tablas.</p></div><a class="boton principal" href="#bbdd">Aprender</a></div></section>` : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}`;
 }
