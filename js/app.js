@@ -11,6 +11,7 @@ import { montarCsharp as labCsharp, PLANTILLA, montarLado, ejemploPrueba } from 
 import { leerTemas } from './temas.js';
 import { montarBbdd } from './bbdd.js';
 import { EJERCICIOS_BD } from './bbddej.js';
+import { zip } from './zip.js';
 
 const D = 86400;
 const URGENTE = 3 * D; // a menos de 3 días: en rojo
@@ -363,16 +364,17 @@ const IC = {
   sync: '<path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/>',
 };
 const icono = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
-const NAV = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['repaso', 'Repaso'], ['notas', 'Notas'], ['ajustes', 'Ajustes']];
-const NAV_MOVIL = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['ejercicios', 'Ejercicios'], ['mas', 'Más']];
+// los ejercicios van dentro de Repaso (pestaña «Ejercicios»): un solo sitio para practicar
+const NAV = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['repaso', 'Repaso'], ['notas', 'Notas'], ['ajustes', 'Ajustes']];
+const NAV_MOVIL = [['inicio', 'Inicio'], ['modulos', 'Módulos'], ['calendario', 'Calendario'], ['repaso', 'Repaso'], ['mas', 'Más']];
 
 function render(forzar) {
   const v = location.hash.startsWith('#config-') ? 'inicio' : location.hash.slice(1) || 'inicio';
   // shortcut: con un trabajo abierto, los repintados (sincronizar, etc.) no lo vuelven a montar para no perder deshacer y selección
   if ((v === 'trabajo-' + S.montado && document.getElementById('taller') || v.startsWith('bbdd-e-') && v === S.montado && document.getElementById('bbdd')) && !forzar) return pintarEstado();
   S.montado = null;
-  const base = v.startsWith('modulo-') || v.startsWith('tarea-') ? 'modulos' : v.startsWith('trabajo-') || v === 'bbdd' || v.startsWith('bbdd-') ? 'ejercicios' : ['repasar', 'examen'].includes(v) ? 'repaso' : v;
-  const baseMovil = ['notas', 'ajustes', 'repaso'].includes(base) ? 'mas' : base;
+  const base = v.startsWith('modulo-') || v.startsWith('tarea-') ? 'modulos' : v.startsWith('trabajo-') || v === 'bbdd' || v.startsWith('bbdd-') || ['ejercicios', 'repasar', 'examen'].includes(v) ? 'repaso' : v;
+  const baseMovil = ['notas', 'ajustes'].includes(base) ? 'mas' : base;
   app.innerHTML = `
   <div class="marco">
     <aside class="lateral">
@@ -418,6 +420,7 @@ window.addEventListener('hashchange', () => { if (S.curso) { render(true); windo
 const cabecera = (titulo, extra = '', ante = '') => `<header class="cab-vista">${ante ? `<span class="antetitulo">${ante}</span>` : ''}<h1>${titulo}</h1>${extra ? `<div class="cab-extra">${extra}</div>` : ''}</header>`;
 const cifra = (valor, texto, clase = '') => `<div class="cifra corte ${clase}"><b>${valor}</b><small>${texto}</small></div>`;
 const vacio = (t) => `<p class="vacio">${t}</p>`;
+const pestanasRepaso = (v) => `<nav class="sub-rep" aria-label="Repaso"><a href="#repaso" ${v === 'repaso' ? 'aria-current="page"' : ''}>Repasar</a><a href="#ejercicios" ${v === 'ejercicios' ? 'aria-current="page"' : ''}>Ejercicios</a></nav>`;
 // Fecha en palabras: «Hoy a las 23:59», «Jueves a las 08:01», «Hace 3 días», «mié, 11 nov a las 18:25».
 const F_SEMANA = F({ weekday: 'long' }), F_DIA_MES = F({ day: 'numeric', month: 'short' });
 const inicioDia = (ts) => new Date(ts * 1000).setHours(0, 0, 0, 0) / 1000;
@@ -787,7 +790,6 @@ document.addEventListener('drop', (ev) => {
 
 function vistaMas() {
   return cabecera('Más') + `<div class="mas-enlaces">
-    <a href="#repaso" class="mas-enlace corte">${icono('repaso')}<span><b>Repaso</b><small>Test, tarjetas, huecos y exámenes</small></span></a>
     <a href="#notas" class="mas-enlace corte">${icono('notas')}<span><b>Notas</b><small>Medias y calificaciones sobre 10</small></span></a>
     <a href="#ajustes" class="mas-enlace corte">${icono('ajustes')}<span><b>Ajustes</b><small>Aules, GitHub, apariencia y copia</small></span></a>
   </div>`;
@@ -1105,7 +1107,7 @@ function vistaEjercicios() {
   // de entrada, el módulo con más cosas por entregar
   if (!mods.includes(S.filtro.modulo)) { const T = tareas().filter(porHacer); S.filtro.modulo = [...mods].sort((a, b) => T.filter((t) => t.modulo === b).length - T.filter((t) => t.modulo === a).length)[0] || ''; }
   const m = S.filtro.modulo;
-  return cabecera('Ejercicios', '<span class="suave">Haz aquí las tareas: diagramas, SQL, Java, C#, web… Todo se guarda solo.</span>') + `
+  return cabecera('Repaso', '<span class="suave">Haz aquí las tareas: diagramas, SQL, Java, C#, web… Todo se guarda solo.</span>') + pestanasRepaso('ejercicios') + `
   <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="filtro-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
   <details class="panel corte"><summary>+ Nuevo trabajo libre</summary>
     <form id="f-trabajo" class="rejilla-form">
@@ -1126,7 +1128,49 @@ function vistaEjercicios() {
   ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejercicios y ejemplos leídos de tus temas de Aules (${S.temas.ejercicios.length} ejercicios, ${Object.keys(S.temas.ejemplos).length} ejemplos) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>E/R y modelo relacional</b><p class="suave">5 lecciones interactivas y ${EJERCICIOS_BD.length} ejercicios para hacer el E/R en el editor y pasarlo a tablas.</p></div><a class="boton principal" href="#bbdd">Aprender</a></div></section>` : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
-  ${listaEjercicios(m)}`;
+  ${listaEjercicios(m)}
+  ${panelExportar()}`;
+}
+// ---------- exportar a zip los ejercicios que elija: código, diagramas (SVG y JSON) y tablas ----------
+const nombreArchivo = (t) => String(t || '').replace(/[\\/:*?"<>|\n]+/g, '-').replace(/\s+/g, ' ').trim().slice(0, 70) || 'sin nombre';
+function exportables() {
+  const out = [], svg = (d) => (d?.nodos?.length ? [['diagrama.svg', svgExportable(d)], ['diagrama.json', JSON.stringify(d)]] : []);
+  for (const e of catalogo()) {
+    const g = S.prog.ej[e.id], tit = `${e.n ? e.n + ' ' : ''}${String(e.texto).split(':')[0]}`;
+    if (g?.codigo) out.push({ id: 'ej:' + e.id, grupo: e.modulo, titulo: tit, hecho: !!g.hecho, archivos: [[tit + (e.lenguaje === 'csharp' ? '.cs' : '.txt'), `/*\n${e.texto}\n*/\n\n${g.codigo}`]] });
+  }
+  for (const w of trabajos()) {
+    const d = (w.datos || {})[w.tipo], t = w.tarea && tareas().find((x) => x.clave === w.tarea);
+    const A = ({ diagrama: () => svg(d), sql: () => (d?.codigo ? [['script.sql', d.codigo]] : []), practica: () => (d?.codigo ? [['consultas.sql', d.codigo]] : []), csharp: () => (d?.codigo ? [['Program.cs', d.codigo]] : []),
+      java: () => (d?.archivos || []).map((a) => [a.nombre, a.codigo]), web: () => [['index.html', d?.html], ['estilos.css', d?.css]].filter((x) => x[1]), notas: () => (d?.texto ? [['notas.txt', d.texto]] : []),
+      kanban: () => (d?.columnas ? [['tablero.md', d.columnas.map((c) => `## ${c.nombre}\n` + d.tarjetas.filter((x) => x.col === c.id).map((x) => `- ${x.titulo}`).join('\n')).join('\n\n')]] : []) }[w.tipo] || (() => []))();
+    if (A.length) out.push({ id: 'w:' + w.id, grupo: w.modulo || 'Sin módulo', titulo: w.titulo, hecho: !!t && situacion(t) === 'hecha', carpeta: true, archivos: A });
+  }
+  for (const e of EJERCICIOS_BD) {
+    const v = (S.prog.bbdd || {})['E-' + e.id];
+    if (v?.er?.nodos?.length || v?.rel) out.push({ id: 'bd:' + e.id, grupo: 'Bases de Datos', titulo: e.t, hecho: !!v.ok, carpeta: true, archivos: [['enunciado.txt', e.enun.trim()], ...svg(v.er), ...(v.rel ? [['tablas.txt', v.rel]] : [])] });
+  }
+  return out;
+}
+function panelExportar() {
+  const L = exportables(), grupos = [...new Set(L.map((x) => x.grupo))];
+  if (!L.length) return '';
+  return `<details class="panel corte exportar"><summary>Exportar ejercicios a zip</summary>
+    <p class="suave">Marca los que quieras: van en carpetas por módulo, con el código, los diagramas (SVG y JSON) y las tablas. Vienen marcados los terminados.</p>
+    <div class="fila-botones"><button type="button" class="boton mini" data-acc="zip-marcar" data-v="1">Todos</button><button type="button" class="boton mini" data-acc="zip-marcar" data-v="">Ninguno</button></div>
+    ${grupos.map((g) => `<fieldset class="exportar-grupo"><legend>${esc(g)}</legend>${L.filter((x) => x.grupo === g).map((x) => `<label><input type="checkbox" data-zip="${esc(x.id)}" ${x.hecho ? 'checked' : ''}><span>${esc(x.titulo)}</span>${x.hecho ? '<span class="chip ok">Terminado</span>' : ''}</label>`).join('')}</fieldset>`).join('')}
+    <button type="button" class="boton principal" data-acc="zip">Descargar zip</button><span class="suave zip-estado" aria-live="polite"></span></details>`;
+}
+function descargarZip(boton) {
+  const marcados = new Set([...document.querySelectorAll('[data-zip]:checked')].map((x) => x.dataset.zip)), L = exportables().filter((x) => marcados.has(x.id));
+  const estado = boton.parentNode.querySelector('.zip-estado');
+  if (!L.length) { estado.textContent = 'Marca al menos uno.'; return; }
+  const usados = new Set(), unico = (r) => { let n = r, i = 2; while (usados.has(n)) n = r.replace(/(\.[^./]+)?$/, ` (${i++})$1`); usados.add(n); return n; };
+  const archivos = L.flatMap((x) => x.archivos.map(([n, datos]) => ({ nombre: unico(`${nombreArchivo(x.grupo)}/${x.carpeta ? nombreArchivo(x.titulo) + '/' : ''}${nombreArchivo(n)}`), datos: String(datos ?? '') })));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(zip(archivos)); a.download = `ejercicios-${new Date().toISOString().slice(0, 10)}.zip`;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  estado.textContent = `${L.length} ejercicio${L.length === 1 ? '' : 's'}, ${archivos.length} archivos.`;
 }
 // ---------- repaso (cajas de Leitner: acertar sube de caja y espacia la próxima vez; fallar vuelve a la 1) ----------
 const DIAS_CAJA = [0, 1, 3, 7, 14, 30];
@@ -1267,7 +1311,7 @@ function vistaRepasoSec() {
   const mods = [...new Set([window.REPASO, window.TARJETAS, window.HUECOS, window.RESUMENES].flatMap((o) => Object.keys(o || {})))];
   if (!mods.includes(S.repMod)) S.repMod = mods.includes('Sistemas Informáticos') ? 'Sistemas Informáticos' : mods[0];
   const m = S.repMod, L = ((window.REPASO || {})[m] || []).filter(Boolean), h = examenesDe(m);
-  return cabecera('Repaso', '<span class="suave">Test, tarjetas, huecos y exámenes para preparar los exámenes.</span>') + `
+  return cabecera('Repaso', '<span class="suave">Test, tarjetas, huecos y exámenes para preparar los exámenes.</span>') + pestanasRepaso('repaso') + `
   <div class="chips-mod" role="group" aria-label="Módulo">${mods.map((x) => `<button type="button" data-acc="rep-mod" data-v="${esc(x)}" aria-pressed="${x === m}" style="--mod:${colorDe(x)}"><i class="punto-mod"></i>${esc(x)}</button>`).join('')}</div>
   <div class="rep-fichas">${fichaRepaso(m, 'p', 'Preguntas tipo test', 'Repasar')}${fichaRepaso(m, 't', 'Tarjetas', 'Estudiar')}${fichaRepaso(m, 'h', 'Completar huecos', 'Completar')}</div>
   ${((window.RESUMENES || {})[m] || []).map((r) => `<a class="panel rep-resumen" href="repaso/" target="_blank" rel="noopener"><span class="rep-pdf" aria-hidden="true">PDF</span><span><b>${esc(r.t)}</b><small class="suave">Solo lectura, con tu contraseña personal</small></span><span class="rep-ir" aria-hidden="true">↗</span></a>`).join('')}
@@ -1753,6 +1797,8 @@ document.addEventListener('click', async (ev) => {
   else if (acc === 'enunciado') { const a = document.querySelector('.taller-enun'), abierto = el.getAttribute('aria-expanded') === 'true'; a.hidden = abierto; el.setAttribute('aria-expanded', String(!abierto)); }
   else if (acc === 'borrar-trabajo') { if (el.dataset.confirmar !== 'si') { el.dataset.confirmar = 'si'; el.textContent = '¿Seguro?'; return; } cambiar('trabajos', el.dataset.v, { borrado: true }); render(); }
   else if (acc === 'filtro-mod') { S.filtro.modulo = el.dataset.v; render(); }
+  else if (acc === 'zip') descargarZip(el);
+  else if (acc === 'zip-marcar') el.closest('.exportar').querySelectorAll('[data-zip]').forEach((x) => (x.checked = !!el.dataset.v));
   else if (acc === 'ir-ejercicios') { S.filtro.modulo = el.dataset.modulo; }
   else if (acc === 'tab-mod') { S.tabModulo = el.dataset.v; render(); }
   else if (acc === 'dia') { S.diaSel = +el.dataset.v; render(); }

@@ -32,6 +32,16 @@ import { createRequire } from 'node:module';
   assert.ok(veces.vnn > veces.card * 4, 'lo fallado sale más');
 }
 
+// --- zip para exportar ejercicios: CRC32 conocido y cabeceras en su sitio ---
+{
+  const { zip, crc32 } = await import('./js/zip.js');
+  assert.equal(crc32(new TextEncoder().encode('123456789')), 0xcbf43926);
+  const b = new Uint8Array(await zip([{ nombre: 'Programación/1.1.cs', datos: 'hola' }, { nombre: 'b.txt', datos: '' }]).arrayBuffer()), v = new DataView(b.buffer);
+  assert.equal(v.getUint32(0, true), 0x04034b50);
+  assert.equal(v.getUint32(b.length - 22, true), 0x06054b50);
+  assert.equal(v.getUint16(b.length - 12, true), 2); // dos archivos
+}
+
 // --- cifrado ---
 const sobre = await cifrar('clave', { a: 'ñ€', n: [1, 2] });
 assert.deepEqual(await descifrar('clave', sobre), { a: 'ñ€', n: [1, 2] });
