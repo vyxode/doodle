@@ -223,4 +223,9 @@ window.PRUEBAS_CS = {
   'banco-5.5': [{ codigo: 'Console.Write(SumarCifras(425) + " " + SumarCifras(7));', n: [11, 7], orden: true, exacto: true }],
   'banco-5.6': [{ codigo: 'int[] v = { 1, 2, 1, 3, 1 }; Console.Write(ContarApariciones(v, 1, 0) + " " + ContarApariciones(v, 5, 0));', n: [3, 0], orden: true, exacto: true }],
   'banco-5.7': [{ codigo: 'Console.Write(EsPalindromoRecursivo("reconocer") + " " + EsPalindromoRecursivo("hola"));', t: ['true false'] }],
+  // Ampliación (selección para el examen)
+  'ampl-2.2.10.2': [{ e: ['12', '18'], n: [36] }, { e: ['4', '6'], n: [12] }],
+  'ampl-2.5.6': [{ e: ['2', '10'], n: [1024] }, { e: ['5', '0'], n: [1] }],
+  'ampl-2.5.7': [{ e: ['4', '3'], t: ['****\n*  *\n****'] }],
+  'ampl-5.9.1': [{ codigo: 'Console.Write(Potencia(2, 10) + " " + Potencia(7, 0));', n: [1024, 1], orden: true, exacto: true }],
 };

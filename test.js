@@ -187,8 +187,12 @@ await promisify(execFile)('python3', ['-c', 'import xml.dom.minidom as m; m.pars
     'prog-4.6.1': main('Console.Write("Nombre: "); string n = Console.ReadLine(); string a = Console.ReadLine(); int e = Convert.ToInt32(Console.ReadLine()); Console.WriteLine(n + ", " + a + ", " + e);'),
     'prog-4.7.1': main('double[] v = new double[6]; for (int i = 0; i < 6; i++) v[i] = Convert.ToDouble(Console.ReadLine()); Array.Sort(v); foreach (double x in v) Console.Write(x + " ");'),
     'prog-4.7.2': main('string[] v = new string[5]; for (int i = 0; i < 5; i++) v[i] = Console.ReadLine(); Array.Sort(v); foreach (string x in v) Console.WriteLine(x);'),
+    'ampl-2.2.10.2': main('int a = Convert.ToInt32(Console.ReadLine()), b = Convert.ToInt32(Console.ReadLine()); int m = Math.Max(a, b); while (m % a != 0 || m % b != 0) m++; Console.WriteLine("MCM: " + m);'),
+    'ampl-2.5.6': main('int b = Convert.ToInt32(Console.ReadLine()), e = Convert.ToInt32(Console.ReadLine()); int r = 1; for (int i = 0; i < e; i++) r *= b; Console.WriteLine(r);'),
+    'ampl-2.5.7': main('int an = Convert.ToInt32(Console.ReadLine()), al = Convert.ToInt32(Console.ReadLine()); for (int f = 0; f < al; f++) { for (int c = 0; c < an; c++) Console.Write(f == 0 || f == al - 1 || c == 0 || c == an - 1 ? "*" : " "); Console.WriteLine(); }'),
+    'ampl-5.9.1': 'using System;\nclass P { static int Potencia(int b, int e) { return e == 0 ? 1 : b * Potencia(b, e - 1); }\nstatic void Main() { ' + P['ampl-5.9.1'][0].codigo + ' } }',
   };
-  for (const [id, src] of Object.entries(ref)) for (const caso of P[id]) { const r = comprobarCaso(run(src, caso.e), caso); assert.ok(r.ok, id + ': ' + r.motivo + ' · salida: ' + JSON.stringify(r.salida)); }
+  for (const [id, src] of Object.entries(ref)) for (const caso of P[id].map((c) => ({ e: [], ...c }))) { const r = comprobarCaso(run(src, caso.e || []), caso); assert.ok(r.ok, id + ': ' + r.motivo + ' · salida: ' + JSON.stringify(r.salida)); }
   // y que un programa mal hecho no pase
   const mal = comprobarCaso(run(main('int[] a = new int[4]; for (int i = 0; i < 4; i++) a[i] = Convert.ToInt32(Console.ReadLine()); Console.WriteLine("Media: " + (a[0]+a[1]+a[2]+a[3]) / 4);'), P['prog-4.1.1.1'][1].e), P['prog-4.1.1.1'][1]);
   assert.ok(!mal.ok && /1,25/.test(mal.motivo), 'división entera detectada: ' + mal.motivo);

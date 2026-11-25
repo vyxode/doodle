@@ -127,15 +127,20 @@ function mediaCurso(c) {
   return ns.length ? ns.reduce((a, b) => a + b) / ns.length : null;
 }
 function catalogo() {
-  const out = [], leidos = !S.demo && S.temas && S.temas.ejercicios.length ? S.temas : null;
-  for (const m of window.EJERCICIOS || []) if (!(leidos && m.modulo === 'Programación' && !m.siempre)) for (const e of m.ejercicios) out.push({ ...e, modulo: m.modulo, lenguaje: e.lenguaje || m.lenguaje });
-  if (leidos) for (const e of leidos.ejercicios) out.push({ ...e, modulo: 'Programación', lenguaje: 'csharp' });
+  const out = [];
+  for (const m of window.EJERCICIOS || []) for (const e of m.ejercicios) out.push({ ...e, modulo: m.modulo, lenguaje: e.lenguaje || m.lenguaje });
   for (const [id, e] of Object.entries(S.prog.ejPropios)) if (!e.borrado) out.push({ ...e, id, propio: true });
   return out;
 }
 const modulosCatalogo = () => [...new Set(catalogo().map((e) => e.modulo))];
 const cursoDeModulo = (m) => cursos().find((c) => nombreModulo(c.nombre) === m);
 const hecho = (e) => !!(S.prog.ej[e.id] || {}).hecho;
+// Una vez, tras leer el progreso de GitHub: borra lo hecho en C# para empezar el repaso del examen de cero (queda en el historial de progreso.enc).
+function reinicioExamen() {
+  if (S.demo || S.prog.ej._reinicio2611) return;
+  for (const [id, g] of Object.entries(S.prog.ej)) if (id[0] !== '_' && (g.codigo || g.hecho)) cambiar('ej', id, { codigo: '', hecho: false });
+  cambiar('ej', '_reinicio2611', {});
+}
 // Etiqueta solo cuando aporta algo: una tarea pendiente normal no lleva chip.
 function estadoTarea(t) {
   const s = situacion(t);
@@ -299,12 +304,14 @@ async function entrar(pass) {
   S.pat = S.cfg.patSobre ? (await descifrar(pass, S.cfg.patSobre).catch(() => ({}))).pat || null : null;
   S.aules = S.cfg.aulesSobre ? await descifrar(pass, S.cfg.aulesSobre).catch(() => null) : null;
   if (S.recordar) { LS.set('doodle-recordar', pass); S.recordar = false; }
+  if (!S.pat) reinicioExamen();
   if (location.hash.startsWith('#config-')) { try { await aplicarConfig(location.hash.slice(8)); } catch (e) { /* código de otra contraseña */ } location.hash = 'inicio'; }
   render();
   if (S.pat) {
     estadoSync('Leyendo GitHub…', 'ambar');
     try {
       const rem = await bajarProgreso(); if (rem) { S.prog = mezclar(S.prog, rem); guardarLocal(); }
+      reinicioExamen();
       const c = await leerArchivo('data/curso.enc'); S.remoto.shaCurso = c.sha;
       if (c.sobre) { const nuevo = await masNuevo(pass, [c.sobre]); if ((nuevo.generado || '') > (S.curso.generado || '')) { novedades(S.curso, nuevo); S.curso = nuevo; LS.set('doodle-curso', c.sobre); } }
       estadoSync('Sincronizado', 'si'); render();
@@ -1125,7 +1132,7 @@ function vistaEjercicios() {
       <div class="campo campo-boton"><button class="boton principal">Añadir ejercicio</button></div>
     </form></details>` : ''}
   ${m === 'Programación' && window.CHULETA ? `<section class="bloque"><div class="panel practica-cta"><div><b>Chuleta de C#</b><p class="suave">Todo lo de los temas 1 a 5 con ejemplos y buscador. También está en cada ejercicio de C#.</p></div><button type="button" class="boton" data-acc="chuleta">Abrir</button></div></section>` : ''}
-  ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejercicios y ejemplos leídos de tus temas de Aules (${S.temas.ejercicios.length} ejercicios, ${Object.keys(S.temas.ejemplos).length} ejemplos) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
+  ${m === 'Programación' && !S.demo && S.aules ? `<p class="suave nota-temas">${S.temas ? `Ejemplos leídos de tus temas de Aules (${Object.keys(S.temas.ejemplos).length}) · ${esc(cuando(Math.floor(S.temas.fecha / 1000)))}` : 'Aún no se han leído tus temas de Aules.'} <button type="button" class="enlace" data-acc="releer-temas">${S.leyendoTemas ? 'Leyendo…' : 'Volver a leer'}</button></p>` : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>E/R y modelo relacional</b><p class="suave">5 lecciones interactivas y ${EJERCICIOS_BD.length} ejercicios para hacer el E/R en el editor y pasarlo a tablas.</p></div><a class="boton principal" href="#bbdd">Aprender</a></div></section>` : ''}
   ${m === 'Bases de Datos' ? `<section class="bloque"><div class="panel practica-cta"><div><b>Práctica de SQL</b><p class="suave">${EJ_SQL_N} consultas sobre una tienda de ejemplo que se corrigen solas.</p></div><button type="button" class="boton principal" data-acc="practicar-sql">Practicar</button></div></section>` : ''}
   ${listaEjercicios(m)}
