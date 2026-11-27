@@ -310,8 +310,12 @@ async function entrar(pass) {
   if (S.pat) {
     estadoSync('Leyendo GitHub…', 'ambar');
     try {
-      const rem = await bajarProgreso(); if (rem) { S.prog = mezclar(S.prog, rem); guardarLocal(); }
+      const rem = await bajarProgreso();
+      // lo hecho en este equipo sin conexión o sin clave (más nuevo que lo de GitHub) se sube ya, sin esperar a otro cambio
+      const pendiente = Object.entries(S.prog).some(([sec, o]) => Object.entries(o).some(([k, v]) => (v.t || 0) > (((rem || {})[sec] || {})[k]?.t || 0)));
+      if (rem) { S.prog = mezclar(S.prog, rem); guardarLocal(); }
       reinicioExamen();
+      if (pendiente) await subirProgreso();
       const c = await leerArchivo('data/curso.enc'); S.remoto.shaCurso = c.sha;
       if (c.sobre) { const nuevo = await masNuevo(pass, [c.sobre]); if ((nuevo.generado || '') > (S.curso.generado || '')) { novedades(S.curso, nuevo); S.curso = nuevo; LS.set('doodle-curso', c.sobre); } }
       estadoSync('Sincronizado', 'si'); render();
@@ -417,7 +421,7 @@ function pintarEstado() {
   const ok = !g ? 'no' : Date.now() - Date.parse(g) < 12 * 3600e3 ? 'si' : 'ambar';
   const html = `
     <span class="punto" data-ok="${S.sincronizando ? 'ambar' : ok}">${esc(S.sync || (g ? 'Aules ' + hace(Date.parse(g)) : S.aules ? 'Sin datos de Aules' : 'Aules sin conectar'))}</span>
-    ${S.pat ? `<span class="punto" data-ok="${esc(S.remoto.estado[1])}">${esc(S.remoto.estado[0] || 'GitHub')}</span>` : ''}
+    ${S.pat ? `<span class="punto" data-ok="${esc(S.remoto.estado[1])}">${esc(S.remoto.estado[0] || 'GitHub')}</span>` : S.pass && !S.demo ? '<a class="punto" data-ok="no" href="#ajustes" title="Tu progreso no sale de este equipo. Pon la clave de GitHub en Ajustes para verlo en los demás.">Solo en este equipo</a>' : ''}
     ${S.aules ? `<button class="boton mini" data-acc="sync" ${S.sincronizando ? 'disabled' : ''} title="Sincronizar con Aules">${icono('sync')}<span>Sincronizar</span></button>` : ''}`;
   for (const id of ['estado-pc', 'estado-movil']) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
 }
